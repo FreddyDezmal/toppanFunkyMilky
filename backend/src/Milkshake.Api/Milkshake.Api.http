@@ -1,0 +1,6 @@
+@Milkshake.Api_HostAddress = http://localhost:5217
+
+GET {{Milkshake.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="backend/src/Milkshake.Api/Milkshake.Api.csproj" />
+    <Project Path="backend/src/Milkshake.Application/Milkshake.Application.csproj" />
+    <Project Path="backend/src/Milkshake.Domain/Milkshake.Domain.csproj" />
+    <Project Path="backend/src/Milkshake.Infrastructure/Milkshake.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="backend/tests/Milkshake.IntegrationTests/Milkshake.IntegrationTests.csproj" />
+    <Project Path="backend/tests/Milkshake.UnitTests/Milkshake.UnitTests.csproj" />
+  </Folder>
+</Solution>
