@@ -1,13 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Milkshake.Api;
 using Milkshake.Api.Contracts;
+using Milkshake.IntegrationTests.Infrastructure;
 
 namespace Milkshake.IntegrationTests;
 
-public sealed class HealthEndpointTests(WebApplicationFactory<ApiAssemblyMarker> factory)
-    : IClassFixture<WebApplicationFactory<ApiAssemblyMarker>>
+public sealed class HealthEndpointTests(MilkshakeApiFactory factory) : IClassFixture<MilkshakeApiFactory>
 {
     [Fact]
     public async Task GetHealth_ReturnsOkWithHealthySelfCheck()

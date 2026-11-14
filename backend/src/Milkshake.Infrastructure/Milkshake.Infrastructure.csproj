@@ -9,6 +9,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Milkshake.Application\Milkshake.Application.csproj" />
     <ProjectReference Include="..\Milkshake.Domain\Milkshake.Domain.csproj" />
   </ItemGroup>
