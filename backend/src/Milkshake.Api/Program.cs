@@ -5,6 +5,8 @@ using Milkshake.Application.Abstractions;
 using Milkshake.Infrastructure;
 using Scalar.AspNetCore;
 
+const string FrontendCorsPolicy = "Frontend";
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ---- Services ------------------------------------------------------------
@@ -14,6 +16,17 @@ builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Only origins listed in configuration may call the API from a browser.
+// Development allows the Vite dev server; production allows none until a real domain is configured.
+string[] allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+builder.Services.AddCors(options => options.AddPolicy(FrontendCorsPolicy, policy =>
+{
+    if (allowedOrigins.Length > 0)
+    {
+        policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
+    }
+}));
 
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
@@ -36,6 +49,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors(FrontendCorsPolicy);
 app.UseAuthorization();
 
 app.MapControllers();
