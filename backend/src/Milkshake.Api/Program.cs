@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Milkshake.Api.Services;
 using Milkshake.Application;
+using Milkshake.Application.Abstractions;
 using Milkshake.Infrastructure;
 using Scalar.AspNetCore;
 
@@ -7,6 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // ---- Services ------------------------------------------------------------
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);

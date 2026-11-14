@@ -1,14 +1,18 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Milkshake.Application.Abstractions;
 using Milkshake.Infrastructure.Persistence;
+using Milkshake.Infrastructure.Persistence.Auditing;
+using Milkshake.Infrastructure.Persistence.Seeding;
 using Npgsql;
 
 namespace Milkshake.Infrastructure;
 
 /// <summary>
-/// Registers infrastructure services: persistence, identity stores, email and payment clients.
+/// Registers infrastructure services: persistence, auditing, seeding, identity stores, email and payment clients.
 /// </summary>
 public static class DependencyInjection
 {
@@ -32,14 +36,29 @@ public static class DependencyInjection
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
+        // Fallbacks for hosts without an HTTP pipeline (the API registers its own ICurrentUser first).
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddScoped<ICurrentUser, SystemCurrentUser>();
+
+        services.AddScoped<AuditingSaveChangesInterceptor>();
+        services.AddOptions<SeedDataOptions>().Bind(configuration.GetSection(SeedDataOptions.SectionName));
+        services.AddScoped<DatabaseSeeder>();
+
         // The connection string is built when the DbContext is first created, not at startup,
         // so the app (and the test host) can start without a database configured.
-        services.AddDbContext<MilkshakeDbContext>(options =>
-            options.UseNpgsql(BuildConnectionString(configuration), npgsql =>
-            {
-                npgsql.MigrationsHistoryTable("__ef_migrations_history", MilkshakeDbContext.Schema);
-                npgsql.EnableRetryOnFailure(maxRetryCount: 3);
-            }));
+        services.AddDbContext<MilkshakeDbContext>((serviceProvider, options) =>
+            options
+                .UseNpgsql(BuildConnectionString(configuration), npgsql =>
+                {
+                    npgsql.MigrationsHistoryTable("__ef_migrations_history", MilkshakeDbContext.Schema);
+                    npgsql.EnableRetryOnFailure(maxRetryCount: 3);
+                })
+                .UseSnakeCaseNamingConvention()
+                .AddInterceptors(serviceProvider.GetRequiredService<AuditingSaveChangesInterceptor>())
+                .UseSeeding((context, _) =>
+                    serviceProvider.GetRequiredService<DatabaseSeeder>().Seed((MilkshakeDbContext)context))
+                .UseAsyncSeeding((context, _, cancellationToken) =>
+                    serviceProvider.GetRequiredService<DatabaseSeeder>().SeedAsync((MilkshakeDbContext)context, cancellationToken)));
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>(
