@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Milkshake.Api.Services;
 using Milkshake.Application;
@@ -17,16 +18,20 @@ builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// Only origins listed in configuration may call the API from a browser.
-// Development allows the Vite dev server; production allows none until a real domain is configured.
-string[] allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-builder.Services.AddCors(options => options.AddPolicy(FrontendCorsPolicy, policy =>
+// Only origins listed in configuration (Cors:AllowedOrigins) may call the API from a browser.
+// Read lazily through options so tests and environments can supply origins without code changes.
+builder.Services.AddCors();
+builder.Services.AddOptions<CorsOptions>().Configure<IConfiguration>((options, configuration) =>
 {
-    if (allowedOrigins.Length > 0)
+    string[] allowedOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+    options.AddPolicy(FrontendCorsPolicy, policy =>
     {
-        policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
-    }
-}));
+        if (allowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
+        }
+    });
+});
 
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
