@@ -18,7 +18,7 @@ The full-stack development foundation is in place and verified end to end: a Rea
 | Database | Supabase PostgreSQL, `milkshake` schema, 17 tables, initial migration applied, reference data seeded |
 | Frontend | React + TypeScript + Vite 8 + Tailwind CSS v4, live API/database status page |
 | Security | Secrets in .NET user secrets only, SSL to the database, Supabase Data API disabled, audit with secret redaction |
-| Tests | 7 domain unit tests, 3 API integration tests, 4 component tests, 1 Playwright end-to-end test |
+| Tests | 15 automated tests, all passing: 7 domain unit, 3 API integration, 4 component, 1 Playwright end-to-end |
 | Repository | Private GitHub repository, 8 commits, history scanned clean of secrets |
 
 ---
@@ -170,7 +170,7 @@ Also present: `EntityFrameworkHiLoSequence` (id generation) and `__ef_migrations
 | Suite | Scope | Result |
 | --- | --- | --- |
 | Backend unit (xUnit) | Price history and `Money` rules | 7 tests – passed (14 Nov) |
-| Backend integration (xUnit) | Health endpoint; CORS allowed/denied origins | 3 tests – health test passed; CORS tests added in Step 8 (confirm with `dotnet test`: expected 10 passed in total) |
+| Backend integration (xUnit) | Health endpoint; CORS allowed/denied origins | 3 passed (`dotnet test`: 10 of 10 backend tests passed, 14 Nov) |
 | Frontend component (Vitest 5.1) | Status card: healthy, unhealthy, unreachable, refresh | 4 passed |
 | End-to-end (Playwright, Chromium) | Browser → React → API → Supabase | 1 passed |
 | Build / lint | `tsc -b && vite build`, oxlint | Passed; 0 warnings, 0 errors |
