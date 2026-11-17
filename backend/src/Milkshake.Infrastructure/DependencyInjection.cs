@@ -1,3 +1,4 @@
+using Milkshake.Application.Accounts;
 using Microsoft.AspNetCore.Identity;
 using Milkshake.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -113,6 +114,8 @@ public static class DependencyInjection
         // role change or "sign out everywhere" takes effect quickly.
         services.Configure<SecurityStampValidatorOptions>(options =>
             options.ValidationInterval = TimeSpan.FromMinutes(5));
+
+        services.AddScoped<IAccountService, AccountService>();
     }
     private static string BuildConnectionString(IConfiguration configuration)
     {

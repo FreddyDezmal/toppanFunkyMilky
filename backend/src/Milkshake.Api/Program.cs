@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Identity;
@@ -79,7 +80,14 @@ builder.Services.AddOptions<CorsOptions>().Configure<IConfiguration>((options, c
     });
 });
 
-builder.Services.AddControllers(options => options.Filters.Add<ValidateCsrfTokenFilter>());
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<ValidateCsrfTokenFilter>();
+
+    // Validation errors use the JSON property names (camelCase) the frontend sends and displays.
+    options.ModelMetadataDetailsProviders.Add(new SystemTextJsonValidationMetadataProvider());
+});
+
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
