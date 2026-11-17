@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Milkshake.Api.Contracts;
@@ -7,6 +8,7 @@ namespace Milkshake.Api.Controllers;
 /// <summary>
 /// Reports whether the API and its dependencies are available.
 /// </summary>
+[AllowAnonymous]
 [ApiController]
 [Route("api/health")]
 [Produces("application/json")]

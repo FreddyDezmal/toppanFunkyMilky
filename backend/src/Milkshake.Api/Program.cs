@@ -1,8 +1,12 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Milkshake.Api.Security;
 using Milkshake.Api.Services;
 using Milkshake.Application;
 using Milkshake.Application.Abstractions;
+using Milkshake.Domain.Users;
 using Milkshake.Infrastructure;
 using Scalar.AspNetCore;
 
@@ -18,6 +22,48 @@ builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// ---- Authentication: ASP.NET Core Identity session cookie ----------------
+builder.Services
+    .AddAuthentication(IdentityConstants.ApplicationScheme)
+    .AddIdentityCookies();
+
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.Name = "milkshake.session";
+    options.Cookie.HttpOnly = true;                           // not readable by JavaScript (XSS protection)
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;  // HTTPS only
+    options.Cookie.SameSite = SameSiteMode.Strict;            // never sent on cross-site requests
+    options.ExpireTimeSpan = TimeSpan.FromHours(2);
+    options.SlidingExpiration = true;                         // activity extends the session
+
+    // This is a JSON API: answer 401/403 instead of redirecting to a login page.
+    options.Events.OnRedirectToLogin = context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return Task.CompletedTask;
+    };
+    options.Events.OnRedirectToAccessDenied = context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Task.CompletedTask;
+    };
+});
+
+// ---- Authorization: everything requires a signed-in user unless marked [AllowAnonymous] ----
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
+    .AddPolicy(AuthorizationPolicies.ManagerOnly, policy => policy.RequireRole(Roles.Manager));
+
+// ---- CSRF protection for cookie sessions ---------------------------------
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-XSRF-TOKEN";
+    options.Cookie.Name = "milkshake.antiforgery";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+});
+
 // Only origins listed in configuration (Cors:AllowedOrigins) may call the API from a browser.
 // Read lazily through options so tests and environments can supply origins without code changes.
 builder.Services.AddCors();
@@ -28,12 +74,12 @@ builder.Services.AddOptions<CorsOptions>().Configure<IConfiguration>((options, c
     {
         if (allowedOrigins.Length > 0)
         {
-            policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
+            policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
         }
     });
 });
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options => options.Filters.Add<ValidateCsrfTokenFilter>());
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
@@ -49,13 +95,14 @@ app.UseStatusCodePages();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();              // OpenAPI document: /openapi/v1.json
-    app.MapScalarApiReference();   // Interactive API docs: /scalar
+    app.MapOpenApi().AllowAnonymous();              // OpenAPI document: /openapi/v1.json
+    app.MapScalarApiReference().AllowAnonymous();   // Interactive API docs: /scalar
 }
 
 app.UseHttpsRedirection();
 app.UseCors(FrontendCorsPolicy);
-app.UseAuthorization();
+app.UseAuthentication();   // who is calling (reads the session cookie)
+app.UseAuthorization();    // what they may do (policies, roles)
 
 app.MapControllers();
 

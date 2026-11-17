@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Identity;
+using Milkshake.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -59,7 +61,8 @@ public static class DependencyInjection
                     serviceProvider.GetRequiredService<DatabaseSeeder>().Seed((MilkshakeDbContext)context))
                 .UseAsyncSeeding((context, _, cancellationToken) =>
                     serviceProvider.GetRequiredService<DatabaseSeeder>().SeedAsync((MilkshakeDbContext)context, cancellationToken)));
-
+                    
+        AddIdentityServices(services);
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>(
                 name: "database",
@@ -74,6 +77,43 @@ public static class DependencyInjection
     /// Combines the password-free connection string with the separately stored password.
     /// NpgsqlConnectionStringBuilder escapes every value correctly, whatever characters the password contains.
     /// </summary>
+    
+        /// <summary>
+    /// Registers ASP.NET Core Identity (users, roles, password hashing, lockout, sign-in) on the existing tables.
+    /// </summary>
+    private static void AddIdentityServices(IServiceCollection services)
+    {
+        services
+            .AddIdentityCore<ApplicationUser>(options =>
+            {
+                // One account per email address; the email is also the user name.
+                options.User.RequireUniqueEmail = true;
+
+                // URS example screen: at least 8 characters. Composition rules are a project recommendation.
+                options.Password.RequiredLength = 8;
+                options.Password.RequireDigit = true;
+                options.Password.RequireLowercase = true;
+                options.Password.RequireUppercase = true;
+                options.Password.RequireNonAlphanumeric = false;
+
+                // Brute-force protection: 5 wrong passwords lock the account for 15 minutes.
+                options.Lockout.AllowedForNewUsers = true;
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+
+                // Email confirmation arrives with the email milestone (M9).
+                options.SignIn.RequireConfirmedAccount = false;
+            })
+            .AddRoles<ApplicationRole>()
+            .AddEntityFrameworkStores<MilkshakeDbContext>()
+            .AddSignInManager()
+            .AddDefaultTokenProviders();
+
+        // Sessions are re-checked against the database every 5 minutes, so a password change,
+        // role change or "sign out everywhere" takes effect quickly.
+        services.Configure<SecurityStampValidatorOptions>(options =>
+            options.ValidationInterval = TimeSpan.FromMinutes(5));
+    }
     private static string BuildConnectionString(IConfiguration configuration)
     {
         string baseConnectionString = configuration.GetConnectionString(ConnectionStringName)

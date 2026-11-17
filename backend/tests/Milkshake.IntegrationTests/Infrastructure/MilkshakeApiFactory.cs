@@ -31,4 +31,10 @@ public sealed class MilkshakeApiFactory : WebApplicationFactory<ApiAssemblyMarke
                 }
             }));
     }
+
+    /// <summary>
+    /// Client that talks to the in-memory API over https, so Secure cookies are issued and sent back.
+    /// </summary>
+    public HttpClient CreateHttpsClient() =>
+        CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
 }
