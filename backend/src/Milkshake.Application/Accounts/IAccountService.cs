@@ -19,6 +19,16 @@ public interface IAccountService
 
     /// <summary>The user's own profile, or null if the account no longer exists.</summary>
     Task<UserProfile?> GetProfileAsync(Guid userId, CancellationToken cancellationToken);
+
+    
+    /// <summary>True if an account with this email exists.</summary>
+    Task<bool> AccountExistsAsync(string email, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Trusted, server-side provisioning (never exposed over HTTP): creates a manager account, or adds the
+    /// Manager role to an existing account. A password is required only when creating a new account.
+    /// </summary>
+    Task<ProvisionManagerResult> ProvisionManagerAsync(ProvisionManagerCommand command, CancellationToken cancellationToken);
 }
 
 /// <summary>Data needed to register a patron (URS §3.1).</summary>
@@ -72,4 +82,34 @@ public static class LoginMessages
     /// <summary>The single message for every sign-in failure.</summary>
     public const string Failed =
         "Incorrect email or password, or the account is temporarily locked. Please try again later.";
+}
+
+
+/// <summary>Data for creating or promoting a manager account.</summary>
+public sealed record ProvisionManagerCommand(string Email, string FirstName, string? Password);
+
+/// <summary>What provisioning did.</summary>
+public enum ProvisionManagerOutcome
+{
+    /// <summary>A new manager account was created.</summary>
+    Created,
+
+    /// <summary>An existing account was given the Manager role.</summary>
+    Promoted,
+
+    /// <summary>The account already had the Manager role; nothing changed.</summary>
+    AlreadyManager,
+
+    /// <summary>Nothing was changed; see the errors.</summary>
+    Failed,
+}
+
+/// <summary>Outcome of manager provisioning.</summary>
+public sealed record ProvisionManagerResult(ProvisionManagerOutcome Outcome, IReadOnlyList<string> Errors)
+{
+    /// <summary>True unless provisioning failed.</summary>
+    public bool Succeeded => Outcome != ProvisionManagerOutcome.Failed;
+
+    /// <summary>Creates a failed result.</summary>
+    public static ProvisionManagerResult Failure(params string[] errors) => new(ProvisionManagerOutcome.Failed, errors);
 }

@@ -1,3 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 using Milkshake.Api.Contracts.Auth;
@@ -39,5 +43,24 @@ public sealed class SecurityPipelineTests(MilkshakeApiFactory factory) : IClassF
         Assert.Contains("httponly", cookie, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("secure", cookie, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("samesite=strict", cookie, StringComparison.OrdinalIgnoreCase);
+    }
+
+    
+    [Fact]
+    public void OnlyLoginAndRegisterAcceptAnonymousStateChangingRequests()
+    {
+        EndpointDataSource endpoints = factory.Services.GetRequiredService<EndpointDataSource>();
+
+        string[] anonymousWrites = endpoints.Endpoints
+            .OfType<RouteEndpoint>()
+            .Where(endpoint => endpoint.Metadata.GetMetadata<IAllowAnonymous>() is not null)
+            .Where(endpoint => endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods
+                .Any(method => !HttpMethods.IsGet(method) && !HttpMethods.IsHead(method)) == true)
+            .Select(endpoint => endpoint.RoutePattern.RawText ?? string.Empty)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        // Anything else here would be an unauthenticated way to change data - for example a manager sign-up.
+        Assert.Equal(new[] { "api/auth/login", "api/auth/register" }, anonymousWrites);
     }
 }

@@ -142,6 +142,92 @@ internal sealed partial class AccountService(
         return user is null ? null : await ToProfileAsync(user);
     }
 
+        public async Task<bool> AccountExistsAsync(string email, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        return await userManager.FindByEmailAsync(email.Trim()) is not null;
+    }
+
+    public async Task<ProvisionManagerResult> ProvisionManagerAsync(ProvisionManagerCommand command, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        string email = command.Email.Trim();
+        ApplicationUser? user = await userManager.FindByEmailAsync(email);
+        ProvisionManagerOutcome outcome;
+
+        if (user is null)
+        {
+            if (string.IsNullOrEmpty(command.Password))
+            {
+                return ProvisionManagerResult.Failure("A password is required to create a new manager account.");
+            }
+
+            if (string.IsNullOrWhiteSpace(command.FirstName))
+            {
+                return ProvisionManagerResult.Failure("A first name is required to create a new manager account.");
+            }
+
+            // User + role in one transaction, as for registration.
+            ApplicationUser? created = null;
+            IExecutionStrategy strategy = dbContext.Database.CreateExecutionStrategy();
+            string[] errors = await strategy.ExecuteAsync(
+                async ct =>
+                {
+                    dbContext.ChangeTracker.Clear();
+                    await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(ct);
+
+                    var candidate = new ApplicationUser { UserName = email, Email = email, FirstName = command.FirstName.Trim() };
+
+                    IdentityResult createResult = await userManager.CreateAsync(candidate, command.Password);
+                    if (!createResult.Succeeded)
+                    {
+                        return createResult.Errors.Select(e => e.Description).ToArray();
+                    }
+
+                    IdentityResult roleResult = await userManager.AddToRoleAsync(candidate, Roles.Manager);
+                    if (!roleResult.Succeeded)
+                    {
+                        return roleResult.Errors.Select(e => e.Description).ToArray();
+                    }
+
+                    await transaction.CommitAsync(ct);
+                    created = candidate;
+                    return Array.Empty<string>();
+                },
+                cancellationToken);
+
+            if (created is null)
+            {
+                return ProvisionManagerResult.Failure(errors);
+            }
+
+            user = created;
+            outcome = ProvisionManagerOutcome.Created;
+        }
+        else if (await userManager.IsInRoleAsync(user, Roles.Manager))
+        {
+            return new ProvisionManagerResult(ProvisionManagerOutcome.AlreadyManager, []);
+        }
+        else
+        {
+            IdentityResult roleResult = await userManager.AddToRoleAsync(user, Roles.Manager);
+            if (!roleResult.Succeeded)
+            {
+                return ProvisionManagerResult.Failure(roleResult.Errors.Select(e => e.Description).ToArray());
+            }
+
+            // The account's existing sessions are re-validated and pick up the new role promptly.
+            await userManager.UpdateSecurityStampAsync(user);
+            outcome = ProvisionManagerOutcome.Promoted;
+        }
+
+        await securityEvents.RecordAsync(SecurityEventType.ManagerProvisioned, user.Id, user.Email, cancellationToken);
+        LogManagerProvisioned(logger, user.Id, outcome);
+
+        return new ProvisionManagerResult(outcome, []);
+    }
+
     private async Task<UserProfile> ToProfileAsync(ApplicationUser user)
     {
         IList<string> roles = await userManager.GetRolesAsync(user);
@@ -192,4 +278,8 @@ internal sealed partial class AccountService(
     // Only the user id is logged: never the password, and not the email (personal data).
     [LoggerMessage(Level = LogLevel.Information, Message = "Patron account {UserId} registered.")]
     private static partial void LogPatronRegistered(ILogger logger, Guid userId);
+
+    
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Manager account {UserId} provisioned ({Outcome}).")]
+    private static partial void LogManagerProvisioned(ILogger logger, Guid userId, ProvisionManagerOutcome outcome);
 }

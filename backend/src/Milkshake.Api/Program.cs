@@ -1,3 +1,4 @@
+using Milkshake.Api.Cli;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
@@ -116,6 +117,15 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+
+// Administrative command: create or promote a manager account, then exit (the web server is not started).
+if (ManagerProvisioningCli.IsInvoked(args))
+{
+    int exitCode = await ManagerProvisioningCli.RunAsync(app.Services, args);
+    await app.DisposeAsync();
+    return exitCode;
+}
+
 // ---- HTTP pipeline -------------------------------------------------------
 // Unhandled exceptions become RFC 9457 ProblemDetails JSON; no stack traces reach the client.
 app.UseExceptionHandler();
@@ -135,4 +145,5 @@ app.UseAuthorization();    // what they may do (policies, roles)
 
 app.MapControllers();
 
-app.Run();
+await app.RunAsync();
+return 0;
