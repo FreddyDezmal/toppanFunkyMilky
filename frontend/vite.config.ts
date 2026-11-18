@@ -21,6 +21,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // Threads start much faster than child processes on Windows and avoid worker start-up timeouts.
+    pool: 'threads',
     // Unit and component tests only; Playwright end-to-end tests live in /e2e.
     include: ['src/**/*.test.{ts,tsx}'],
   },

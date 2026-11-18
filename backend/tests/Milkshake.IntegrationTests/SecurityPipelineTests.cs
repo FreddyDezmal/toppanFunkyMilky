@@ -1,3 +1,6 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -62,5 +65,37 @@ public sealed class SecurityPipelineTests(MilkshakeApiFactory factory) : IClassF
 
         // Anything else here would be an unauthenticated way to change data - for example a manager sign-up.
         Assert.Equal(new[] { "api/auth/login", "api/auth/register" }, anonymousWrites);
+    }
+
+    
+    [Fact]
+    public void SessionCookie_IsHttpOnlySecureStrictAndExpiresAfterTwoIdleHours()
+    {
+        CookieAuthenticationOptions options = factory.Services
+            .GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
+            .Get(IdentityConstants.ApplicationScheme);
+
+        Assert.Equal("milkshake.session", options.Cookie.Name);
+        Assert.True(options.Cookie.HttpOnly);
+        Assert.Equal(CookieSecurePolicy.Always, options.Cookie.SecurePolicy);
+        Assert.Equal(SameSiteMode.Strict, options.Cookie.SameSite);
+        Assert.Equal(TimeSpan.FromHours(2), options.ExpireTimeSpan);
+        Assert.True(options.SlidingExpiration);
+    }
+
+    [Fact]
+    public void IdentityPolicy_MatchesTheAgreedPasswordLockoutAndSessionRules()
+    {
+        IdentityOptions identity = factory.Services.GetRequiredService<IOptions<IdentityOptions>>().Value;
+        SecurityStampValidatorOptions stamp = factory.Services.GetRequiredService<IOptions<SecurityStampValidatorOptions>>().Value;
+
+        Assert.Equal(8, identity.Password.RequiredLength);
+        Assert.True(identity.Password.RequireDigit);
+        Assert.True(identity.Password.RequireLowercase);
+        Assert.True(identity.Password.RequireUppercase);
+        Assert.True(identity.User.RequireUniqueEmail);
+        Assert.Equal(5, identity.Lockout.MaxFailedAccessAttempts);
+        Assert.Equal(TimeSpan.FromMinutes(15), identity.Lockout.DefaultLockoutTimeSpan);
+        Assert.Equal(TimeSpan.FromMinutes(5), stamp.ValidationInterval);
     }
 }
