@@ -21,11 +21,11 @@ public sealed class Topping : CatalogItem
     public IReadOnlyCollection<ToppingPrice> Prices => _prices;
 
     /// <summary>Schedules a new price; the current price ends when it starts.</summary>
-    public ToppingPrice SetPrice(Money price, DateTimeOffset effectiveFrom) =>
+    public override ToppingPrice SetPrice(Money price, DateTimeOffset effectiveFrom) =>
         PriceSchedule.Add(_prices, new ToppingPrice(this, price, effectiveFrom));
 
     /// <summary>The price in force at a moment, or null if none.</summary>
-    public Money? PriceAt(DateTimeOffset moment) => PriceSchedule.PriceAt(_prices, moment);
+    public override Money? PriceAt(DateTimeOffset moment) => PriceSchedule.PriceAt(_prices, moment);
 }
 
 /// <summary>One period of a topping's price.</summary>

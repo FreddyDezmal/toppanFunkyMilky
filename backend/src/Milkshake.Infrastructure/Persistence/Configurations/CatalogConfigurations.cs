@@ -16,7 +16,8 @@ internal abstract class CatalogItemConfiguration<TItem>(string tableName) : IEnt
         builder.ToTable(tableName);
         builder.HasKey(item => item.Id);
         builder.Property(item => item.Name).HasMaxLength(CatalogItem.NameMaxLength).IsRequired();
-        builder.HasIndex(item => item.Name).IsUnique();
+        // Names are unique ignoring letter case: a unique index on lower(name), created with SQL in the
+        // CaseInsensitiveNamesAndRowVersions migration (EF Core cannot express expression indexes).
 
         ConfigurePrices(builder);
     }

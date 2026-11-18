@@ -16,7 +16,8 @@ internal sealed class RestaurantConfiguration : IEntityTypeConfiguration<Restaur
         builder.HasKey(r => r.Id);
         builder.Property(r => r.Name).HasMaxLength(Restaurant.NameMaxLength).IsRequired();
         builder.Property(r => r.Address).HasMaxLength(Restaurant.AddressMaxLength);
-        builder.HasIndex(r => r.Name).IsUnique();
+        // Names are unique ignoring letter case: a unique index on lower(name), created with SQL in the
+        // CaseInsensitiveNamesAndRowVersions migration (EF Core cannot express expression indexes).
     }
 }
 

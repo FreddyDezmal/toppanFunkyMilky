@@ -22,6 +22,9 @@ internal sealed class AuditingSaveChangesInterceptor(TimeProvider timeProvider, 
     private const string RedactedValue = "***";
     private const string CreatedAtColumn = "created_at";
     private const string UpdatedAtColumn = "updated_at";
+    
+    // PostgreSQL row version (optimistic concurrency): changes on every write and is not business data.
+    private const string RowVersionColumn = "xmin";
 
     // Secrets that must never be written to the audit trail in clear text.
     private static readonly HashSet<string> SensitiveColumns = new(StringComparer.Ordinal)
@@ -118,7 +121,7 @@ internal sealed class AuditingSaveChangesInterceptor(TimeProvider timeProvider, 
         foreach (PropertyEntry property in AllProperties(entry))
         {
             string column = property.Metadata.GetColumnName();
-            if (column is CreatedAtColumn or UpdatedAtColumn)
+            if (column is CreatedAtColumn or UpdatedAtColumn or RowVersionColumn)
             {
                 continue;
             }

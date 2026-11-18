@@ -21,11 +21,11 @@ public sealed class Consistency : CatalogItem
     public IReadOnlyCollection<ConsistencyPrice> Prices => _prices;
 
     /// <summary>Schedules a new price; the current price ends when it starts.</summary>
-    public ConsistencyPrice SetPrice(Money price, DateTimeOffset effectiveFrom) =>
+    public override ConsistencyPrice SetPrice(Money price, DateTimeOffset effectiveFrom) =>
         PriceSchedule.Add(_prices, new ConsistencyPrice(this, price, effectiveFrom));
 
     /// <summary>The price in force at a moment, or null if none.</summary>
-    public Money? PriceAt(DateTimeOffset moment) => PriceSchedule.PriceAt(_prices, moment);
+    public override Money? PriceAt(DateTimeOffset moment) => PriceSchedule.PriceAt(_prices, moment);
 }
 
 /// <summary>One period of a consistency's price.</summary>

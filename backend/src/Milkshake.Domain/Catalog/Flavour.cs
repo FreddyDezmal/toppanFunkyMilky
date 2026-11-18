@@ -21,11 +21,11 @@ public sealed class Flavour : CatalogItem
     public IReadOnlyCollection<FlavourPrice> Prices => _prices;
 
     /// <summary>Schedules a new price; the current price ends when it starts.</summary>
-    public FlavourPrice SetPrice(Money price, DateTimeOffset effectiveFrom) =>
+    public override FlavourPrice SetPrice(Money price, DateTimeOffset effectiveFrom) =>
         PriceSchedule.Add(_prices, new FlavourPrice(this, price, effectiveFrom));
 
     /// <summary>The price in force at a moment, or null if none.</summary>
-    public Money? PriceAt(DateTimeOffset moment) => PriceSchedule.PriceAt(_prices, moment);
+    public override Money? PriceAt(DateTimeOffset moment) => PriceSchedule.PriceAt(_prices, moment);
 }
 
 /// <summary>One period of a flavour's price.</summary>

@@ -6,7 +6,7 @@ namespace Milkshake.Domain.Catalog;
 /// Shared shape of a selectable milkshake option (flavour, topping, consistency).
 /// Items are deactivated, never deleted, so historical orders keep valid references.
 /// </summary>
-public abstract class CatalogItem : IHasTimestamps
+public abstract class CatalogItem : IHasTimestamps, IHasRowVersion
 {
     /// <summary>Maximum length of an item name.</summary>
     public const int NameMaxLength = 100;
@@ -42,6 +42,9 @@ public abstract class CatalogItem : IHasTimestamps
     /// <inheritdoc />
     public DateTimeOffset UpdatedAt { get; set; }
 
+    /// <inheritdoc />
+    public uint Version { get; private set; }
+
     /// <summary>Changes the display name.</summary>
     public void Rename(string name)
     {
@@ -67,4 +70,10 @@ public abstract class CatalogItem : IHasTimestamps
 
     /// <summary>Makes the item available for new orders again.</summary>
     public void Activate() => IsActive = true;
+
+    /// <summary>Schedules a new price; the current price ends when it starts.</summary>
+    public abstract PricePeriod SetPrice(Money price, DateTimeOffset effectiveFrom);
+
+    /// <summary>The price in force at a moment, or null if none.</summary>
+    public abstract Money? PriceAt(DateTimeOffset moment);
 }

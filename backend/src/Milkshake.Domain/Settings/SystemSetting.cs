@@ -23,7 +23,7 @@ public enum SettingValueType
 /// A management-configurable value (URS §3.4.6), e.g. maximum drinks per order or the VAT rate.
 /// Values are stored as invariant-culture text and validated against <see cref="ValueType"/>.
 /// </summary>
-public sealed class SystemSetting : IHasTimestamps
+public sealed class SystemSetting : IHasTimestamps, IHasRowVersion
 {
     /// <summary>Maximum key length.</summary>
     public const int KeyMaxLength = 100;
@@ -70,6 +70,9 @@ public sealed class SystemSetting : IHasTimestamps
 
     /// <inheritdoc />
     public DateTimeOffset UpdatedAt { get; set; }
+    
+    /// <inheritdoc />
+    public uint Version { get; private set; }
 
     /// <summary>Changes the value after validating it against the setting's type.</summary>
     public void ChangeValue(string value)

@@ -1,3 +1,5 @@
+using Milkshake.Application.Management;
+using Milkshake.Infrastructure.Management;
 using Milkshake.Application.Accounts;
 using Microsoft.AspNetCore.Identity;
 using Milkshake.Infrastructure.Identity;
@@ -64,6 +66,8 @@ public static class DependencyInjection
                     serviceProvider.GetRequiredService<DatabaseSeeder>().SeedAsync((MilkshakeDbContext)context, cancellationToken)));
                     
         AddIdentityServices(services);
+        services.AddScoped<ICatalogManagementService, CatalogManagementService>();
+        services.AddScoped<IRestaurantManagementService, RestaurantManagementService>();
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>(
                 name: "database",

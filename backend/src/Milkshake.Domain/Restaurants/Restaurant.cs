@@ -3,7 +3,7 @@ using Milkshake.Domain.Common;
 namespace Milkshake.Domain.Restaurants;
 
 /// <summary>A pickup location (URS §3.1). Deactivated rather than deleted.</summary>
-public sealed class Restaurant : IHasTimestamps
+public sealed class Restaurant : IHasTimestamps, IHasRowVersion
 {
     /// <summary>Maximum length of a restaurant name.</summary>
     public const int NameMaxLength = 100;
@@ -40,6 +40,9 @@ public sealed class Restaurant : IHasTimestamps
 
     /// <inheritdoc />
     public DateTimeOffset UpdatedAt { get; set; }
+    
+    /// <inheritdoc />
+    public uint Version { get; private set; }
 
     /// <summary>Changes the display name.</summary>
     public void Rename(string name)

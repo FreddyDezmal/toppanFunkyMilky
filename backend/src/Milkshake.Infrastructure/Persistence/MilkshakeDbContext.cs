@@ -1,3 +1,4 @@
+using Milkshake.Domain.Common;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Milkshake.Domain.Auditing;
@@ -67,5 +68,20 @@ public sealed class MilkshakeDbContext(DbContextOptions<MilkshakeDbContext> opti
         builder.UseHiLo();
 
         builder.ApplyConfigurationsFromAssembly(typeof(MilkshakeDbContext).Assembly);
+
+        // Optimistic concurrency: every IHasRowVersion entity's Version is PostgreSQL's built-in xmin system column.
+        // Every row already has it (no column is created) and it changes on every update, so EF Core adds
+        // "WHERE xmin = <version read>" to updates and reports a conflict when someone else saved first.
+        foreach (Type entityType in builder.Model.GetEntityTypes()
+                     .Select(type => type.ClrType)
+                     .Where(type => typeof(IHasRowVersion).IsAssignableFrom(type))
+                     .ToList())
+        {
+            builder.Entity(entityType)
+                .Property(nameof(IHasRowVersion.Version))
+                .IsRowVersion()
+                .HasColumnName("xmin")
+                .HasColumnType("xid");
+        }
     }
 }

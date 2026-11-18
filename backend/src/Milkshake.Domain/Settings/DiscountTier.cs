@@ -6,7 +6,7 @@ namespace Milkshake.Domain.Settings;
 /// One frequent-customer discount tier (URS §3.4.5). The discount rate per tier is not in the URS
 /// (open question Q-01), so tiers are seeded inactive until confirmed.
 /// </summary>
-public sealed class DiscountTier : IHasTimestamps
+public sealed class DiscountTier : IHasTimestamps, IHasRowVersion
 {
     /// <summary>Highest tier number defined by the URS.</summary>
     public const int MaxTierNumber = 3;
@@ -49,6 +49,9 @@ public sealed class DiscountTier : IHasTimestamps
 
     /// <inheritdoc />
     public DateTimeOffset UpdatedAt { get; set; }
+    
+    /// <inheritdoc />
+    public uint Version { get; private set; }
 
     /// <summary>Changes the tier's thresholds and rate.</summary>
     public void Update(int minPreviousOrders, int minDrinksPerOrder, decimal discountRate)
