@@ -17,7 +17,8 @@ managers maintain prices, lookups and discounts, and review reports and audit hi
 
 ## Prerequisites
 
-.NET SDK 10.0.4xx (pinned in `global.json`), Node.js 24+ LTS, Git, `dotnet-ef` 10.x (`dotnet tool install --global dotnet-ef`).
+.NET SDK 10.0.4xx (pinned in `global.json`), Node.js 24+ LTS, Git, `dotnet-ef` 10.x (`dotnet tool install --global dotnet-ef`),
+and **Docker Desktop** (backend integration tests run against a throwaway PostgreSQL container).
 
 ## First-time setup
 
@@ -42,9 +43,21 @@ managers maintain prices, lookups and discounts, and review reports and audit hi
    dotnet ef database update --project backend/src/Milkshake.Infrastructure --startup-project backend/src/Milkshake.Api
    ```
 
-3. **Frontend configuration:** copy `frontend/.env.example` to `frontend/.env.development.local`.
+3. **Frontend configuration:** copy `frontend/.env.example` to `frontend/.env.development.local` and leave
+   `VITE_API_BASE_URL` empty. The app then calls `/api` on its own origin and Vite forwards it to the API
+   (required for the `SameSite=Strict` session cookie).
 
 4. **HTTPS development certificate:** `dotnet dev-certs https --trust`
+
+5. **A manager account** (there is deliberately no sign-up page or endpoint for managers). With the API stopped:
+
+   ```powershell
+   dotnet run --project backend/src/Milkshake.Api --launch-profile https -- provision-manager --email <email> --first-name <name>
+   ```
+
+   The password is entered twice at a hidden prompt (or, for unattended set-up only, read from the
+   `MILKSHAKE_MANAGER_PASSWORD` environment variable). Running it for an existing account adds the Manager role
+   without changing its password. In production: `dotnet Milkshake.Api.dll provision-manager ...` on the server.
 
 ## Run locally
 
@@ -52,7 +65,7 @@ managers maintain prices, lookups and discounts, and review reports and audit hi
 # Terminal 1 - API (https://localhost:7298, docs at /scalar)
 dotnet run --project backend/src/Milkshake.Api --launch-profile https
 
-# Terminal 2 - frontend (http://localhost:5173)
+# Terminal 2 - frontend (http://localhost:5173; /api is proxied to the API)
 cd frontend
 npm install
 npm run dev
@@ -61,10 +74,11 @@ npm run dev
 ## Tests
 
 ```powershell
-dotnet test Milkshake.slnx          # backend unit + integration tests (no database needed)
+dotnet test Milkshake.slnx          # backend unit + integration tests (Docker must be running; Supabase is never touched)
 cd frontend
-npm test                            # component tests
-npm run test:e2e                    # end-to-end smoke test (starts API + frontend; needs database secrets)
+npm test                            # component tests (Vitest)
+npm run test:e2e                    # end-to-end tests against the real stack (needs database secrets;
+                                    # creates one e2e-...@example.test patron per run in the dev database)
 ```
 
 ## Repository layout
@@ -79,8 +93,29 @@ frontend/                             React application
 docs/                                 roadmap and working notes
 ```
 
+## Authentication
+
+| Endpoint | Access | Purpose |
+| --- | --- | --- |
+| `GET /api/auth/csrf` | anyone | anti-forgery token for state-changing requests |
+| `POST /api/auth/register` | anyone | creates a **Patron** and signs them in (role assigned by the server) |
+| `POST /api/auth/login` | anyone | email + password; sets the session cookie |
+| `POST /api/auth/logout` | signed in | ends the session and invalidates the user's other sessions |
+| `GET /api/auth/me` | signed in | id, first name, email, mobile number, roles |
+| `GET /api/manager/ping` | Manager | role-enforcement probe until management features arrive |
+
+- Session: ASP.NET Core Identity cookie `milkshake.session` (HttpOnly, Secure, SameSite=Strict, 2-hour sliding expiry).
+  Nothing is stored in browser storage; React asks `/api/auth/me` who is signed in.
+- Every POST/PUT/PATCH/DELETE needs the `X-XSRF-TOKEN` header; the frontend HTTP client handles this.
+- Endpoints require a signed-in user unless explicitly marked `[AllowAnonymous]`.
+- 5 wrong passwords lock an account for 15 minutes; every sign-in failure returns the same message.
+- Login and registration are limited to 10 requests per minute per IP (`RateLimiting:AuthPermitLimit`).
+- Sign-ins, failures, lockouts, logouts and manager provisioning are recorded in `milkshake.security_events`.
+
 ## Security notes
 
 - Secrets live in user secrets (development) or environment variables / a secrets store (production), never in Git.
 - Frontend `VITE_` variables are public by design: never put secrets in them.
-- Every data change is recorded in `milkshake.audit_logs` in the same transaction as the change.
+- Every data change is recorded in `milkshake.audit_logs` in the same transaction as the change; password hashes,
+  security stamps and tokens are stored only as `***`.
+- Passwords are never logged (verified by an automated test that searches every log line).
