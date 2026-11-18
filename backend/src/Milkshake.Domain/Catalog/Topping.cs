@@ -20,12 +20,19 @@ public sealed class Topping : CatalogItem
     /// <summary>Full price history.</summary>
     public IReadOnlyCollection<ToppingPrice> Prices => _prices;
 
-    /// <summary>Schedules a new price; the current price ends when it starts.</summary>
+    /// <inheritdoc />
     public override ToppingPrice SetPrice(Money price, DateTimeOffset effectiveFrom) =>
         PriceSchedule.Add(_prices, new ToppingPrice(this, price, effectiveFrom));
 
-    /// <summary>The price in force at a moment, or null if none.</summary>
+    /// <inheritdoc />
     public override Money? PriceAt(DateTimeOffset moment) => PriceSchedule.PriceAt(_prices, moment);
+
+    /// <inheritdoc />
+    public override ToppingPrice CancelLatestScheduledPrice(DateTimeOffset now) =>
+        PriceSchedule.CancelLatestScheduled(_prices, now);
+
+    /// <inheritdoc />
+    public override IReadOnlyList<PricePeriod> GetPriceHistory() => PriceSchedule.History(_prices);
 }
 
 /// <summary>One period of a topping's price.</summary>

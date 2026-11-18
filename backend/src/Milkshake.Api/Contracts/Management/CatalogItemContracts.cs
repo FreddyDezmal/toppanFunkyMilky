@@ -4,6 +4,7 @@ using Milkshake.Application.Management;
 namespace Milkshake.Api.Contracts.Management;
 
 /// <summary>A flavour, topping or consistency. Send <see cref="Version"/> back with any change.</summary>
+/// <summary>A flavour, topping or consistency. Send <see cref="Version"/> back with any change.</summary>
 public sealed record CatalogItemResponse(
     int Id,
     string Name,
@@ -11,13 +12,16 @@ public sealed record CatalogItemResponse(
     bool IsActive,
     decimal? CurrentPrice,
     string? CurrencyCode,
+    decimal? ScheduledPrice,
+    DateTimeOffset? ScheduledFrom,
     uint Version)
 {
     /// <summary>Maps an application summary.</summary>
     public static CatalogItemResponse From(CatalogItemSummary item)
     {
         ArgumentNullException.ThrowIfNull(item);
-        return new(item.Id, item.Name, item.DisplayOrder, item.IsActive, item.CurrentPrice, item.CurrencyCode, item.Version);
+        return new(item.Id, item.Name, item.DisplayOrder, item.IsActive, item.CurrentPrice, item.CurrencyCode,
+            item.ScheduledPrice, item.ScheduledFrom, item.Version);
     }
 }
 

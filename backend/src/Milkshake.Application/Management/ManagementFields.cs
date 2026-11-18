@@ -14,4 +14,14 @@ public static class ManagementFields
 
     /// <summary>Restaurant address.</summary>
     public const string Address = "address";
+
+    
+    /// <summary>Price amount.</summary>
+    public const string Amount = "amount";
+
+    /// <summary>When a price starts.</summary>
+    public const string EffectiveFrom = "effectiveFrom";
+
+    /// <summary>A price period.</summary>
+    public const string PriceId = "priceId";
 }

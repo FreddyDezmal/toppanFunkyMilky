@@ -18,4 +18,9 @@ public static class ManagementMessages
     /// <summary>Duplicate name, e.g. "A flavour with this name already exists…".</summary>
     public static string DuplicateName(string label) =>
         $"A {label} with this name already exists. If it is inactive, reactivate it instead.";
+
+    
+    /// <summary>The price chosen for cancellation is no longer the latest future price.</summary>
+    public const string PriceNotCancellable =
+        "This price has taken effect or is no longer the latest scheduled price. Reload to see the current prices.";
 }

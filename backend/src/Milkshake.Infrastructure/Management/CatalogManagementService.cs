@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Milkshake.Application.Management;
 using Milkshake.Domain.Catalog;
 using Milkshake.Domain.Common;
-using Milkshake.Domain.Settings;
 using Milkshake.Infrastructure.Persistence;
 
 namespace Milkshake.Infrastructure.Management;
@@ -122,7 +121,7 @@ internal sealed class CatalogManagementService(MilkshakeDbContext dbContext, Tim
             return DuplicateName(kind);
         }
 
-        string currency = await GetPricingCurrencyAsync(cancellationToken);
+        string currency = await PricingCurrency.GetAsync(dbContext, cancellationToken);
 
         TItem item = create(name, command.DisplayOrder);
         item.SetPrice(new Money(command.InitialPrice, currency), timeProvider.GetUtcNow());
@@ -232,21 +231,21 @@ internal sealed class CatalogManagementService(MilkshakeDbContext dbContext, Tim
         return items.AnyAsync(item => item.Name.ToLower() == lowered && (exceptId == null || item.Id != exceptId), cancellationToken);
     }
 
-    private async Task<string> GetPricingCurrencyAsync(CancellationToken cancellationToken)
-    {
-        string? currency = await dbContext.SystemSettings.AsNoTracking()
-            .Where(setting => setting.Key == SettingKeys.CurrencyCode)
-            .Select(setting => setting.Value)
-            .SingleOrDefaultAsync(cancellationToken);
+    
 
-        return currency ?? throw new InvalidOperationException(
-            $"The '{SettingKeys.CurrencyCode}' setting is missing. Run the database seeder before adding catalogue items.");
-    }
-
-    private static CatalogItemSummary ToSummary(CatalogItem item, DateTimeOffset now)
+        /// <summary>Shared with the pricing service so both return the same item shape.</summary>
+    internal static CatalogItemSummary ToSummary(CatalogItem item, DateTimeOffset now)
     {
         Money? price = item.PriceAt(now);
-        return new CatalogItemSummary(item.Id, item.Name, item.DisplayOrder, item.IsActive, price?.Amount, price?.CurrencyCode, item.Version);
+        PricePeriod? next = item.GetPriceHistory()
+            .Where(period => period.EffectiveFrom > now)
+            .MinBy(period => period.EffectiveFrom);
+
+        return new CatalogItemSummary(
+            item.Id, item.Name, item.DisplayOrder, item.IsActive,
+            price?.Amount, price?.CurrencyCode,
+            next?.Price.Amount, next?.EffectiveFrom,
+            item.Version);
     }
 
     private static ManagementResult<CatalogItemSummary> DuplicateName(CatalogKind kind) =>

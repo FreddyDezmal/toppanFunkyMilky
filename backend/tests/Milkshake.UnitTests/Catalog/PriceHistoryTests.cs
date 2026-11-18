@@ -28,7 +28,7 @@ public sealed class PriceHistoryTests
         var flavour = new Flavour("Vanilla", displayOrder: 1);
         flavour.SetPrice(new Money(30.00m, "ZAR"), March);
 
-        Assert.Throws<InvalidOperationException>(() => flavour.SetPrice(new Money(25.00m, "ZAR"), January));
+        Assert.Throws<BusinessRuleException>(() => flavour.SetPrice(new Money(25.00m, "ZAR"), January));
     }
 
     [Fact]

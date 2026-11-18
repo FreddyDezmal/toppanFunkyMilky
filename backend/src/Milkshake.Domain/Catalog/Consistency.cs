@@ -20,12 +20,19 @@ public sealed class Consistency : CatalogItem
     /// <summary>Full price history.</summary>
     public IReadOnlyCollection<ConsistencyPrice> Prices => _prices;
 
-    /// <summary>Schedules a new price; the current price ends when it starts.</summary>
+    /// <inheritdoc />
     public override ConsistencyPrice SetPrice(Money price, DateTimeOffset effectiveFrom) =>
         PriceSchedule.Add(_prices, new ConsistencyPrice(this, price, effectiveFrom));
 
-    /// <summary>The price in force at a moment, or null if none.</summary>
+    /// <inheritdoc />
     public override Money? PriceAt(DateTimeOffset moment) => PriceSchedule.PriceAt(_prices, moment);
+
+    /// <inheritdoc />
+    public override ConsistencyPrice CancelLatestScheduledPrice(DateTimeOffset now) =>
+        PriceSchedule.CancelLatestScheduled(_prices, now);
+
+    /// <inheritdoc />
+    public override IReadOnlyList<PricePeriod> GetPriceHistory() => PriceSchedule.History(_prices);
 }
 
 /// <summary>One period of a consistency's price.</summary>

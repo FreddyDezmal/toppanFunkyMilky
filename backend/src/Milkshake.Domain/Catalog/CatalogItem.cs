@@ -76,4 +76,29 @@ public abstract class CatalogItem : IHasTimestamps, IHasRowVersion
 
     /// <summary>The price in force at a moment, or null if none.</summary>
     public abstract Money? PriceAt(DateTimeOffset moment);
+
+    
+    /// <summary>
+    /// A manager's price change: a price starting now or later. Nothing that has taken effect is changed;
+    /// the latest price simply ends when this one starts.
+    /// </summary>
+    public PricePeriod SchedulePrice(Money price, DateTimeOffset effectiveFrom, DateTimeOffset now)
+    {
+        if (effectiveFrom < now)
+        {
+            throw new BusinessRuleException(PricingMessages.NoBackDating);
+        }
+
+        return SetPrice(price, effectiveFrom);
+    }
+
+    /// <summary>
+    /// Withdraws the latest price if it has not started yet; the price before it becomes open-ended again.
+    /// Returns the withdrawn period, which the caller must delete from storage.
+    /// </summary>
+    public abstract PricePeriod CancelLatestScheduledPrice(DateTimeOffset now);
+
+    /// <summary>All price periods, newest first.</summary>
+    public abstract IReadOnlyList<PricePeriod> GetPriceHistory();
+
 }

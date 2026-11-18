@@ -51,7 +51,7 @@ public sealed record CreateCatalogItemCommand(string Name, int DisplayOrder, dec
 /// <summary>Changes to an existing item, based on the version the manager saw.</summary>
 public sealed record UpdateCatalogItemCommand(string Name, int DisplayOrder, uint Version);
 
-/// <summary>A catalogue item as managers see it.</summary>
+/// <summary>A catalogue item as managers see it, with its current and next scheduled price.</summary>
 public sealed record CatalogItemSummary(
     int Id,
     string Name,
@@ -59,4 +59,6 @@ public sealed record CatalogItemSummary(
     bool IsActive,
     decimal? CurrentPrice,
     string? CurrencyCode,
+    decimal? ScheduledPrice,
+    DateTimeOffset? ScheduledFrom,
     uint Version);

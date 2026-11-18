@@ -20,12 +20,19 @@ public sealed class Flavour : CatalogItem
     /// <summary>Full price history.</summary>
     public IReadOnlyCollection<FlavourPrice> Prices => _prices;
 
-    /// <summary>Schedules a new price; the current price ends when it starts.</summary>
+    /// <inheritdoc />
     public override FlavourPrice SetPrice(Money price, DateTimeOffset effectiveFrom) =>
         PriceSchedule.Add(_prices, new FlavourPrice(this, price, effectiveFrom));
 
-    /// <summary>The price in force at a moment, or null if none.</summary>
+    /// <inheritdoc />
     public override Money? PriceAt(DateTimeOffset moment) => PriceSchedule.PriceAt(_prices, moment);
+
+    /// <inheritdoc />
+    public override FlavourPrice CancelLatestScheduledPrice(DateTimeOffset now) =>
+        PriceSchedule.CancelLatestScheduled(_prices, now);
+
+    /// <inheritdoc />
+    public override IReadOnlyList<PricePeriod> GetPriceHistory() => PriceSchedule.History(_prices);
 }
 
 /// <summary>One period of a flavour's price.</summary>
