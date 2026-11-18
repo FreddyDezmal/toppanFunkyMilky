@@ -1,15 +1,12 @@
 /**
- * Returns the API base URL without a trailing slash.
- * Throws a clear message (shown in the UI) when the environment variable is missing.
+ * Base URL of the API without a trailing slash. Empty (the default) means "same origin":
+ * Vite forwards /api in development, and production serves app and API from one domain.
  */
 export function getApiBaseUrl(): string {
-  const value = import.meta.env.VITE_API_BASE_URL
+  return (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
+}
 
-  if (!value) {
-    throw new Error(
-      'VITE_API_BASE_URL is not set. Copy frontend/.env.example to frontend/.env.development.local and restart "npm run dev".',
-    )
-  }
-
-  return value.replace(/\/+$/, '')
+/** Where API calls go, for display. */
+export function describeApiTarget(): string {
+  return getApiBaseUrl() || `${window.location.origin} (same origin)`
 }

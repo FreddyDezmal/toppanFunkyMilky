@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from '../../lib/api/config'
+import { describeApiTarget } from '../../lib/api/config'
 import type { HealthStatus } from './types'
 import { useSystemHealth } from './useSystemHealth'
 
@@ -68,7 +68,7 @@ export function SystemStatusCard() {
             ))}
           </dl>
           <p className="mt-4 text-xs text-slate-500">
-            Connected to {getApiBaseUrl()} · checked {new Date(state.data.checkedAtUtc).toLocaleString()}
+            Connected to {describeApiTarget()} · checked {new Date(state.data.checkedAtUtc).toLocaleString()}
           </p>
         </>
       )}

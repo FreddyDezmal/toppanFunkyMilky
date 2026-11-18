@@ -1,10 +1,13 @@
-import { AppLayout } from '../components/layout/AppLayout'
-import { HomePage } from '../pages/HomePage'
+import { BrowserRouter } from 'react-router'
+import { AuthProvider } from '../features/auth/AuthProvider'
+import { AppRoutes } from './AppRoutes'
 
 export default function App() {
   return (
-    <AppLayout>
-      <HomePage />
-    </AppLayout>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
   )
 }

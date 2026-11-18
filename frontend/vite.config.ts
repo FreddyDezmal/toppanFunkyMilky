@@ -7,9 +7,16 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    // Fixed port: the API's CORS policy allows exactly this origin.
     port: 5173,
     strictPort: true,
+    // Same origin in development: the browser calls /api on Vite, which forwards to ASP.NET Core.
+    // The SameSite=Strict session cookie then behaves exactly as it will behind one production domain.
+    proxy: {
+      '/api': {
+        target: 'https://localhost:7298',
+        secure: false, // Node does not trust the local ASP.NET Core development certificate
+      },
+    },
   },
   test: {
     environment: 'jsdom',

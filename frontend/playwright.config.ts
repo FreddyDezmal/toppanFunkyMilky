@@ -10,6 +10,8 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: 'list',
+    // The dev database is remote (≈190 ms per query from here); registration and login chain many queries.
+  expect: { timeout: 20_000 },
   use: {
     baseURL: 'http://localhost:5173',
     ignoreHTTPSErrors: true, // local ASP.NET Core development certificate
