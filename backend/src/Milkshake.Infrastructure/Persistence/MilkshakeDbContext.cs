@@ -47,6 +47,9 @@ public sealed class MilkshakeDbContext(DbContextOptions<MilkshakeDbContext> opti
 
     /// <summary>Audit trail.</summary>
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    
+    /// <summary>Sign-in, sign-out and provisioning events.</summary>
+    public DbSet<SecurityEvent> SecurityEvents => Set<SecurityEvent>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder builder)

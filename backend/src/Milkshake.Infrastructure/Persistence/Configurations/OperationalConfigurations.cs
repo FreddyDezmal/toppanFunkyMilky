@@ -75,3 +75,23 @@ internal sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.HasIndex(a => a.UserId);
     }
 }
+
+
+internal sealed class SecurityEventConfiguration : IEntityTypeConfiguration<SecurityEvent>
+{
+    public void Configure(EntityTypeBuilder<SecurityEvent> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("security_events");
+        builder.HasKey(e => e.Id);
+        builder.Property(e => e.EventType).HasConversion<string>().HasMaxLength(30);
+        builder.Property(e => e.Email).HasMaxLength(SecurityEvent.EmailMaxLength);
+        builder.Property(e => e.IpAddress).HasMaxLength(SecurityEvent.IpAddressMaxLength);
+        builder.Property(e => e.TraceId).HasMaxLength(SecurityEvent.TraceIdMaxLength);
+
+        // No foreign key to users: the trail must survive account deletion.
+        builder.HasIndex(e => e.OccurredAt);
+        builder.HasIndex(e => e.UserId);
+    }
+}

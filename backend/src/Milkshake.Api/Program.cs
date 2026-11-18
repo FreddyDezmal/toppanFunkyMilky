@@ -1,7 +1,9 @@
-using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Milkshake.Api.Security;
 using Milkshake.Api.Services;
@@ -65,6 +67,25 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.SameSite = SameSiteMode.Strict;
 });
 
+// ---- Rate limiting: login and registration, per client IP ----------------
+// The limit is configuration (RateLimiting:AuthPermitLimit, default 10 per minute), read lazily so tests can change it.
+builder.Services.AddRateLimiter(_ => { });
+builder.Services.AddOptions<RateLimiterOptions>().Configure<IConfiguration>((options, configuration) =>
+{
+    int permitLimit = configuration.GetValue("RateLimiting:AuthPermitLimit", 10);
+
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(RateLimitPolicies.Auth, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = permitLimit,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+});
+
 // Only origins listed in configuration (Cors:AllowedOrigins) may call the API from a browser.
 // Read lazily through options so tests and environments can supply origins without code changes.
 builder.Services.AddCors();
@@ -87,7 +108,6 @@ builder.Services.AddControllers(options =>
     // Validation errors use the JSON property names (camelCase) the frontend sends and displays.
     options.ModelMetadataDetailsProviders.Add(new SystemTextJsonValidationMetadataProvider());
 });
-
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
@@ -109,6 +129,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors(FrontendCorsPolicy);
+app.UseRateLimiter();      // rejects floods before any authentication or database work
 app.UseAuthentication();   // who is calling (reads the session cookie)
 app.UseAuthorization();    // what they may do (policies, roles)
 

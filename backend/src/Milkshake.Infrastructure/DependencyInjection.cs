@@ -114,7 +114,9 @@ public static class DependencyInjection
         // role change or "sign out everywhere" takes effect quickly.
         services.Configure<SecurityStampValidatorOptions>(options =>
             options.ValidationInterval = TimeSpan.FromMinutes(5));
-
+            
+        services.AddHttpContextAccessor();
+        services.AddScoped<SecurityEventRecorder>();
         services.AddScoped<IAccountService, AccountService>();
     }
     private static string BuildConnectionString(IConfiguration configuration)

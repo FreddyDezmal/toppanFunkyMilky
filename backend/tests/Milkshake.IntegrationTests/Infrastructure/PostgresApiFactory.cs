@@ -43,6 +43,7 @@ public sealed class PostgresApiFactory : WebApplicationFactory<ApiAssemblyMarker
 
         builder.UseEnvironment("Testing");
         builder.UseSetting($"ConnectionStrings:{DependencyInjection.ConnectionStringName}", _postgres.GetConnectionString());
+        builder.UseSetting("RateLimiting:AuthPermitLimit", "1000");
     }
 }
 

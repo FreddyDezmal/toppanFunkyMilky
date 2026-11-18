@@ -69,7 +69,7 @@ internal sealed class AuditingSaveChangesInterceptor(TimeProvider timeProvider, 
 
         foreach (EntityEntry entry in context.ChangeTracker.Entries().ToList())
         {
-            if (entry.Entity is AuditLog ||
+            if (entry.Entity is AuditLog or SecurityEvent ||
                 entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
             {
                 continue;

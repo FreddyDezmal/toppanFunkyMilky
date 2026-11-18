@@ -222,6 +222,56 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_logs", "milkshake");
                 });
 
+            modelBuilder.Entity("Milkshake.Domain.Auditing.SecurityEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseHiLo(b.Property<long>("Id"));
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)")
+                        .HasColumnName("ip_address");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("TraceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("trace_id");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_security_events");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("ix_security_events_occurred_at");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_security_events_user_id");
+
+                    b.ToTable("security_events", "milkshake");
+                });
+
             modelBuilder.Entity("Milkshake.Domain.Catalog.Consistency", b =>
                 {
                     b.Property<int>("Id")
