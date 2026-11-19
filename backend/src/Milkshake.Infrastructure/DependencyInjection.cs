@@ -75,6 +75,7 @@ public static class DependencyInjection
         services.AddScoped<ISettingsManagementService, SettingsManagementService>();
         services.AddScoped<IDiscountTierManagementService, DiscountTierManagementService>();
         services.AddScoped<IOrderingCatalogService, OrderingCatalogService>();
+        services.AddScoped<IDiscountConfigurationSource, DiscountConfigurationSource>();
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>(

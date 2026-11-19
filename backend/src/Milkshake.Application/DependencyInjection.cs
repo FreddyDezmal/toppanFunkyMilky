@@ -17,6 +17,11 @@ public static class DependencyInjection
 
         services.AddScoped<IOrderDraftValidator, OrderDraftValidator>();
         services.AddScoped<IOrderPricingService, OrderPricingService>();
+        services.AddScoped<IDiscountResolver, DiscountResolver>();
+
+        // No order history exists until M7/M8; replace this registration with a source that reads paid orders.
+        services.AddScoped<IDiscountEligibilitySource, NoOrderHistoryYet>();
+
 
         return services;
     }

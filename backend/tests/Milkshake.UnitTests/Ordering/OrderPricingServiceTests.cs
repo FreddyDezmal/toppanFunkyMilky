@@ -18,11 +18,16 @@ public sealed class OrderPricingServiceTests
         public Task<OrderingOptionsResult> GetOptionsAsync(CancellationToken cancellationToken) => Task.FromResult(result);
     }
 
-    private static OrderPricingService ServiceWith(decimal vatRate)
+    private sealed class FixedDiscount(DiscountTerms? terms) : IDiscountResolver
+    {
+        public Task<DiscountTerms?> ResolveAsync(CancellationToken cancellationToken) => Task.FromResult(terms);
+    }
+
+    private static OrderPricingService ServiceWith(decimal vatRate, DiscountTerms? discount = null)
     {
         var settings = new OrderingSettings(1, 10, 15, 7, Johannesburg, "Africa/Johannesburg", "ZAR", "en-ZA", vatRate);
         var options = new OrderingOptions([Vanilla], [Thick], [OreoCrumbs], [BranchA], settings, PickupRules.WindowFor(settings, Now));
-        return new OrderPricingService(new FixedCatalog(new OrderingOptionsResult(options)));
+        return new OrderPricingService(new FixedCatalog(new OrderingOptionsResult(options)), new FixedDiscount(discount));
     }
 
     private static OrderDraft Draft(params DraftDrinkSelection?[] drinks) => new(BranchA.Id, Tomorrow, drinks);
@@ -60,6 +65,18 @@ public sealed class OrderPricingServiceTests
     }
 
     [Fact]
+    public async Task AResolvedDiscount_IsPassedToTheCalculator()
+    {
+        // FICTIONAL 10% (decision P5): 92.00 − 9.20 = 82.80; VAT 12.42; total 95.22.
+        var discount = new DiscountTerms(2, 0.10m, new Milkshake.Domain.Common.Money(50.00m, "ZAR"));
+
+        DraftPricingResult result = await ServiceWith(0.15m, discount).PriceDraftAsync(Draft(Complete(), Complete()), CancellationToken.None);
+
+        PriceBreakdown price = Assert.IsType<PriceBreakdown>(result.Price);
+        Assert.Equal((9.20m, 82.80m, 12.42m, 95.22m), (price.Discount.Amount.Amount, price.Taxable.Amount, price.Vat.Amount, price.Total.Amount));
+    }
+
+    [Fact]
     public async Task AnInvalidDraft_ReturnsTheFieldErrors_AndNoPrice()
     {
         DraftPricingResult result = await ServiceWith(0.15m).PriceDraftAsync(
@@ -72,7 +89,7 @@ public sealed class OrderPricingServiceTests
     [Fact]
     public async Task UnavailableOptions_MakePricingUnavailable()
     {
-        var service = new OrderPricingService(new FixedCatalog(OrderingOptionsResult.Unavailable()));
+        var service = new OrderPricingService(new FixedCatalog(OrderingOptionsResult.Unavailable()), new FixedDiscount(null));
 
         DraftPricingResult result = await service.PriceDraftAsync(Draft(Complete()), CancellationToken.None);
 

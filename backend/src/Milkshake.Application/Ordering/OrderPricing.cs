@@ -40,9 +40,10 @@ public static class OrderPricingInput
 {
     /// <summary>
     /// The pricing input for a validated draft. Fees are those the draft was validated against, the VAT rate is the
-    /// setting in force, and <paramref name="pricedAtUtc"/> is the instant both were read. No discount yet (decision P5).
+    /// setting in force, and <paramref name="pricedAtUtc"/> is the instant both were read. The discount comes from
+    /// <see cref="IDiscountResolver"/> and is null while the rules are unconfirmed (decision P5).
     /// </summary>
-    public static PricingInput For(ValidatedDraft draft, OrderingSettings settings, DateTimeOffset pricedAtUtc)
+    public static PricingInput For(ValidatedDraft draft, OrderingSettings settings, DateTimeOffset pricedAtUtc, DiscountTerms? discount)
     {
         ArgumentNullException.ThrowIfNull(draft);
         ArgumentNullException.ThrowIfNull(settings);
@@ -51,7 +52,7 @@ public static class OrderPricingInput
             settings.CurrencyCode,
             settings.VatRate,
             draft.Drinks.Select(d => new DrinkToPrice(Component(d.Flavour), Component(d.Consistency), Component(d.Topping))).ToList(),
-            Discount: null,
+            discount,
             pricedAtUtc);
     }
 
@@ -67,7 +68,7 @@ public static class OrderPricingInput
 /// Default pricing service: loads the options once, validates the draft against them and prices it with the fees and
 /// VAT rate of that same moment, so a price change during the calculation cannot mix old and new prices.
 /// </summary>
-public sealed class OrderPricingService(IOrderingCatalogService catalog) : IOrderPricingService
+public sealed class OrderPricingService(IOrderingCatalogService catalog, IDiscountResolver discounts) : IOrderPricingService
 {
     /// <inheritdoc />
     public async Task<DraftPricingResult> PriceDraftAsync(OrderDraft draft, CancellationToken cancellationToken)
@@ -86,8 +87,11 @@ public sealed class OrderPricingService(IOrderingCatalogService catalog) : IOrde
             return DraftPricingResult.Invalid(validation.Errors);
         }
 
+        DiscountTerms? discount = await discounts.ResolveAsync(cancellationToken);
+
         // The pickup window was computed at the instant the fees were read: that instant prices the whole order.
-        PriceBreakdown price = PriceCalculator.Calculate(OrderPricingInput.For(validated, options.Settings, options.Pickup.AsOfUtc));
+        PriceBreakdown price = PriceCalculator.Calculate(
+            OrderPricingInput.For(validated, options.Settings, options.Pickup.AsOfUtc, discount));
         return DraftPricingResult.Priced(validated, price);
     }
 }
