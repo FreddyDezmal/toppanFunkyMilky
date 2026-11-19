@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router'
+import { Link, useParams } from 'react-router'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { listCatalogItems, setCatalogItemActive } from '../../features/management/api'
 import { CatalogItemForm } from '../../features/management/CatalogItemForm'
@@ -241,6 +241,15 @@ function CatalogManager({ kind }: { kind: CatalogKind }) {
                       disabled={actionsLocked}
                       className="rounded-md px-2 py-1 font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40"
                     >
+
+                    <Link
+                      to={`/manager/catalog/${kind}/${item.id}/prices`}
+                      aria-label={`Prices for ${item.name}`}
+                      className="rounded-md px-2 py-1 font-medium text-brand-700 hover:bg-brand-50"
+                    >
+                      Prices
+                    </Link>
+                      
                       Edit
                     </button>
                     {item.isActive ? (

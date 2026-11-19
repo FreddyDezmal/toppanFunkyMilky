@@ -43,6 +43,9 @@ export function ManagementLayout() {
             {CATALOG_LABELS[kind].title}
           </NavLink>
         ))}
+        <NavLink to="/manager/restaurants" className={sectionLinkClass}>
+          Restaurants
+        </NavLink>
       </nav>
       <Outlet />
     </DisplayFormatContext>

@@ -5,6 +5,9 @@ interface ConfirmDialogProps {
   title: string
   message: string
   confirmLabel: string
+  
+  /** Label of the safe choice (default "Cancel"). */
+  cancelLabel?: string
   /** Disables both buttons while the action runs. */
   busy?: boolean
   onConfirm: () => void
@@ -15,7 +18,16 @@ interface ConfirmDialogProps {
  * Accessible confirmation for consequential actions: role="alertdialog", focus starts on Cancel (the safe choice),
  * Tab stays inside the dialog, Escape cancels, and focus returns to where it was when the dialog closes.
  */
-export function ConfirmDialog({ open, title, message, confirmLabel, busy = false, onConfirm, onCancel }: ConfirmDialogProps) {
+export function ConfirmDialog({
+  open,
+  title,
+  message,
+  confirmLabel,
+  cancelLabel = 'Cancel',
+  busy = false,
+  onConfirm,
+  onCancel,
+}: ConfirmDialogProps) {
   const titleId = useId()
   const messageId = useId()
   const cancelRef = useRef<HTMLButtonElement>(null)
@@ -82,7 +94,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel, busy = false
             disabled={busy}
             className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
-            Cancel
+            {cancelLabel}
           </button>
           <button
             type="button"

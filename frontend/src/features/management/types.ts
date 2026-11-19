@@ -43,3 +43,32 @@ export const SETTING_KEYS = {
   displayLocale: 'Pricing.DisplayLocale',
   currencyCode: 'Pricing.CurrencyCode',
 } as const
+
+
+export type PriceStatus = 'Past' | 'Current' | 'Scheduled'
+
+/** One price period. Times are UTC ISO 8601. */
+export interface PricePeriod {
+  id: number
+  amount: number
+  currencyCode: string
+  effectiveFrom: string
+  effectiveTo: string | null
+  status: PriceStatus
+  canCancel: boolean
+}
+
+/** GET /api/manager/catalog/{kind}/{id}/prices: the item (with its current version) and its history, newest first. */
+export interface PriceHistory {
+  item: CatalogItem
+  prices: PricePeriod[]
+}
+
+/** GET /api/manager/restaurants. */
+export interface Restaurant {
+  id: number
+  name: string
+  address: string | null
+  isActive: boolean
+  version: number
+}

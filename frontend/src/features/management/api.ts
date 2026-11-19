@@ -1,5 +1,5 @@
 import { getJson, postJson, putJson } from '../../lib/api/httpClient'
-import type { CatalogItem, CatalogKind, Setting, StatusFilter } from './types'
+import type { CatalogItem, CatalogKind, PriceHistory, Restaurant, Setting, StatusFilter } from './types'
 
 const MANAGER = '/api/manager'
 
@@ -28,4 +28,41 @@ export function setCatalogItemActive(kind: CatalogKind, id: number, active: bool
 
 export function listSettings(signal?: AbortSignal): Promise<Setting[]> {
   return getJson<Setting[]>(`${MANAGER}/settings`, { signal })
+}
+
+
+export function getPriceHistory(kind: CatalogKind, id: number, signal?: AbortSignal): Promise<PriceHistory> {
+  return getJson<PriceHistory>(`${MANAGER}/catalog/${kind}/${id}/prices`, { signal })
+}
+
+/** effectiveFrom: UTC ISO string, or null for "immediately". */
+export function schedulePrice(
+  kind: CatalogKind,
+  id: number,
+  input: { amount: number; effectiveFrom: string | null; version: number },
+): Promise<PriceHistory> {
+  return postJson<PriceHistory>(`${MANAGER}/catalog/${kind}/${id}/prices`, input)
+}
+
+export function cancelScheduledPrice(kind: CatalogKind, id: number, priceId: number, version: number): Promise<PriceHistory> {
+  return postJson<PriceHistory>(`${MANAGER}/catalog/${kind}/${id}/prices/${priceId}/cancel`, { version })
+}
+
+export function listRestaurants(status: StatusFilter, signal?: AbortSignal): Promise<Restaurant[]> {
+  return getJson<Restaurant[]>(`${MANAGER}/restaurants?status=${status}`, { signal })
+}
+
+export function createRestaurant(input: { name: string; address: string | null }): Promise<Restaurant> {
+  return postJson<Restaurant>(`${MANAGER}/restaurants`, input)
+}
+
+export function updateRestaurant(
+  id: number,
+  input: { name: string; address: string | null; version: number },
+): Promise<Restaurant> {
+  return putJson<Restaurant>(`${MANAGER}/restaurants/${id}`, input)
+}
+
+export function setRestaurantActive(id: number, active: boolean, version: number): Promise<Restaurant> {
+  return postJson<Restaurant>(`${MANAGER}/restaurants/${id}/${active ? 'activate' : 'deactivate'}`, { version })
 }

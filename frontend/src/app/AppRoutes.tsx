@@ -8,6 +8,8 @@ import { HomePage } from '../pages/HomePage'
 import { LoginPage } from '../pages/LoginPage'
 import { ManagerPage } from '../pages/ManagerPage'
 import { CatalogPage } from '../pages/management/CatalogPage'
+import { PricesPage } from '../pages/management/PricesPage'
+import { RestaurantsPage } from '../pages/management/RestaurantsPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { RegisterPage } from '../pages/RegisterPage'
 
@@ -28,6 +30,8 @@ export function AppRoutes() {
           <Route path="manager" element={<ManagementLayout />}>
             <Route index element={<ManagerPage />} />
             <Route path="catalog/:kind" element={<CatalogPage />} />
+            <Route path="catalog/:kind/:id/prices" element={<PricesPage />} />
+            <Route path="restaurants" element={<RestaurantsPage />} />
           </Route>
         </Route>
 
