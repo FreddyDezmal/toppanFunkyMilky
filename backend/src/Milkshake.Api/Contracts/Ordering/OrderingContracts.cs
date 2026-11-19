@@ -1,3 +1,4 @@
+using Milkshake.Domain.Pricing;
 using System.Globalization;
 using System.Text.Json.Serialization;
 using Milkshake.Application.Ordering;
@@ -85,11 +86,14 @@ public sealed class DraftDrinkRequest
 
     /// <summary>An active topping id.</summary>
     public int? ToppingId { get; init; }
+
+    /// <summary>Maps to the application model.</summary>
+    public DraftDrinkSelection ToSelection() => new(FlavourId, ConsistencyId, ToppingId);
 }
 
 /// <summary>
 /// POST /api/ordering/draft/validate. The number of drinks is the length of <see cref="Drinks"/>.
-/// Unknown fields are rejected; prices are never accepted from the browser.
+/// Unknown fields are rejected; prices, VAT rates and discounts are never accepted from the browser.
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed class ValidateDraftRequest
@@ -107,39 +111,131 @@ public sealed class ValidateDraftRequest
     public IReadOnlyList<DraftDrinkRequest?>? Drinks { get; init; }
 
     /// <summary>Maps to the application model.</summary>
-    public OrderDraft ToDraft() =>
-        new(
-            RestaurantId,
-            PickupLocal,
-            Drinks?.Select(d => d is null ? null : new DraftDrinkSelection(d.FlavourId, d.ConsistencyId, d.ToppingId)).ToList() ?? []);
+    public OrderDraft ToDraft() => new(RestaurantId, PickupLocal, Drinks?.Select(d => d?.ToSelection()).ToList() ?? []);
 }
 
-/// <summary>A validated drink with the names and current fees of its choices.</summary>
+/// <summary>
+/// POST /api/ordering/quote: the milkshakes being chosen, identifiers only (no restaurant or pickup time yet).
+/// Unknown fields are rejected; prices, VAT rates, discounts and purchase counts are never accepted from the browser.
+/// </summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed class QuoteRequest
+{
+    /// <summary>One entry per milkshake; choices not yet made are null.</summary>
+    public IReadOnlyList<DraftDrinkRequest?>? Drinks { get; init; }
+
+    /// <summary>Maps to the application model.</summary>
+    public IReadOnlyList<DraftDrinkSelection?> ToSelections() => Drinks?.Select(d => d?.ToSelection()).ToList() ?? [];
+}
+
+/// <summary>The frequent-customer discount applied. 0.00 with no tier while discounts are deferred (decision P5).</summary>
+public sealed record DiscountResponse(decimal Amount, int? TierNumber, decimal? Rate, bool CapApplied);
+
+/// <summary>
+/// Order totals calculated on the server (M6 rules P1–P4): subtotal, discount (before VAT), taxable amount, VAT rate
+/// and amount, and total. Amounts are in <see cref="CurrencyCode"/>; the VAT rate is a fraction (0.15 = 15%).
+/// </summary>
+public sealed record OrderTotalsResponse(
+    string CurrencyCode,
+    decimal Subtotal,
+    DiscountResponse Discount,
+    decimal Taxable,
+    decimal VatRate,
+    decimal Vat,
+    decimal Total)
+{
+    /// <summary>Maps the calculator's breakdown.</summary>
+    public static OrderTotalsResponse From(PriceBreakdown price)
+    {
+        ArgumentNullException.ThrowIfNull(price);
+        AppliedDiscount discount = price.Discount;
+
+        return new OrderTotalsResponse(
+            price.CurrencyCode,
+            price.Subtotal.Amount,
+            new DiscountResponse(discount.Amount.Amount, discount.TierNumber, discount.Rate, discount.CapApplied),
+            price.Taxable.Amount,
+            price.VatRate,
+            price.Vat.Amount,
+            price.Total.Amount);
+    }
+}
+
+/// <summary>Wording shared by every price estimate.</summary>
+public static class EstimateNotes
+{
+    /// <summary>Shown with every quote.</summary>
+    public const string Estimate =
+        "Estimated prices based on current fees and VAT. The final amount is calculated when you place your order.";
+}
+
+/// <summary>One milkshake in a live quote: its price, or null until all three choices are made.</summary>
+public sealed record QuotedDrinkResponse(int Number, decimal? Price);
+
+/// <summary>
+/// A non-binding live estimate (POST /api/ordering/quote). <see cref="Totals"/> is null until every milkshake is
+/// complete. Nothing is stored; the amount is recalculated when the order is placed.
+/// </summary>
+public sealed record QuoteResponse(
+    bool IsEstimate,
+    DateTimeOffset PricedAtUtc,
+    string CurrencyCode,
+    decimal VatRate,
+    IReadOnlyList<QuotedDrinkResponse> Drinks,
+    OrderTotalsResponse? Totals,
+    string Note)
+{
+    /// <summary>Maps the application model.</summary>
+    public static QuoteResponse From(DrinksQuote quote)
+    {
+        ArgumentNullException.ThrowIfNull(quote);
+
+        return new QuoteResponse(
+            IsEstimate: true,
+            quote.PricedAtUtc,
+            quote.CurrencyCode,
+            quote.VatRate,
+            quote.Lines.Select(line => new QuotedDrinkResponse(line.Number, line.Price?.Amount)).ToList(),
+            quote.Totals is null ? null : OrderTotalsResponse.From(quote.Totals),
+            EstimateNotes.Estimate);
+    }
+}
+
+/// <summary>A validated drink with the names and current fees of its choices, and its price (the sum of the fees).</summary>
 public sealed record DraftDrinkResponse(
     int Number,
     OrderingOptionResponse Flavour,
     OrderingOptionResponse Consistency,
-    OrderingOptionResponse Topping);
+    OrderingOptionResponse Topping,
+    decimal Price);
 
 /// <summary>The chosen pickup time: business-local wall clock, the UTC instant, and the time zone.</summary>
 public sealed record DraftPickupResponse(string Local, DateTimeOffset Utc, string TimeZone);
 
-/// <summary>A draft whose selections are valid right now. Not an order: nothing has been stored or paid.</summary>
+/// <summary>
+/// A draft whose selections are valid right now, with its estimated price. Not an order: nothing has been stored or
+/// paid, and the amount is recalculated when the order is placed.
+/// </summary>
 public sealed record DraftSummaryResponse(
     bool IsDraft,
     OrderingRestaurantResponse Restaurant,
     DraftPickupResponse Pickup,
     IReadOnlyList<DraftDrinkResponse> Drinks,
+    OrderTotalsResponse Totals,
+    bool IsEstimate,
+    DateTimeOffset PricedAtUtc,
     string Note)
 {
     /// <summary>Shown with every draft summary.</summary>
     public const string DraftNote =
-        "Draft – not yet ordered or paid. Fees shown are current fees; the final price, VAT and any discount are calculated at checkout.";
+        "Draft – not yet ordered or paid. Prices are an estimate based on current fees and VAT; the final amount is calculated when you place your order.";
 
     /// <summary>Maps the application model.</summary>
-    public static DraftSummaryResponse From(ValidatedDraft draft)
+    public static DraftSummaryResponse From(ValidatedDraft draft, PriceBreakdown price)
     {
         ArgumentNullException.ThrowIfNull(draft);
+        ArgumentNullException.ThrowIfNull(price);
+        Dictionary<int, decimal> drinkPrices = price.Drinks.ToDictionary(d => d.Number, d => d.Price.Amount);
 
         return new DraftSummaryResponse(
             IsDraft: true,
@@ -148,7 +244,12 @@ public sealed record DraftSummaryResponse(
                 draft.Pickup.Local.ToString(PickupRules.LocalFormat, CultureInfo.InvariantCulture),
                 draft.Pickup.Utc,
                 draft.Pickup.TimeZoneId),
-            draft.Drinks.Select(d => new DraftDrinkResponse(d.Number, Option(d.Flavour), Option(d.Consistency), Option(d.Topping))).ToList(),
+            draft.Drinks
+                .Select(d => new DraftDrinkResponse(d.Number, Option(d.Flavour), Option(d.Consistency), Option(d.Topping), drinkPrices[d.Number]))
+                .ToList(),
+            OrderTotalsResponse.From(price),
+            IsEstimate: true,
+            price.PricedAtUtc,
             DraftNote);
     }
 

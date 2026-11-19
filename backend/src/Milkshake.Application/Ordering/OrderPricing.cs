@@ -25,6 +25,35 @@ public sealed record DraftPricingResult(
     public static DraftPricingResult Unavailable() => new(null, null, NoErrors, true);
 }
 
+/// <summary>One milkshake in a live quote: its price once all three choices are made, otherwise null.</summary>
+public sealed record DrinkQuoteLine(int Number, Money? Price);
+
+/// <summary>
+/// A live, non-binding estimate while the patron is choosing: a price per complete milkshake, and the order totals
+/// (<see cref="Totals"/>) only once every milkshake is complete. All amounts were read at <see cref="PricedAtUtc"/>.
+/// </summary>
+public sealed record DrinksQuote(
+    IReadOnlyList<DrinkQuoteLine> Lines,
+    PriceBreakdown? Totals,
+    string CurrencyCode,
+    decimal VatRate,
+    DateTimeOffset PricedAtUtc);
+
+/// <summary>A live quote, field errors (unknown or unavailable choices, quantity), or "ordering unavailable".</summary>
+public sealed record DrinksQuoteResult(DrinksQuote? Quote, IReadOnlyDictionary<string, string[]> Errors, bool OrderingUnavailable)
+{
+    private static readonly IReadOnlyDictionary<string, string[]> NoErrors = new Dictionary<string, string[]>();
+
+    /// <summary>Quoted.</summary>
+    public static DrinksQuoteResult Quoted(DrinksQuote quote) => new(quote, NoErrors, false);
+
+    /// <summary>Some choices are unknown or unavailable, or the quantity is outside the limits.</summary>
+    public static DrinksQuoteResult Invalid(IReadOnlyDictionary<string, string[]> errors) => new(null, errors, false);
+
+    /// <summary>Ordering cannot be offered right now (invalid configuration).</summary>
+    public static DrinksQuoteResult Unavailable() => new(null, NoErrors, true);
+}
+
 /// <summary>
 /// Prices orders on the server (M6). The browser never supplies prices, VAT or discounts: everything comes from the
 /// options and settings in force at one instant. M7 will call this immediately before storing an order.
@@ -33,6 +62,12 @@ public interface IOrderPricingService
 {
     /// <summary>Validates a complete draft and prices it at the current instant.</summary>
     Task<DraftPricingResult> PriceDraftAsync(OrderDraft draft, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Live estimate for the milkshakes being chosen (no restaurant or pickup time yet). Incomplete milkshakes are
+    /// allowed and simply have no price; unknown or unavailable choices and a quantity outside the limits are errors.
+    /// </summary>
+    Task<DrinksQuoteResult> QuoteDrinksAsync(IReadOnlyList<DraftDrinkSelection?> drinks, CancellationToken cancellationToken);
 }
 
 /// <summary>Builds the calculator's input from server-side data only.</summary>
@@ -93,5 +128,91 @@ public sealed class OrderPricingService(IOrderingCatalogService catalog, IDiscou
         PriceBreakdown price = PriceCalculator.Calculate(
             OrderPricingInput.For(validated, options.Settings, options.Pickup.AsOfUtc, discount));
         return DraftPricingResult.Priced(validated, price);
+    }
+
+    /// <inheritdoc />
+    public async Task<DrinksQuoteResult> QuoteDrinksAsync(IReadOnlyList<DraftDrinkSelection?> drinks, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(drinks);
+
+        OrderingOptionsResult current = await catalog.GetOptionsAsync(cancellationToken);
+        if (current.Options is not OrderingOptions options)
+        {
+            return DrinksQuoteResult.Unavailable();
+        }
+
+        OrderingSettings settings = options.Settings;
+        var errors = new Dictionary<string, string[]>();
+
+        // Same quantity rule as the full draft; a request with thousands of drinks gets one message.
+        if (drinks.Count < settings.MinDrinks || drinks.Count > settings.MaxDrinks)
+        {
+            errors[OrderDraftFields.Drinks] = [OrderDraftMessages.Quantity(settings.MinDrinks, settings.MaxDrinks)];
+            return DrinksQuoteResult.Invalid(errors);
+        }
+
+        Dictionary<int, OrderingOption> flavours = options.Flavours.ToDictionary(o => o.Id);
+        Dictionary<int, OrderingOption> consistencies = options.Consistencies.ToDictionary(o => o.Id);
+        Dictionary<int, OrderingOption> toppings = options.Toppings.ToDictionary(o => o.Id);
+
+        var lines = new List<DrinkQuoteLine>(drinks.Count);
+        var complete = new List<DrinkToPrice>(drinks.Count);
+        for (int index = 0; index < drinks.Count; index++)
+        {
+            int number = index + 1;
+            DraftDrinkSelection? drink = drinks[index];
+            OrderingOption? flavour = Find(drink?.FlavourId, flavours, OrderDraftFields.Flavour(index), "flavour", number, errors);
+            OrderingOption? consistency = Find(drink?.ConsistencyId, consistencies, OrderDraftFields.Consistency(index), "consistency", number, errors);
+            OrderingOption? topping = Find(drink?.ToppingId, toppings, OrderDraftFields.Topping(index), "topping", number, errors);
+
+            if (flavour is null || consistency is null || topping is null)
+            {
+                lines.Add(new DrinkQuoteLine(number, null));
+                continue;
+            }
+
+            var toPrice = new DrinkToPrice(
+                OrderPricingInput.Component(flavour), OrderPricingInput.Component(consistency), OrderPricingInput.Component(topping));
+            complete.Add(toPrice);
+            lines.Add(new DrinkQuoteLine(number, PriceCalculator.PriceDrink(toPrice, settings.CurrencyCode)));
+        }
+
+        if (errors.Count > 0)
+        {
+            return DrinksQuoteResult.Invalid(errors);
+        }
+
+        PriceBreakdown? totals = null;
+        if (complete.Count == drinks.Count)
+        {
+            DiscountTerms? discount = await discounts.ResolveAsync(cancellationToken);
+            totals = PriceCalculator.Calculate(
+                new PricingInput(settings.CurrencyCode, settings.VatRate, complete, discount, options.Pickup.AsOfUtc));
+        }
+
+        return DrinksQuoteResult.Quoted(new DrinksQuote(lines, totals, settings.CurrencyCode, settings.VatRate, options.Pickup.AsOfUtc));
+    }
+
+    // A missing choice is allowed while choosing; an unknown or unavailable one is an error (same message as validation).
+    private static OrderingOption? Find(
+        int? id,
+        Dictionary<int, OrderingOption> available,
+        string field,
+        string label,
+        int number,
+        Dictionary<string, string[]> errors)
+    {
+        if (id is not int value)
+        {
+            return null;
+        }
+
+        if (available.TryGetValue(value, out OrderingOption? option))
+        {
+            return option;
+        }
+
+        errors[field] = [OrderDraftMessages.NoLongerAvailable(label, number)];
+        return null;
     }
 }
