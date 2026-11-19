@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Milkshake.Api.Cli;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
@@ -69,12 +70,14 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.SameSite = SameSiteMode.Strict;
 });
 
-// ---- Rate limiting: login and registration, per client IP ----------------
-// The limit is configuration (RateLimiting:AuthPermitLimit, default 10 per minute), read lazily so tests can change it.
+// ---- Rate limiting: login and registration per client IP; ordering per signed-in user ----
+// Limits are configuration (RateLimiting:AuthPermitLimit, default 10 per minute; RateLimiting:OrderingPermitLimit,
+// default 60 per minute), read lazily so tests can change them.
 builder.Services.AddRateLimiter(_ => { });
 builder.Services.AddOptions<RateLimiterOptions>().Configure<IConfiguration>((options, configuration) =>
 {
     int permitLimit = configuration.GetValue("RateLimiting:AuthPermitLimit", 10);
+    int orderingPermitLimit = configuration.GetValue("RateLimiting:OrderingPermitLimit", 60);
 
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.AddPolicy(RateLimitPolicies.Auth, httpContext =>
@@ -83,6 +86,19 @@ builder.Services.AddOptions<RateLimiterOptions>().Configure<IConfiguration>((opt
             _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = permitLimit,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+
+    // M5 finding F1: per patron, so patrons sharing one address (office, mobile network) do not limit each other.
+    options.AddPolicy(RateLimitPolicies.Ordering, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) is string userId
+                ? "user:" + userId
+                : "ip:" + (httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = orderingPermitLimit,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
             }));
@@ -147,8 +163,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors(FrontendCorsPolicy);
-app.UseRateLimiter();      // rejects floods before any authentication or database work
-app.UseAuthentication();   // who is calling (reads the session cookie)
+app.UseAuthentication();   // who is calling (reads the session cookie; no database work)
+app.UseRateLimiter();      // after authentication so ordering is limited per patron; login stays per IP
 app.UseAuthorization();    // what they may do (policies, roles)
 
 app.MapControllers();

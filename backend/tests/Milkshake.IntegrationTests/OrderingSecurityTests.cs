@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,8 @@ public sealed class OrderingSecurityTests(MilkshakeApiFactory factory) : IClassF
         {
             Assert.Null(endpoint.Metadata.GetMetadata<IAllowAnonymous>());
             Assert.Contains(endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>(), a => a.Policy == AuthorizationPolicies.PatronOnly);
+            Assert.Equal(RateLimitPolicies.Ordering, endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName);
+
         });
     }
 }
