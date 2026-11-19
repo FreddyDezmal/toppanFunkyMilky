@@ -45,6 +45,8 @@ export const SETTING_KEYS = {
   vatRate: 'Tax.VatRate',
   maxDiscountAmount: 'Discounts.MaxDiscountAmount',
   minPickupLeadTimeMinutes: 'Pickup.MinLeadTimeMinutes',
+  pickupMaxAdvanceDays: 'Pickup.MaxAdvanceDays',
+  pickupTimeZone: 'Pickup.TimeZone',
   displayLocale: 'Pricing.DisplayLocale',
   currencyCode: 'Pricing.CurrencyCode',
 } as const
@@ -55,6 +57,8 @@ const SETTING_LABELS: Record<string, string> = {
   [SETTING_KEYS.vatRate]: 'VAT rate',
   [SETTING_KEYS.maxDiscountAmount]: 'Maximum discount amount',
   [SETTING_KEYS.minPickupLeadTimeMinutes]: 'Minimum pickup lead time',
+  [SETTING_KEYS.pickupMaxAdvanceDays]: 'Maximum days ahead for pickup',
+  [SETTING_KEYS.pickupTimeZone]: 'Pickup time zone',
   [SETTING_KEYS.displayLocale]: 'Display locale',
   [SETTING_KEYS.currencyCode]: 'Currency',
 }

@@ -56,7 +56,8 @@ builder.Services.ConfigureApplicationCookie(options =>
 // ---- Authorization: everything requires a signed-in user unless marked [AllowAnonymous] ----
 builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
-    .AddPolicy(AuthorizationPolicies.ManagerOnly, policy => policy.RequireRole(Roles.Manager));
+    .AddPolicy(AuthorizationPolicies.ManagerOnly, policy => policy.RequireRole(Roles.Manager))
+    .AddPolicy(AuthorizationPolicies.PatronOnly, policy => policy.RequireRole(Roles.Patron));
 
 // ---- CSRF protection for cookie sessions ---------------------------------
 builder.Services.AddAntiforgery(options =>

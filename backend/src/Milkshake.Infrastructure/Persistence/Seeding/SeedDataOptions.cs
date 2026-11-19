@@ -93,4 +93,11 @@ public sealed class SettingsSeed
 
     /// <summary>Minimum minutes between ordering and pickup.</summary>
     public int MinPickupLeadTimeMinutes { get; set; }
+
+    
+    /// <summary>IANA time zone for pickup times, e.g. Africa/Johannesburg [provisional, Q-17].</summary>
+    public string PickupTimeZone { get; set; } = string.Empty;
+
+    /// <summary>Days ahead a pickup may be booked; 0 = same day only [provisional, Q-18].</summary>
+    public int PickupMaxAdvanceDays { get; set; }
 }

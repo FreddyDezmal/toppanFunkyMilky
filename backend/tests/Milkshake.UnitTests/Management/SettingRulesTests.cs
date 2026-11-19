@@ -27,6 +27,10 @@ public sealed class SettingRulesTests
     [InlineData(SettingKeys.MinPickupLeadTimeMinutes, "241")]
     [InlineData(SettingKeys.DisplayLocale, "not a locale")]
     [InlineData(SettingKeys.CurrencyCode, "USD")]
+    [InlineData(SettingKeys.PickupTimeZone, "Mars/Olympus_Mons")]
+    [InlineData(SettingKeys.PickupTimeZone, "South Africa Standard Time")]   // Windows name, not IANA
+    [InlineData(SettingKeys.PickupMaxAdvanceDays, "31")]
+    [InlineData(SettingKeys.PickupMaxAdvanceDays, "-1")]
     [InlineData("Unknown.Key", "1")]
     public void Validate_RejectsInvalidValues(string key, string value)
     {
@@ -48,6 +52,9 @@ public sealed class SettingRulesTests
     [InlineData(SettingKeys.MaxDiscountAmount, "50.00", "50.00")]
     [InlineData(SettingKeys.MinPickupLeadTimeMinutes, "0", "0")]
     [InlineData(SettingKeys.MinPickupLeadTimeMinutes, "240", "240")]
+    [InlineData(SettingKeys.PickupTimeZone, "Africa/Johannesburg", "Africa/Johannesburg")]
+    [InlineData(SettingKeys.PickupMaxAdvanceDays, "0", "0")]
+    [InlineData(SettingKeys.PickupMaxAdvanceDays, "30", "30")]
     [InlineData(SettingKeys.DisplayLocale, "en-ZA", "en-ZA")]
     [InlineData(SettingKeys.DisplayLocale, "en-za", "en-ZA")]
     public void Validate_AcceptsAndNormalisesValidValues(string key, string value, string expected)

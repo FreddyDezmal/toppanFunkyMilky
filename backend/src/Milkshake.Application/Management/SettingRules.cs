@@ -11,8 +11,9 @@ public sealed record SettingValidation(string? NormalisedValue, string? Error)
 }
 
 /// <summary>
-/// Business limits for management-editable settings (M10 decision D6). URS values: 1 to 10 drinks, VAT 15%.
-/// The upper limits for maximum drinks (50) and lead time (240 minutes) are project recommendations.
+/// Business limits for management-editable settings (M10 decision D6, M5 provisional pickup settings).
+/// URS values: 1 to 10 drinks, VAT 15%. The upper limits for maximum drinks (50), lead time (240 minutes) and
+/// advance booking (30 days) are project recommendations.
 /// </summary>
 public static class SettingRules
 {
@@ -21,6 +22,9 @@ public static class SettingRules
 
     /// <summary>Highest allowed minimum pickup lead time in minutes [project recommendation, D6].</summary>
     public const int MaxLeadTimeMinutes = 240;
+
+    /// <summary>Highest allowed advance booking in days [project recommendation, M5].</summary>
+    public const int MaxAdvanceDaysLimit = 30;
 
     /// <summary>Shown when someone tries to change the currency.</summary>
     public const string CurrencyReadOnlyMessage =
@@ -33,6 +37,8 @@ public static class SettingRules
         SettingKeys.VatRate,
         SettingKeys.MaxDiscountAmount,
         SettingKeys.MinPickupLeadTimeMinutes,
+        SettingKeys.PickupMaxAdvanceDays,
+        SettingKeys.PickupTimeZone,
         SettingKeys.DisplayLocale,
         SettingKeys.CurrencyCode,
     ];
@@ -63,6 +69,8 @@ public static class SettingRules
         SettingKeys.VatRate => "Fraction from 0 to 1, e.g. 0.15 for 15%. URS value: 15%.",
         SettingKeys.MaxDiscountAmount => "Amount in the pricing currency, 0 or more, at most two decimal places. Meaning pending confirmation (open question Q-02).",
         SettingKeys.MinPickupLeadTimeMinutes => $"Whole number of minutes from 0 to {MaxLeadTimeMinutes}. Pickup rules pending confirmation (open question Q-06).",
+        SettingKeys.PickupMaxAdvanceDays => $"Whole number of days from 0 (same day only) to {MaxAdvanceDaysLimit}. Provisional, pending confirmation (open question Q-18).",
+        SettingKeys.PickupTimeZone => "IANA time zone name, e.g. Africa/Johannesburg. Pickup times are chosen and shown in this zone. Provisional (open question Q-17).",
         SettingKeys.DisplayLocale => "Locale used to format prices, e.g. en-ZA.",
         SettingKeys.CurrencyCode => "Read-only. Changing the currency would require re-entering every price.",
         _ => string.Empty,
@@ -168,6 +176,30 @@ public static class SettingRules
                 }
 
                 return Ok(minutes.ToString(CultureInfo.InvariantCulture));
+            }
+
+            case SettingKeys.PickupMaxAdvanceDays:
+            {
+                if (!TryWhole(trimmed, out int days))
+                {
+                    return Fail("Enter a whole number of days.");
+                }
+
+                if (days < 0 || days > MaxAdvanceDaysLimit)
+                {
+                    return Fail($"Advance booking must be between 0 and {MaxAdvanceDaysLimit} days.");
+                }
+
+                return Ok(days.ToString(CultureInfo.InvariantCulture));
+            }
+
+            case SettingKeys.PickupTimeZone:
+            {
+                // IANA names only (e.g. Africa/Johannesburg): they work on Windows and Linux servers alike.
+                bool isIana = TimeZoneInfo.TryConvertIanaIdToWindowsId(trimmed, out _);
+                return isIana && TimeZoneInfo.TryFindSystemTimeZoneById(trimmed, out _)
+                    ? Ok(trimmed)
+                    : Fail("Enter an IANA time zone name such as Africa/Johannesburg.");
             }
 
             case SettingKeys.DisplayLocale:

@@ -23,4 +23,11 @@ public static class SettingKeys
 
     /// <summary>Locale used to format amounts for display, e.g. en-ZA.</summary>
     public const string DisplayLocale = "Pricing.DisplayLocale";
+
+    
+    /// <summary>IANA time zone in which pickup times are chosen and shown [provisional, Q-17].</summary>
+    public const string PickupTimeZone = "Pickup.TimeZone";
+
+    /// <summary>How many days ahead a pickup may be booked; 0 = same day only [provisional, Q-18].</summary>
+    public const string PickupMaxAdvanceDays = "Pickup.MaxAdvanceDays";
 }

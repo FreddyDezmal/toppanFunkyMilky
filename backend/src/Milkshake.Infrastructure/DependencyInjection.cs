@@ -1,3 +1,5 @@
+using Milkshake.Application.Ordering;
+using Milkshake.Infrastructure.Ordering;
 using Milkshake.Application.Management;
 using Milkshake.Infrastructure.Management;
 using Milkshake.Application.Accounts;
@@ -66,11 +68,13 @@ public static class DependencyInjection
                     serviceProvider.GetRequiredService<DatabaseSeeder>().SeedAsync((MilkshakeDbContext)context, cancellationToken)));
                     
         AddIdentityServices(services);
+
         services.AddScoped<ICatalogManagementService, CatalogManagementService>();
         services.AddScoped<IRestaurantManagementService, RestaurantManagementService>();
         services.AddScoped<ICatalogPricingService, CatalogPricingService>();
         services.AddScoped<ISettingsManagementService, SettingsManagementService>();
         services.AddScoped<IDiscountTierManagementService, DiscountTierManagementService>();
+        services.AddScoped<IOrderingCatalogService, OrderingCatalogService>();
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>(
