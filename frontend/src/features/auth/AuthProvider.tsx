@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import * as authApi from './api'
 import { AuthContext, type AuthContextValue, type AuthStatus } from './authContext'
 import type { CurrentUser, LoginInput, RegisterInput } from './types'
+import { clearOrderDrafts } from '../ordering/draftStorage'
 
 /**
  * Holds who is signed in. The session itself lives in an HTTP-only cookie that JavaScript cannot read;
@@ -52,6 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authApi.logout()
     } finally {
       // Clear local state even if the request failed, so the UI never shows a stale signed-in user.
+      // The order draft goes too: it belongs to the user who is signing out (decision E2).
+      clearOrderDrafts()
       setUser(null)
       setStatus('anonymous')
     }
