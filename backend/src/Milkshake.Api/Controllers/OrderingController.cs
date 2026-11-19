@@ -7,13 +7,13 @@ using Milkshake.Application.Ordering;
 namespace Milkshake.Api.Controllers;
 
 /// <summary>
-/// Patron ordering (M5): read-only options now; draft validation follows in the next steps.
-/// Nothing here creates an order or takes payment.
+/// Patron ordering (M5): read-only options and stateless draft validation.
+/// Nothing here creates an order, stores a draft or takes payment.
 /// </summary>
 [ApiController]
 [Route("api/ordering")]
 [Authorize(Policy = AuthorizationPolicies.PatronOnly)]
-public sealed class OrderingController(IOrderingCatalogService catalog) : ControllerBase
+public sealed class OrderingController(IOrderingCatalogService catalog, IOrderDraftValidator validator) : ControllerBase
 {
     /// <summary>
     /// Active flavours, consistencies and toppings with current fees, active restaurants, drink limits and the
@@ -32,10 +32,51 @@ public sealed class OrderingController(IOrderingCatalogService catalog) : Contro
         OrderingOptionsResult result = await catalog.GetOptionsAsync(cancellationToken);
 
         return result.Options is null
-            ? Problem(
-                statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: OrderingMessages.UnavailableTitle,
-                detail: OrderingMessages.UnavailableDetail)
+            ? Unavailable()
             : Ok(OrderingOptionsResponse.From(result.Options));
     }
+
+    /// <summary>
+    /// Checks a draft against the options in force now: drink count within the configured limits, exactly one active
+    /// flavour, consistency and topping per drink, and an active restaurant. Stores nothing.
+    /// </summary>
+    /// <response code="200">Every selection is valid; the resolved draft summary.</response>
+    /// <response code="400">Missing, unavailable or malformed selections, keyed by field (e.g. drinks[1].toppingId).</response>
+    /// <response code="503">Ordering configuration is invalid.</response>
+    [HttpPost("draft/validate")]
+    [ProducesResponseType<DraftSummaryResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<DraftSummaryResponse>> ValidateDraft(ValidateDraftRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        DraftValidationResult result = await validator.ValidateAsync(request.ToDraft(), cancellationToken);
+
+        if (result.OrderingUnavailable)
+        {
+            return Unavailable();
+        }
+
+        if (result.Draft is null)
+        {
+            foreach ((string field, string[] messages) in result.Errors)
+            {
+                foreach (string message in messages)
+                {
+                    ModelState.AddModelError(field, message);
+                }
+            }
+
+            return ValidationProblem(ModelState);
+        }
+
+        return Ok(DraftSummaryResponse.From(result.Draft));
+    }
+
+    private ObjectResult Unavailable() =>
+        Problem(
+            statusCode: StatusCodes.Status503ServiceUnavailable,
+            title: OrderingMessages.UnavailableTitle,
+            detail: OrderingMessages.UnavailableDetail);
 }

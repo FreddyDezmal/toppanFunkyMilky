@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json.Serialization;
 using Milkshake.Application.Ordering;
 
 namespace Milkshake.Api.Contracts.Ordering;
@@ -69,5 +70,74 @@ public sealed record OrderingOptionsResponse(
     }
 
     private static OrderingOptionResponse ToResponse(OrderingOption option) =>
+        new(option.Id, option.Name, new FeeResponse(option.FeeAmount, option.CurrencyCode));
+}
+
+
+/// <summary>One drink in a draft: identifiers only. Unknown fields (e.g. a price) are rejected.</summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed class DraftDrinkRequest
+{
+    /// <summary>An active flavour id from GET /api/ordering/options.</summary>
+    public int? FlavourId { get; init; }
+
+    /// <summary>An active consistency id.</summary>
+    public int? ConsistencyId { get; init; }
+
+    /// <summary>An active topping id.</summary>
+    public int? ToppingId { get; init; }
+}
+
+/// <summary>
+/// POST /api/ordering/draft/validate. The number of drinks is the length of <see cref="Drinks"/>.
+/// Unknown fields are rejected; prices are never accepted from the browser.
+/// </summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed class ValidateDraftRequest
+{
+    /// <summary>An active restaurant id.</summary>
+    public int? RestaurantId { get; init; }
+
+    /// <summary>One entry per milkshake.</summary>
+    public IReadOnlyList<DraftDrinkRequest?>? Drinks { get; init; }
+
+    /// <summary>Maps to the application model.</summary>
+    public OrderDraft ToDraft() =>
+        new(
+            RestaurantId,
+            Drinks?.Select(d => d is null ? null : new DraftDrinkSelection(d.FlavourId, d.ConsistencyId, d.ToppingId)).ToList() ?? []);
+}
+
+/// <summary>A validated drink with the names and current fees of its choices.</summary>
+public sealed record DraftDrinkResponse(
+    int Number,
+    OrderingOptionResponse Flavour,
+    OrderingOptionResponse Consistency,
+    OrderingOptionResponse Topping);
+
+/// <summary>A draft whose selections are valid right now. Not an order: nothing has been stored or paid.</summary>
+public sealed record DraftSummaryResponse(
+    bool IsDraft,
+    OrderingRestaurantResponse Restaurant,
+    IReadOnlyList<DraftDrinkResponse> Drinks,
+    string Note)
+{
+    /// <summary>Shown with every draft summary.</summary>
+    public const string DraftNote =
+        "Draft – not yet ordered or paid. Fees shown are current fees; the final price, VAT and any discount are calculated at checkout.";
+
+    /// <summary>Maps the application model.</summary>
+    public static DraftSummaryResponse From(ValidatedDraft draft)
+    {
+        ArgumentNullException.ThrowIfNull(draft);
+
+        return new DraftSummaryResponse(
+            IsDraft: true,
+            new OrderingRestaurantResponse(draft.Restaurant.Id, draft.Restaurant.Name, draft.Restaurant.Address),
+            draft.Drinks.Select(d => new DraftDrinkResponse(d.Number, Option(d.Flavour), Option(d.Consistency), Option(d.Topping))).ToList(),
+            DraftNote);
+    }
+
+    private static OrderingOptionResponse Option(OrderingOption option) =>
         new(option.Id, option.Name, new FeeResponse(option.FeeAmount, option.CurrencyCode));
 }

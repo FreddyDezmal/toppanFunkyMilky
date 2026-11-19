@@ -1,9 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
+using Milkshake.Application.Ordering;
 
 namespace Milkshake.Application;
 
 /// <summary>
-/// Registers application-layer services (use cases, pricing, discounts, validation).
+/// Registers application-layer services (use cases and rules that depend only on interfaces).
 /// </summary>
 public static class DependencyInjection
 {
@@ -14,8 +15,7 @@ public static class DependencyInjection
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        // Application services (ordering, pricing, discount engine, lookup management)
-        // are registered here in later milestones.
+        services.AddScoped<IOrderDraftValidator, OrderDraftValidator>();
 
         return services;
     }

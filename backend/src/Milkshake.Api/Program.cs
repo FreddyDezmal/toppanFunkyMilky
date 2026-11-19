@@ -109,7 +109,14 @@ builder.Services.AddControllers(options =>
 
     // Validation errors use the JSON property names (camelCase) the frontend sends and displays.
     options.ModelMetadataDetailsProviders.Add(new SystemTextJsonValidationMetadataProvider());
+})
+.AddJsonOptions(json =>
+{
+    // A property sent twice is ambiguous (which value wins?), so it is rejected as malformed.
+    json.JsonSerializerOptions.AllowDuplicateProperties = false;
 });
+
+
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
