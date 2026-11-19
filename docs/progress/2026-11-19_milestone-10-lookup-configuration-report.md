@@ -183,7 +183,7 @@ before applying; applied to Supabase on 18 November 2026. Steps 4–9 needed no 
 | Tests: xUnit + Testcontainers, Vitest, Playwright | ✅ |
 | All existing tests continue to pass | ✅ |
 | Documentation updated | ✅ (README, this report) |
-| No secrets committed | ✅ (section 10) |
+| No secrets committed | ✅ (section 11) |
 | Discount tiers can be activated | ⏳ intentionally blocked until Q-01 to Q-04 are answered and M6 implements them |
 
 ---
