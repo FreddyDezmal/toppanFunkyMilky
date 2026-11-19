@@ -40,10 +40,29 @@ export interface Setting {
 }
 
 export const SETTING_KEYS = {
+  minDrinksPerOrder: 'Orders.MinDrinksPerOrder',
+  maxDrinksPerOrder: 'Orders.MaxDrinksPerOrder',
+  vatRate: 'Tax.VatRate',
+  maxDiscountAmount: 'Discounts.MaxDiscountAmount',
+  minPickupLeadTimeMinutes: 'Pickup.MinLeadTimeMinutes',
   displayLocale: 'Pricing.DisplayLocale',
   currencyCode: 'Pricing.CurrencyCode',
 } as const
 
+const SETTING_LABELS: Record<string, string> = {
+  [SETTING_KEYS.minDrinksPerOrder]: 'Minimum drinks per order',
+  [SETTING_KEYS.maxDrinksPerOrder]: 'Maximum drinks per order',
+  [SETTING_KEYS.vatRate]: 'VAT rate',
+  [SETTING_KEYS.maxDiscountAmount]: 'Maximum discount amount',
+  [SETTING_KEYS.minPickupLeadTimeMinutes]: 'Minimum pickup lead time',
+  [SETTING_KEYS.displayLocale]: 'Display locale',
+  [SETTING_KEYS.currencyCode]: 'Currency',
+}
+
+/** A manager-friendly name for a setting key. */
+export function settingLabel(key: string): string {
+  return SETTING_LABELS[key] ?? key
+}
 
 export type PriceStatus = 'Past' | 'Current' | 'Scheduled'
 
@@ -70,5 +89,17 @@ export interface Restaurant {
   name: string
   address: string | null
   isActive: boolean
+  version: number
+}
+
+/** GET /api/manager/discount-tiers. Rates are fractions (0.05 = 5%). */
+export interface DiscountTier {
+  tierNumber: number
+  minPreviousOrders: number
+  minDrinksPerOrder: number
+  discountRate: number
+  isActive: boolean
+  canActivate: boolean
+  activationBlockedReason: string | null
   version: number
 }

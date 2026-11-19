@@ -1,5 +1,13 @@
 import { getJson, postJson, putJson } from '../../lib/api/httpClient'
-import type { CatalogItem, CatalogKind, PriceHistory, Restaurant, Setting, StatusFilter } from './types'
+import type {
+  CatalogItem,
+  CatalogKind,
+  DiscountTier,
+  PriceHistory,
+  Restaurant,
+  Setting,
+  StatusFilter,
+} from './types'
 
 const MANAGER = '/api/manager'
 
@@ -25,11 +33,6 @@ export function updateCatalogItem(
 export function setCatalogItemActive(kind: CatalogKind, id: number, active: boolean, version: number): Promise<CatalogItem> {
   return postJson<CatalogItem>(`${MANAGER}/catalog/${kind}/${id}/${active ? 'activate' : 'deactivate'}`, { version })
 }
-
-export function listSettings(signal?: AbortSignal): Promise<Setting[]> {
-  return getJson<Setting[]>(`${MANAGER}/settings`, { signal })
-}
-
 
 export function getPriceHistory(kind: CatalogKind, id: number, signal?: AbortSignal): Promise<PriceHistory> {
   return getJson<PriceHistory>(`${MANAGER}/catalog/${kind}/${id}/prices`, { signal })
@@ -65,4 +68,24 @@ export function updateRestaurant(
 
 export function setRestaurantActive(id: number, active: boolean, version: number): Promise<Restaurant> {
   return postJson<Restaurant>(`${MANAGER}/restaurants/${id}/${active ? 'activate' : 'deactivate'}`, { version })
+}
+
+export function listSettings(signal?: AbortSignal): Promise<Setting[]> {
+  return getJson<Setting[]>(`${MANAGER}/settings`, { signal })
+}
+
+/** Returns all settings: saving minimum or maximum drinks also changes the other one's version. */
+export function updateSetting(key: string, value: string, version: number): Promise<Setting[]> {
+  return putJson<Setting[]>(`${MANAGER}/settings/${encodeURIComponent(key)}`, { value, version })
+}
+
+export function listDiscountTiers(signal?: AbortSignal): Promise<DiscountTier[]> {
+  return getJson<DiscountTier[]>(`${MANAGER}/discount-tiers`, { signal })
+}
+
+export function updateDiscountTier(
+  tierNumber: number,
+  input: { minPreviousOrders: number; minDrinksPerOrder: number; discountRate: number; version: number },
+): Promise<DiscountTier> {
+  return putJson<DiscountTier>(`${MANAGER}/discount-tiers/${tierNumber}`, input)
 }

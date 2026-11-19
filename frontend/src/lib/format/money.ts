@@ -10,6 +10,15 @@ export function formatMoney(amount: number, currencyCode: string, locale?: strin
   }
 }
 
+/** Formats a fraction (0.15) as a percentage ("15%") for the configured locale. */
+export function formatPercent(fraction: number, locale?: string): string {
+  try {
+    return new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 2 }).format(fraction)
+  } catch {
+    return `${fraction * 100}%`
+  }
+}
+
 /** Formats a UTC timestamp from the API in the user's time zone. */
 export function formatDateTime(isoUtc: string, locale?: string): string {
   try {

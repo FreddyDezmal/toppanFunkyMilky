@@ -113,3 +113,43 @@ export function validateRestaurantForm(values: RestaurantFormValues): Restaurant
 
   return errors
 }
+
+export interface TierFormValues {
+  minPreviousOrders: string
+  minDrinksPerOrder: string
+  discountRate: string
+}
+
+export type TierFormErrors = Partial<Record<keyof TierFormValues, string>>
+
+const RATE = /^\d+(\.\d{1,4})?$/
+
+/** Parses a rate fraction "0.05" or "0,05" (0 to 1, at most four decimals); null if invalid. */
+export function parseRate(value: string): number | null {
+  const normalised = value.trim().replace(',', '.')
+  if (!RATE.test(normalised)) {
+    return null
+  }
+  const rate = Number(normalised)
+  return rate <= 1 ? rate : null
+}
+
+export function validateTierForm(values: TierFormValues): TierFormErrors {
+  const errors: TierFormErrors = {}
+
+  const previous = values.minPreviousOrders.trim()
+  if (!WHOLE_NUMBER.test(previous) || Number(previous) > MAX_INT) {
+    errors.minPreviousOrders = 'Enter a whole number of 0 or more.'
+  }
+
+  const drinks = values.minDrinksPerOrder.trim()
+  if (!WHOLE_NUMBER.test(drinks) || Number(drinks) < 1 || Number(drinks) > MAX_INT) {
+    errors.minDrinksPerOrder = 'Enter a whole number of 1 or more.'
+  }
+
+  if (parseRate(values.discountRate) === null) {
+    errors.discountRate = 'Enter a fraction from 0 to 1 with at most four decimal places, e.g. 0.05 for 5%.'
+  }
+
+  return errors
+}

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { parseAmount, validateCatalogForm, validatePriceForm, validateRestaurantForm } from './validation'
+import {
+  parseAmount,
+  validateCatalogForm,
+  validatePriceForm,
+  validateRestaurantForm,
+  validateTierForm,
+} from './validation'
 
 const valid = { name: 'Mint', displayOrder: '2', initialPrice: '25.50' }
 
@@ -63,5 +69,18 @@ describe('validateRestaurantForm', () => {
   it('allows an empty address but limits its length', () => {
     expect(validateRestaurantForm({ name: 'Harbour', address: '' })).toEqual({})
     expect(validateRestaurantForm({ name: 'Harbour', address: 'x'.repeat(251) }).address).toMatch(/250/)
+  })
+})
+
+
+describe('validateTierForm', () => {
+  it('accepts whole-number thresholds and a rate with a comma', () => {
+    expect(validateTierForm({ minPreviousOrders: '0', minDrinksPerOrder: '1', discountRate: '0,0525' })).toEqual({})
+  })
+
+  it('rejects zero drinks, a rate above 1 and more than four decimals', () => {
+    expect(validateTierForm({ minPreviousOrders: '5', minDrinksPerOrder: '0', discountRate: '0.05' }).minDrinksPerOrder).toBeDefined()
+    expect(validateTierForm({ minPreviousOrders: '5', minDrinksPerOrder: '2', discountRate: '1.01' }).discountRate).toBeDefined()
+    expect(validateTierForm({ minPreviousOrders: '5', minDrinksPerOrder: '2', discountRate: '0.12345' }).discountRate).toBeDefined()
   })
 })
