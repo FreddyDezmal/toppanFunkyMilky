@@ -14,6 +14,8 @@ interface TextFieldProps {
   disabled?: boolean
   /** Earliest allowed value for date/time inputs. */
   min?: string
+    /** Latest allowed value for date/time inputs. */
+  max?: string
 }
 
 /** Labelled input whose hint and error are announced by screen readers (aria-describedby, aria-invalid). */
@@ -28,7 +30,9 @@ export function TextField({
   hint,
   error,
   required = true,
-  disabled = false, min,
+  disabled = false,
+  min,
+  max,
 }: TextFieldProps) {
   const hintId = hint ? `${id}-hint` : undefined
   const errorId = error ? `${id}-error` : undefined
@@ -48,6 +52,7 @@ export function TextField({
         autoComplete={autoComplete}
         disabled={disabled}
         min={min}
+        max={max}        
         aria-required={required ? 'true' : undefined}
         aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy}

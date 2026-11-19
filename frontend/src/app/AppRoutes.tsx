@@ -3,6 +3,7 @@ import { AppLayout } from '../components/layout/AppLayout'
 import { RequireAuth } from '../features/auth/RequireAuth'
 import { ROLES } from '../features/auth/types'
 import { ManagementLayout } from '../features/management/ManagementLayout'
+import { OrderLayout } from '../features/ordering/OrderLayout'
 import { AccountPage } from '../pages/AccountPage'
 import { HomePage } from '../pages/HomePage'
 import { LoginPage } from '../pages/LoginPage'
@@ -13,6 +14,10 @@ import { PricesPage } from '../pages/management/PricesPage'
 import { RestaurantsPage } from '../pages/management/RestaurantsPage'
 import { SettingsPage } from '../pages/management/SettingsPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
+import { OrderDrinksPage } from '../pages/ordering/OrderDrinksPage'
+import { OrderPickupPage } from '../pages/ordering/OrderPickupPage'
+import { OrderQuantityPage } from '../pages/ordering/OrderQuantityPage'
+import { OrderReviewPage } from '../pages/ordering/OrderReviewPage'
 import { RegisterPage } from '../pages/RegisterPage'
 
 /** All routes. Separate from the router so tests can render it inside a MemoryRouter. */
@@ -26,6 +31,15 @@ export function AppRoutes() {
 
         <Route element={<RequireAuth />}>
           <Route path="account" element={<AccountPage />} />
+        </Route>
+
+        <Route element={<RequireAuth role={ROLES.patron} />}>
+          <Route path="order" element={<OrderLayout />}>
+            <Route index element={<OrderQuantityPage />} />
+            <Route path="drinks" element={<OrderDrinksPage />} />
+            <Route path="pickup" element={<OrderPickupPage />} />
+            <Route path="review" element={<OrderReviewPage />} />
+          </Route>
         </Route>
 
         <Route element={<RequireAuth role={ROLES.manager} />}>

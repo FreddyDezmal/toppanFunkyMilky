@@ -38,6 +38,13 @@ export function AppLayout() {
             </NavLink>
             {status === 'authenticated' && user && (
               <>
+
+                {hasRole(user, ROLES.patron) && (
+                  <NavLink to="/order" className={navLinkClass}>
+                    Order
+                  </NavLink>
+                )}              
+
                 <NavLink to="/account" className={navLinkClass}>
                   My account
                 </NavLink>
