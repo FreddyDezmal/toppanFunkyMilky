@@ -231,6 +231,13 @@ function CatalogManager({ kind }: { kind: CatalogKind }) {
                     </span>
                   </td>
                   <td className="space-x-2 whitespace-nowrap py-2 text-right">
+                                        <Link
+                      to={`/manager/catalog/${kind}/${item.id}/prices`}
+                      aria-label={`Prices for ${item.name}`}
+                      className="rounded-md px-2 py-1 font-medium text-brand-700 hover:bg-brand-50"
+                    >
+                      Prices
+                    </Link>
                     <button
                       type="button"
                       aria-label={`Edit ${item.name}`}
@@ -241,15 +248,6 @@ function CatalogManager({ kind }: { kind: CatalogKind }) {
                       disabled={actionsLocked}
                       className="rounded-md px-2 py-1 font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40"
                     >
-
-                    <Link
-                      to={`/manager/catalog/${kind}/${item.id}/prices`}
-                      aria-label={`Prices for ${item.name}`}
-                      className="rounded-md px-2 py-1 font-medium text-brand-700 hover:bg-brand-50"
-                    >
-                      Prices
-                    </Link>
-                      
                       Edit
                     </button>
                     {item.isActive ? (
