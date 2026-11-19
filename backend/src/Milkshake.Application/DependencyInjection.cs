@@ -16,6 +16,7 @@ public static class DependencyInjection
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddScoped<IOrderDraftValidator, OrderDraftValidator>();
+        services.AddScoped<IOrderPricingService, OrderPricingService>();
 
         return services;
     }

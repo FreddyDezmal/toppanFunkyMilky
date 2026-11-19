@@ -13,7 +13,8 @@ public sealed record OrderingSettings(
     TimeZoneInfo TimeZone,
     string TimeZoneId,
     string CurrencyCode,
-    string DisplayLocale);
+    string DisplayLocale,
+    decimal VatRate);
 
 /// <summary>Typed settings, or the reasons they cannot be used (for the server log only).</summary>
 public sealed record OrderingSettingsResult(OrderingSettings? Settings, IReadOnlyList<string> Problems)
@@ -37,6 +38,7 @@ public static class OrderingSettingsReader
         SettingKeys.PickupTimeZone,
         SettingKeys.CurrencyCode,
         SettingKeys.DisplayLocale,
+        SettingKeys.VatRate,
     ];
 
     /// <summary>Validates and converts the stored values (key → invariant-culture text).</summary>
@@ -75,6 +77,7 @@ public static class OrderingSettingsReader
         string days = Checked(SettingKeys.PickupMaxAdvanceDays);
         string zoneId = Checked(SettingKeys.PickupTimeZone);
         string locale = Checked(SettingKeys.DisplayLocale);
+        string vatRate = Checked(SettingKeys.VatRate);
 
         string currency = stored[SettingKeys.CurrencyCode].Trim();
         if (currency.Length != 3 || !currency.All(char.IsAsciiLetterUpper))
@@ -95,7 +98,8 @@ public static class OrderingSettingsReader
             TimeZoneInfo.FindSystemTimeZoneById(zoneId),
             zoneId,
             currency,
-            locale);
+            locale,
+            decimal.Parse(vatRate, NumberStyles.Number, CultureInfo.InvariantCulture));
 
         return new OrderingSettingsResult(settings, problems);
     }

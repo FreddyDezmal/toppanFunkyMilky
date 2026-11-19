@@ -15,7 +15,7 @@ public sealed class OrderDraftRulesTests
 
     private static OrderingOptions Options(int min = 1, int max = 10)
     {
-        var settings = new OrderingSettings(min, max, 15, 7, Johannesburg, "Africa/Johannesburg", "ZAR", "en-ZA");
+        var settings = new OrderingSettings(min, max, 15, 7, Johannesburg, "Africa/Johannesburg", "ZAR", "en-ZA", 0.15m);
         return new OrderingOptions([Vanilla], [Thick], [OreoCrumbs], [BranchA], settings, PickupRules.WindowFor(settings, Now));
     }
 

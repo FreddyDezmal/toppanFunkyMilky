@@ -12,10 +12,10 @@ public sealed class PickupRulesTests
     private static readonly DateTimeOffset Now = new(2026, 11, 19, 10, 0, 0, TimeSpan.Zero);
 
     private static OrderingSettings Settings(int leadMinutes = 15, int maxAdvanceDays = 7) =>
-        new(1, 10, leadMinutes, maxAdvanceDays, Johannesburg, "Africa/Johannesburg", "ZAR", "en-ZA");
+        new(1, 10, leadMinutes, maxAdvanceDays, Johannesburg, "Africa/Johannesburg", "ZAR", "en-ZA", 0.15m);
 
     private static OrderingSettings LondonSettings() =>
-        new(1, 10, 15, 7, London, "Europe/London", "GBP", "en-GB");
+        new(1, 10, 15, 7, London, "Europe/London", "GBP", "en-GB", 0.20m);
 
     private static PickupCheck Check(string? pickupLocal) =>
         PickupRules.Check(pickupLocal, Settings(), PickupRules.WindowFor(Settings(), Now));
