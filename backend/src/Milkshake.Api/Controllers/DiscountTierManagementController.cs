@@ -12,7 +12,6 @@ namespace Milkshake.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/manager/discount-tiers")]
-[Produces("application/json")]
 [Authorize(Policy = AuthorizationPolicies.ManagerOnly)]
 public sealed class DiscountTierManagementController(IDiscountTierManagementService tiers) : ControllerBase
 {

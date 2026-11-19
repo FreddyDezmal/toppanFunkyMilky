@@ -12,7 +12,6 @@ namespace Milkshake.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/manager/restaurants")]
-[Produces("application/json")]
 [Authorize(Policy = AuthorizationPolicies.ManagerOnly)]
 public sealed class RestaurantManagementController(IRestaurantManagementService restaurants) : ControllerBase
 {

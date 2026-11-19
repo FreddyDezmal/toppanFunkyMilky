@@ -12,7 +12,6 @@ namespace Milkshake.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/manager/catalog/{kind:regex(^(flavours|toppings|consistencies)$)}/{id:int}/prices")]
-[Produces("application/json")]
 [Authorize(Policy = AuthorizationPolicies.ManagerOnly)]
 public sealed class CatalogPricingController(ICatalogPricingService pricing) : ControllerBase
 {

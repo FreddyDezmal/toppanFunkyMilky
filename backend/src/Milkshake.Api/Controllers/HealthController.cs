@@ -11,7 +11,6 @@ namespace Milkshake.Api.Controllers;
 [AllowAnonymous]
 [ApiController]
 [Route("api/health")]
-[Produces("application/json")]
 public sealed class HealthController(HealthCheckService healthCheckService, TimeProvider timeProvider) : ControllerBase
 {
     /// <summary>

@@ -13,7 +13,6 @@ namespace Milkshake.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/manager/catalog/{kind:regex(^(flavours|toppings|consistencies)$)}")]
-[Produces("application/json")]
 [Authorize(Policy = AuthorizationPolicies.ManagerOnly)]
 public sealed class CatalogManagementController(ICatalogManagementService catalog) : ControllerBase
 {

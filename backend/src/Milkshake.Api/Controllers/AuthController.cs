@@ -16,7 +16,6 @@ namespace Milkshake.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/auth")]
-[Produces("application/json")]
 public sealed class AuthController(
     IAntiforgery antiforgery,
     IOptions<AntiforgeryOptions> antiforgeryOptions) : ControllerBase
