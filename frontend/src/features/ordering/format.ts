@@ -39,6 +39,6 @@ export function optionLabel(option: OrderingOption, locale?: string): string {
   return `${option.name} (${formatMoney(option.fee.amount, option.fee.currencyCode, locale)})`
 }
 
-/** Shown wherever fees appear (decision E5): fees are informational, never a total or final price. */
-export const FEES_NOTE =
-  'Fees shown are the current fees for each choice. The final price, VAT and any discount are calculated at checkout.'
+/** Shown wherever prices appear (M6): every amount is a server estimate, recalculated when the order is placed. */
+export const ESTIMATE_NOTE =
+  'Prices are estimates based on current fees and VAT. The final amount is calculated when you place your order.'

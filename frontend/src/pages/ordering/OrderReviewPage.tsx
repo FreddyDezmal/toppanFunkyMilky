@@ -7,6 +7,7 @@ import { EmptyDraft } from '../../features/ordering/EmptyDraft'
 import { draftErrorsFrom, type DraftErrors } from '../../features/ordering/errors'
 import { formatLocalTime, timeZoneLabel } from '../../features/ordering/format'
 import { useOrderDraft } from '../../features/ordering/orderDraftContext'
+import { PriceSummary } from '../../features/ordering/PriceSummary'
 import type { DraftSummary, OrderingOption } from '../../features/ordering/types'
 import { useOrdering } from '../../features/ordering/useOrdering'
 
@@ -29,8 +30,8 @@ function stepFor(field: string): { to: string; label: string } {
 }
 
 /**
- * /order/review — the server checks the draft against the options in force now and returns the summary shown here.
- * Fees are informational (decision E5): no totals, VAT or discount until checkout (M6). Nothing is ordered or paid.
+ * /order/review — the server checks the draft against the options in force now and returns the summary shown here,
+ * with its estimated price (M6). Every amount comes from that response; nothing is ordered or paid.
  */
 export function OrderReviewPage() {
   const { options, reloadOptions } = useOrdering()
@@ -141,7 +142,10 @@ export function OrderReviewPage() {
               <ol className="mt-1 space-y-3">
                 {state.summary.drinks.map((drink) => (
                   <li key={drink.number}>
-                    <h3 className="font-medium">Milkshake {drink.number}</h3>
+                    <h3 className="flex justify-between gap-4 font-medium">
+                      <span>Milkshake {drink.number}</span>{' '}
+                      <span>{formatMoney(drink.price, state.summary.totals.currencyCode, locale)}</span>
+                    </h3>
                     <ul className="text-sm text-slate-700">
                       <li>
                         {drink.flavour.name} · {fee(drink.flavour)}
@@ -158,6 +162,13 @@ export function OrderReviewPage() {
               </ol>
             </div>
           </div>
+
+          <section aria-labelledby="review-price-heading" className="mt-6 max-w-sm rounded-xl bg-slate-50 p-4">
+            <h2 id="review-price-heading" className="mb-2 text-lg font-semibold">
+              Estimated price
+            </h2>
+            <PriceSummary totals={state.summary.totals} locale={locale} />
+          </section>
 
           <div className="mt-6 flex flex-wrap gap-2">
             <Link to="/order/drinks" className={LINK_CLASS}>
@@ -206,4 +217,4 @@ export function OrderReviewPage() {
       />
     </section>
   )
-}
+}

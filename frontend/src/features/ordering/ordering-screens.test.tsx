@@ -1,18 +1,21 @@
-import { fireEvent, screen, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearCsrfToken } from '../../lib/api/httpClient'
+import { formatMoney, formatPercent } from '../../lib/format/money'
 import { jsonResponse } from '../../test/mockApi'
-import { draftSummary, patronUser } from '../../test/orderingFixtures'
+import { draftSummary, patronUser, quoteFor } from '../../test/orderingFixtures'
 import { callsTo, renderOrderingAt } from '../../test/renderOrdering'
 import type { CurrentUser } from '../auth/types'
 import { saveDraft } from './draftStorage'
 import { RECONCILE_MESSAGES } from './reconcileDraft'
-import type { OrderDraft } from './types'
+import type { DrinkSelection, OrderDraft } from './types'
 
 const manager: CurrentUser = { ...patronUser, id: 'manager-1', firstName: 'Mandla', roles: ['Manager'] }
 const vanillaThickOreo = { flavourId: 3, consistencyId: 29, toppingId: 19 }
 const empty = { flavourId: null, consistencyId: null, toppingId: null }
+// Intl uses a non-breaking space ("R 46,00"); Testing Library compares page text with ordinary spaces.
+const zar = (amount: number) => formatMoney(amount, 'ZAR', 'en-ZA').replace(/\s/g, ' ')
 
 function storeDraft(draft: Partial<OrderDraft>) {
   saveDraft(patronUser.id, { restaurantId: null, pickupLocal: null, drinks: [], ...draft })
@@ -107,7 +110,7 @@ describe('milkshakes', () => {
 
     const flavour = await screen.findByLabelText('Flavour')
     expect(within(flavour).getByRole('option', { name: /^Vanilla \(R/ })).toBeInTheDocument()
-    expect(screen.getByText(/Fees shown are the current fees/)).toBeInTheDocument()
+    expect(screen.getByText(/Prices are estimates based on current fees and VAT/)).toBeInTheDocument()
 
     await userEvent.selectOptions(flavour, '3')
     await userEvent.selectOptions(screen.getByLabelText('Consistency'), '29')
@@ -193,14 +196,20 @@ describe('review', () => {
   const ready: Partial<OrderDraft> = { restaurantId: 35, pickupLocal: '2026-11-20T10:00', drinks: [vanillaThickOreo] }
   const VALIDATE = 'POST /api/ordering/draft/validate'
 
-  it('shows the server-checked draft with its fees and no total, and payment is not offered yet', async () => {
+  it('shows the server-checked draft with per-drink prices and estimated totals, and payment is not offered yet', async () => {
     storeDraft(ready)
     const fetchMock = renderOrderingAt('/order/review', { [VALIDATE]: () => jsonResponse(draftSummary()) })
 
     expect(await screen.findByText(/^Draft – not yet ordered or paid/)).toBeInTheDocument()
     expect(screen.getByText('Branch A')).toBeInTheDocument()
     expect(screen.getByText(/^Vanilla ·/)).toBeInTheDocument()
-    expect(screen.queryByText(/total/i)).not.toBeInTheDocument()
+    expect(within(screen.getByRole('heading', { name: /^Milkshake 1/ })).getByText(zar(46))).toBeInTheDocument()
+    const price = screen.getByRole('region', { name: 'Estimated price' })
+    expect(within(price).getByText(zar(46))).toBeInTheDocument()
+    expect(within(price).getByText(`${zar(0)} (none)`)).toBeInTheDocument()
+    expect(within(price).getByText(`VAT (${formatPercent(0.15, 'en-ZA')})`)).toBeInTheDocument()
+    expect(within(price).getByText(zar(6.9))).toBeInTheDocument()
+    expect(within(price).getByText(zar(52.9))).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue to payment (coming soon)' })).toBeDisabled()
 
     const [call] = callsTo(fetchMock, 'POST', '/api/ordering/draft/validate')
@@ -244,5 +253,79 @@ describe('review', () => {
 
     expect(await screen.findByRole('heading', { name: 'How many milkshakes?' })).toBeInTheDocument()
     expect(screen.getByLabelText('Number of milkshakes')).toHaveValue('')
+  })
+})
+
+describe('live prices', () => {
+  const QUOTE = 'POST /api/ordering/quote'
+  const bodyOf = (init: RequestInit | undefined) => (JSON.parse(String(init?.body)) as { drinks: DrinkSelection[] }).drinks
+
+  it('shows each milkshake’s price and the estimated total from the server', async () => {
+    // 30 + 6 + 10 = 46.00 and 32 + 0 + 8 = 40.00; subtotal 86.00; VAT 12.90; total 98.90.
+    storeDraft({ drinks: [vanillaThickOreo, { flavourId: 4, consistencyId: 30, toppingId: 20 }] })
+    const fetchMock = renderOrderingAt('/order/drinks')
+
+    expect(await screen.findByText(`Estimated total ${zar(98.9)}.`)).toBeInTheDocument()
+    expect(within(screen.getByRole('listitem', { name: 'Milkshake 2' })).getByText(zar(40))).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Estimated price' })).getByText(zar(12.9))).toBeInTheDocument()
+    expect(bodyOf(callsTo(fetchMock, 'POST', '/api/ordering/quote')[0]?.[1])).toEqual([
+      vanillaThickOreo,
+      { flavourId: 4, consistencyId: 30, toppingId: 20 },
+    ])
+  })
+
+  it('asks the server again after a change and shows the new price', async () => {
+    storeDraft({ drinks: [vanillaThickOreo] })
+    renderOrderingAt('/order/drinks')
+    expect(await screen.findByText(`Estimated total ${zar(52.9)}.`)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit milkshake 1' }))
+    await userEvent.selectOptions(screen.getByLabelText('Flavour'), '4')
+
+    // Chocolate 32 + 6 + 10 = 48.00; VAT 7.20; total 55.20.
+    expect(await screen.findByText(`Estimated total ${zar(55.2)}.`)).toBeInTheDocument()
+  })
+
+  it('never lets a late answer to an older request overwrite a newer price', async () => {
+    let releaseFirst: (() => void) | undefined
+    let calls = 0
+    storeDraft({ drinks: [vanillaThickOreo] })
+    renderOrderingAt('/order/drinks', {
+      [QUOTE]: (init) => {
+        calls += 1
+        const quote = quoteFor(bodyOf(init))
+        if (calls > 1) {
+          return jsonResponse(quote)
+        }
+        // The first answer is slow and (to make it obvious) carries a different total.
+        return new Promise<Response>((resolve) => {
+          releaseFirst = () => resolve(jsonResponse({ ...quote, totals: { ...quote.totals!, total: 999 } }))
+        })
+      },
+    })
+    await waitFor(() => expect(calls).toBe(1))
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit milkshake 1' }))
+    await userEvent.selectOptions(screen.getByLabelText('Flavour'), '4')
+    expect(await screen.findByText(`Estimated total ${zar(55.2)}.`)).toBeInTheDocument()
+
+    await act(async () => {
+      releaseFirst?.()
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+
+    expect(screen.getByText(`Estimated total ${zar(55.2)}.`)).toBeInTheDocument()
+    expect(screen.queryByText((content) => content.includes(zar(999)))).not.toBeInTheDocument()
+  })
+
+  it('explains a failed quote without blocking the order', async () => {
+    storeDraft({ drinks: [vanillaThickOreo] })
+    renderOrderingAt('/order/drinks', {
+      [QUOTE]: () =>
+        jsonResponse({ status: 503, title: 'Ordering is temporarily unavailable.', detail: 'Please try again later.' }, 503),
+    })
+
+    expect(await screen.findByText('Ordering is temporarily unavailable. Please try again later.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue to pickup' })).toBeEnabled()
   })
 })

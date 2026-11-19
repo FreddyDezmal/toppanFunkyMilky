@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 
 /**
  * Patron ordering journey (M5) against the real stack (React → ASP.NET Core → Supabase).
@@ -45,6 +45,16 @@ function storedDrafts(page: Page): Promise<string[]> {
   )
 }
 
+/** Picks an option whose fee differs from the current one (labels end in "(R 12,00)"), so the total must change. */
+async function chooseDifferentlyPricedOption(select: Locator) {
+  const fee = (label: string | null) => label?.match(/\(([^)]*)\)$/)?.[1]
+  const current = await select.locator('option:checked').textContent()
+  const labels = await select.locator('option').allTextContents()
+  const other = labels.findIndex((label, index) => index > 0 && fee(label) !== fee(current))
+  test.skip(other < 0, 'Every option in this list has the same fee in this database.')
+  await select.selectOption({ index: other })
+}
+
 /** True when the page is wider than the window (content would need sideways scrolling). */
 function overflowsHorizontally(page: Page): Promise<boolean> {
   return page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)
@@ -73,7 +83,23 @@ test('a patron builds a draft: quantity, milkshakes, pickup and a server-checked
     }
     await card.getByRole('button', { name: `Done with milkshake ${number}` }).click()
     await expect(card.getByRole('button', { name: `Edit milkshake ${number}` })).toBeFocused()
+    await expect(card.getByText(/^Price:/)).toBeVisible()
   }
+
+  // Live prices (M6): the server's estimate appears once every milkshake is complete, and follows a change.
+  const estimate = page.getByRole('region', { name: 'Estimated price' }).getByRole('status')
+  await expect(estimate).toHaveText(/^Estimated total .+\.$/)
+  const firstTotal = await estimate.textContent()
+  const second = page.getByRole('listitem', { name: 'Milkshake 2', exact: true })
+  await second.getByRole('button', { name: 'Edit milkshake 2' }).click()
+  await chooseDifferentlyPricedOption(second.getByLabel('Topping', { exact: true }))
+  await second.getByRole('button', { name: 'Done with milkshake 2' }).click()
+  await expect(async () => {
+    const text = await estimate.textContent()
+    expect(text).toMatch(/^Estimated total .+\.$/)
+    expect(text).not.toBe(firstTotal)
+  }).toPass()
+  const estimatedTotal = (await estimate.textContent())?.replace(/^Estimated total /, '').replace(/\.$/, '') ?? ''
   await page.getByRole('button', { name: 'Continue to pickup' }).click()
 
   // Pickup: an active restaurant and the latest allowed time (always inside the window, whatever the time now).
@@ -92,7 +118,12 @@ test('a patron builds a draft: quantity, milkshakes, pickup and a server-checked
   await expect(page.getByText(/^Draft – not yet ordered or paid/)).toBeVisible()
   await expect(page.getByRole('heading', { name: '2 milkshakes' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Continue to payment (coming soon)' })).toBeDisabled()
-  await expect(page.getByText(/total/i)).toHaveCount(0)
+  // Server-calculated estimate: discount shown as none (deferred), VAT with its rate, and the same total as before.
+  const reviewPrice = page.getByRole('region', { name: 'Estimated price' })
+  await expect(reviewPrice.getByText('Estimated total', { exact: true })).toBeVisible()
+  await expect(reviewPrice.getByText(/\(none\)$/)).toBeVisible()
+  await expect(reviewPrice.getByText(/^VAT \(/)).toBeVisible()
+  await expect(reviewPrice.getByText(estimatedTotal, { exact: true }).last()).toBeVisible()
   await expectNoSeriousAccessibilityProblems(page, 'Review')
 
   // A refresh keeps the draft; storage holds identifiers and the pickup time only.
@@ -134,9 +165,16 @@ test('forged prices and tampered drafts are refused, and the screens fit a phone
       body,
     })
     const withoutToken = await fetch('/api/ordering/draft/validate', { method: 'POST', credentials: 'include', headers, body })
-    return { withToken: withToken.status, withoutToken: withoutToken.status }
+    // A quote with a VAT rate or a discount of the browser's choosing is refused too.
+    const forgedQuote = await fetch('/api/ordering/quote', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { ...headers, 'X-XSRF-TOKEN': token },
+      body: JSON.stringify({ drinks: [], vatRate: 0, discountRate: 1 }),
+    })
+    return { withToken: withToken.status, withoutToken: withoutToken.status, forgedQuote: forgedQuote.status }
   })
-  expect(forged).toEqual({ withToken: 400, withoutToken: 400 })
+  expect(forged).toEqual({ withToken: 400, withoutToken: 400, forgedQuote: 400 })
 
   // A draft edited in sessionStorage is rebuilt on load: unknown ids are cleared with a notice, extras are dropped.
   const userId = await page.evaluate(async () => ((await (await fetch('/api/auth/me')).json()) as { id: string }).id)
@@ -196,4 +234,4 @@ test.describe('manager', () => {
     await page.goto('/order')
     await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
   })
-})
+})

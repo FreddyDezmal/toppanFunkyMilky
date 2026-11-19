@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, clearCsrfToken } from '../../lib/api/httpClient'
-import { draftSummary, orderingOptions } from '../../test/orderingFixtures'
+import { draftSummary, orderingOptions, quoteFor } from '../../test/orderingFixtures'
 import { jsonResponse, mockApi } from '../../test/mockApi'
-import { fetchOrderingOptions, validateDraft } from './api'
+import { fetchOrderingOptions, quoteDrinks, validateDraft } from './api'
 import { draftErrorsFrom, describeOrderingError, drinkErrors, ORDERING_UNAVAILABLE } from './errors'
-import type { OrderDraft } from './types'
+import type { DrinkSelection, OrderDraft } from './types'
 
 beforeEach(() => {
   clearCsrfToken()
@@ -51,6 +51,25 @@ describe('ordering API', () => {
   })
 })
 
+describe('quote API', () => {
+  it('sends identifiers only and returns the server’s estimate', async () => {
+    let sent: RequestInit | undefined
+    mockApi({
+      'POST /api/ordering/quote': (init) => {
+        sent = init
+        return jsonResponse(quoteFor([{ flavourId: 3, consistencyId: 29, toppingId: null }]))
+      },
+    })
+    const drinks = [{ flavourId: 3, consistencyId: 29, toppingId: null, price: 0.01 }] as unknown as DrinkSelection[]
+
+    const quote = await quoteDrinks(drinks)
+
+    expect(quote.totals).toBeNull()
+    expect(JSON.parse(String(sent?.body))).toEqual({ drinks: [{ flavourId: 3, consistencyId: 29, toppingId: null }] })
+    expect(new Headers(sent?.headers).get('X-XSRF-TOKEN')).toBe('test-token')
+  })
+})
+
 describe('ordering errors', () => {
   it('maps validation errors to draft fields and anything else to the form', () => {
     const error = new ApiError('One or more validation errors occurred.', 400, {
@@ -91,4 +110,4 @@ describe('ordering errors', () => {
     expect(describeOrderingError(new ApiError('HTTP 503', 503))).toBe(ORDERING_UNAVAILABLE)
     expect(draftErrorsFrom(withDetail).form).toBe('Ordering is temporarily unavailable. Please try again later.')
   })
-})
+})

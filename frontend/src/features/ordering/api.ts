@@ -1,5 +1,5 @@
 import { getJson, postJson } from '../../lib/api/httpClient'
-import type { DraftSummary, OrderDraft, OrderingOptions } from './types'
+import type { DraftSummary, DrinkSelection, OrderDraft, OrderingOptions, Quote } from './types'
 
 const ORDERING = '/api/ordering'
 
@@ -16,15 +16,24 @@ export function toValidateRequest(draft: OrderDraft) {
   return {
     restaurantId: draft.restaurantId,
     pickupLocal: draft.pickupLocal,
-    drinks: draft.drinks.map((drink) => ({
-      flavourId: drink.flavourId,
-      consistencyId: drink.consistencyId,
-      toppingId: drink.toppingId,
-    })),
+    drinks: draft.drinks.map(toDrinkRequest),
   }
+}
+
+/** One milkshake's identifiers, copied field by field. */
+function toDrinkRequest(drink: DrinkSelection) {
+  return { flavourId: drink.flavourId, consistencyId: drink.consistencyId, toppingId: drink.toppingId }
 }
 
 /** Checks the draft against the options in force now. Stores nothing on the server. */
 export function validateDraft(draft: OrderDraft, signal?: AbortSignal): Promise<DraftSummary> {
   return postJson<DraftSummary>(`${ORDERING}/draft/validate`, toValidateRequest(draft), { signal })
+}
+
+/**
+ * A live, non-binding price estimate for the milkshakes being chosen. Only identifiers are sent; the server decides
+ * every amount. Incomplete milkshakes are allowed (they come back without a price).
+ */
+export function quoteDrinks(drinks: DrinkSelection[], signal?: AbortSignal): Promise<Quote> {
+  return postJson<Quote>(`${ORDERING}/quote`, { drinks: drinks.map(toDrinkRequest) }, { signal })
 }

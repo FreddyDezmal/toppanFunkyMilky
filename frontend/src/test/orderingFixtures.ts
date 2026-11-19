@@ -1,5 +1,5 @@
 import type { CurrentUser } from '../features/auth/types'
-import type { DraftSummary, OrderingOptions } from '../features/ordering/types'
+import type { DraftSummary, DrinkSelection, OrderingOptions, Quote } from '../features/ordering/types'
 
 export const patronUser: CurrentUser = {
   id: '01a1ea38-0000-7000-8000-000000000011',
@@ -53,7 +53,59 @@ export function draftSummary(): DraftSummary {
     isDraft: true,
     restaurant: options.restaurants[0]!,
     pickup: { local: '2026-11-20T10:00', utc: '2026-11-20T08:00:00+00:00', timeZone: 'Africa/Johannesburg' },
-    drinks: [{ number: 1, flavour: options.flavours[0]!, consistency: options.consistencies[0]!, topping: options.toppings[0]! }],
-    note: 'Draft – not yet ordered or paid. Fees shown are current fees; the final price, VAT and any discount are calculated at checkout.',
+    // 30.00 + 6.00 + 10.00 = 46.00; VAT 15% = 6.90; total 52.90.
+    drinks: [{ number: 1, flavour: options.flavours[0]!, consistency: options.consistencies[0]!, topping: options.toppings[0]!, price: 46 }],
+    totals: {
+      currencyCode: 'ZAR',
+      subtotal: 46,
+      discount: { amount: 0, tierNumber: null, rate: null, capApplied: false },
+      taxable: 46,
+      vatRate: 0.15,
+      vat: 6.9,
+      total: 52.9,
+    },
+    isEstimate: true,
+    pricedAtUtc: '2026-11-19T10:00:00+00:00',
+    note: 'Draft – not yet ordered or paid. Prices are an estimate based on current fees and VAT; the final amount is calculated when you place your order.',
+  }
+}
+
+/**
+ * A stand-in for POST /api/ordering/quote in component tests, using the fixture fees. It plays the server's part;
+ * the screens under test never calculate prices themselves. Amounts are worked in cents to stay exact.
+ */
+export function quoteFor(drinks: DrinkSelection[]): Quote {
+  const options = orderingOptions()
+  const cents = (list: { id: number; fee: { amount: number } }[], id: number | null) =>
+    Math.round((list.find((option) => option.id === id)?.fee.amount ?? 0) * 100)
+  const lines = drinks.map((drink, index) => ({
+    number: index + 1,
+    price:
+      drink.flavourId === null || drink.consistencyId === null || drink.toppingId === null
+        ? null
+        : (cents(options.flavours, drink.flavourId) + cents(options.consistencies, drink.consistencyId) + cents(options.toppings, drink.toppingId)) / 100,
+  }))
+  const complete = lines.every((line) => line.price !== null)
+  const subtotalCents = lines.reduce((sum, line) => sum + Math.round((line.price ?? 0) * 100), 0)
+  const vatCents = Math.round((subtotalCents * 15) / 100)
+
+  return {
+    isEstimate: true,
+    pricedAtUtc: '2026-11-19T10:00:00+00:00',
+    currencyCode: 'ZAR',
+    vatRate: 0.15,
+    drinks: lines,
+    totals: complete
+      ? {
+          currencyCode: 'ZAR',
+          subtotal: subtotalCents / 100,
+          discount: { amount: 0, tierNumber: null, rate: null, capApplied: false },
+          taxable: subtotalCents / 100,
+          vatRate: 0.15,
+          vat: vatCents / 100,
+          total: (subtotalCents + vatCents) / 100,
+        }
+      : null,
+    note: 'Estimated prices based on current fees and VAT. The final amount is calculated when you place your order.',
   }
 }

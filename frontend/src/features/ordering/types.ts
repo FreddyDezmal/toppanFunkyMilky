@@ -86,19 +86,64 @@ export interface DraftPickup {
   timeZone: string
 }
 
-/** A validated milkshake with the names and current fees of its choices. */
+/** A validated milkshake with the names and current fees of its choices, and its price (the sum of the fees). */
 export interface DraftSummaryDrink {
   number: number
   flavour: OrderingOption
   consistency: OrderingOption
   topping: OrderingOption
+  price: number
 }
 
-/** POST /api/ordering/draft/validate (200): a draft whose selections are valid now. Not an order. */
+/** The frequent-customer discount applied: 0 with no tier while discounts are deferred (M6 decision P5). */
+export interface DiscountSummary {
+  amount: number
+  tierNumber: number | null
+  rate: number | null
+  capApplied: boolean
+}
+
+/**
+ * Order totals calculated by the server (M6): subtotal, discount before VAT, taxable amount, VAT rate (a fraction,
+ * 0.15 = 15%) and amount, and total. Display only: the browser never calculates or sends these.
+ */
+export interface OrderTotals {
+  currencyCode: string
+  subtotal: number
+  discount: DiscountSummary
+  taxable: number
+  vatRate: number
+  vat: number
+  total: number
+}
+
+/** POST /api/ordering/draft/validate (200): a valid draft with its estimated price. Not an order. */
 export interface DraftSummary {
   isDraft: true
   restaurant: OrderingRestaurant
   pickup: DraftPickup
   drinks: DraftSummaryDrink[]
+  totals: OrderTotals
+  isEstimate: true
+  /** UTC ISO 8601: when the fees and VAT were read. */
+  pricedAtUtc: string
   note: string
 }
+
+/** One milkshake in a live quote: its price, or null until all three choices are made. */
+export interface QuotedDrink {
+  number: number
+  price: number | null
+}
+
+/** POST /api/ordering/quote (200): a non-binding estimate. `totals` is null until every milkshake is complete. */
+export interface Quote {
+  isEstimate: true
+  /** UTC ISO 8601. */
+  pricedAtUtc: string
+  currencyCode: string
+  vatRate: number
+  drinks: QuotedDrink[]
+  totals: OrderTotals | null
+  note: string
+}

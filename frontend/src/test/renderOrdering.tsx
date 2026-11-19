@@ -4,16 +4,19 @@ import { AppRoutes } from '../app/AppRoutes'
 import { AuthProvider } from '../features/auth/AuthProvider'
 import type { CurrentUser } from '../features/auth/types'
 import { jsonResponse, mockApi, type ApiRoutes } from './mockApi'
-import { orderingOptions, patronUser } from './orderingFixtures'
+import type { DrinkSelection } from '../features/ordering/types'
+import { orderingOptions, patronUser, quoteFor } from './orderingFixtures'
 
 /**
- * Renders the whole app at an ordering path with a signed-in user (a patron by default) and the fixture options.
- * Pass routes to override or add API responses.
+ * Renders the whole app at an ordering path with a signed-in user (a patron by default), the fixture options and
+ * a stand-in quote endpoint. Pass routes to override or add API responses.
  */
 export function renderOrderingAt(path: string, routes: ApiRoutes = {}, user: CurrentUser = patronUser) {
   const fetchMock = mockApi({
     'GET /api/auth/me': () => jsonResponse(user),
     'GET /api/ordering/options': () => jsonResponse(orderingOptions()),
+    'POST /api/ordering/quote': (init) =>
+      jsonResponse(quoteFor((JSON.parse(String(init?.body)) as { drinks: DrinkSelection[] }).drinks)),
     ...routes,
   })
   render(
@@ -31,4 +34,4 @@ export function callsTo(fetchMock: ReturnType<typeof mockApi>, method: string, p
   return fetchMock.mock.calls.filter(
     ([input, init]) => (init?.method ?? 'GET') === method && new URL(String(input), 'http://localhost').pathname === path,
   )
-}
+}

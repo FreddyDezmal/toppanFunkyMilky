@@ -5,10 +5,13 @@ import { isDrinkComplete } from '../../features/ordering/draft'
 import { DrinkCard } from '../../features/ordering/DrinkCard'
 import { EmptyDraft } from '../../features/ordering/EmptyDraft'
 import { DRAFT_FIELDS } from '../../features/ordering/errors'
-import { FEES_NOTE } from '../../features/ordering/format'
+import { ESTIMATE_NOTE } from '../../features/ordering/format'
 import { useOrderDraft } from '../../features/ordering/orderDraftContext'
+import { PriceSummary } from '../../features/ordering/PriceSummary'
 import { DRINK_FIELD_LABELS, DRINK_FIELDS, type DrinkSelection } from '../../features/ordering/types'
+import { useLiveQuote, type LiveQuote } from '../../features/ordering/useLiveQuote'
 import { useOrdering } from '../../features/ordering/useOrdering'
+import { formatMoney } from '../../lib/format/money'
 
 const HEADING_ID = 'drinks-heading'
 
@@ -23,15 +26,32 @@ function missingChoices(drink: DrinkSelection, index: number): Record<string, st
   return errors
 }
 
+/** One short sentence for screen readers, announced politely as prices change. */
+function estimateStatus(live: LiveQuote, locale: string): string {
+  switch (live.status) {
+    case 'idle':
+      return ''
+    case 'updating':
+      return 'Updating prices…'
+    case 'error':
+      return live.message
+    case 'ready':
+      return live.quote.totals
+        ? `Estimated total ${formatMoney(live.quote.totals.total, live.quote.totals.currencyCode, locale)}.`
+        : 'Complete every milkshake to see the total.'
+  }
+}
+
 function incompleteIndexes(drinks: DrinkSelection[]): Set<number> {
   return new Set(drinks.flatMap((drink, index) => (isDrinkComplete(drink) ? [] : [index])))
 }
 
 /** /order/drinks — exactly one flavour, consistency and topping for every milkshake. */
 export function OrderDrinksPage() {
-  const { options } = useOrdering()
+  const { options, reloadOptions } = useOrdering()
   const { draft, dispatch } = useOrderDraft()
   const navigate = useNavigate()
+  const live = useLiveQuote(draft.drinks, reloadOptions)
   const [editing, setEditing] = useState(() => incompleteIndexes(draft.drinks))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [removeIndex, setRemoveIndex] = useState<number | null>(null)
@@ -109,7 +129,7 @@ export function OrderDrinksPage() {
       <h1 id={HEADING_ID} tabIndex={-1} className="text-2xl font-bold tracking-tight focus:outline-none">
         Choose your milkshakes
       </h1>
-      <p className="mt-1 text-sm text-slate-600">{FEES_NOTE}</p>
+      <p className="mt-1 text-sm text-slate-600">{ESTIMATE_NOTE}</p>
 
       {errorCount > 0 && (
         <p role="alert" className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">
@@ -128,6 +148,7 @@ export function OrderDrinksPage() {
             editing={editing.has(index)}
             errors={errors}
             canRemove={canRemove}
+            price={live.quote?.drinks.find((line) => line.number === index + 1)?.price ?? null}
             onChoose={(field, id) => {
               dispatch({ type: 'setDrinkChoice', index, field, id })
               const key = DRAFT_FIELDS.drinkChoice(index, field)
@@ -139,6 +160,20 @@ export function OrderDrinksPage() {
           />
         ))}
       </ol>
+
+      <section aria-labelledby="estimate-heading" aria-busy={live.status === 'updating'} className="mt-6 rounded-xl bg-slate-50 p-4">
+        <h2 id="estimate-heading" className="font-semibold text-slate-900">
+          Estimated price
+        </h2>
+        <p role="status" className="mt-1 text-sm text-slate-700">
+          {estimateStatus(live, options.display.locale)}
+        </p>
+        {live.quote?.totals && (
+          <div className="mt-3 max-w-sm">
+            <PriceSummary totals={live.quote.totals} locale={options.display.locale} />
+          </div>
+        )}
+      </section>
 
       <div className="mt-6 flex flex-wrap gap-2">
         <button
@@ -161,4 +196,4 @@ export function OrderDrinksPage() {
       />
     </section>
   )
-}
+}

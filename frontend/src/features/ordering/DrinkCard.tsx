@@ -1,5 +1,6 @@
 import { SelectField } from '../../components/forms/SelectField'
 import { formatMoney } from '../../lib/format/money'
+import { isDrinkComplete } from './draft'
 import { DRAFT_FIELDS } from './errors'
 import { optionLabel } from './format'
 import {
@@ -21,6 +22,8 @@ interface DrinkCardProps {
   /** Messages keyed by DRAFT_FIELDS.drinkChoice(index, field). */
   errors: Record<string, string>
   canRemove: boolean
+  /** This milkshake's price from the latest server quote, or null when not (yet) priced. */
+  price: number | null
   onChoose: (field: DrinkField, id: number | null) => void
   onDone: () => void
   onEdit: () => void
@@ -28,7 +31,7 @@ interface DrinkCardProps {
 }
 
 /** One milkshake: three drop-downs while editing, a summary with Edit and Remove when done. */
-export function DrinkCard({ index, drink, options, editing, errors, canRemove, onChoose, onDone, onEdit, onRemove }: DrinkCardProps) {
+export function DrinkCard({ index, drink, options, editing, errors, canRemove, price, onChoose, onDone, onEdit, onRemove }: DrinkCardProps) {
   const number = index + 1
   const locale = options.display.locale
   const headingId = `drink-${index}-heading`
@@ -36,9 +39,22 @@ export function DrinkCard({ index, drink, options, editing, errors, canRemove, o
   return (
     <li aria-labelledby={headingId} className="rounded-xl p-4 ring-1 ring-slate-200">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id={headingId} className="font-semibold text-slate-900">
-          Milkshake {number}
-        </h2>
+        <div>
+          <h2 id={headingId} className="font-semibold text-slate-900">
+            Milkshake {number}
+          </h2>
+          <p className="text-sm text-slate-600">
+            {price !== null ? (
+              <>
+                Price: <span className="font-medium text-slate-900">{formatMoney(price, options.display.currencyCode, locale)}</span>
+              </>
+            ) : isDrinkComplete(drink) ? (
+              'Working out the price…'
+            ) : (
+              'Price shown once all three choices are made.'
+            )}
+          </p>
+        </div>
         <div className="flex gap-2">
           {!editing && (
             <button
@@ -113,4 +129,4 @@ export function DrinkCard({ index, drink, options, editing, errors, canRemove, o
       )}
     </li>
   )
-}
+}
