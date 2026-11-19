@@ -2,8 +2,8 @@ namespace Milkshake.Application.Ordering;
 
 /// <summary>
 /// Server-side rules for a draft (URS §3.4 field table, AC-5.1 to AC-5.8): drink count within the configured limits,
-/// exactly one active flavour, consistency and topping per drink, and an active restaurant.
-/// Pure: the caller supplies the options in force now.
+/// exactly one active flavour, consistency and topping per drink, an active restaurant, and a pickup time inside the
+/// provisional pickup window (<see cref="PickupRules"/>). Pure: the caller supplies the options in force now.
 /// </summary>
 public static class OrderDraftRules
 {
@@ -15,10 +15,11 @@ public static class OrderDraftRules
 
         var errors = new Dictionary<string, string[]>();
         OrderingRestaurant? restaurant = ValidateRestaurant(draft.RestaurantId, options, errors);
+        ValidatedPickup? pickup = ValidatePickup(draft.PickupLocal, options, errors);
         List<ValidatedDrink> drinks = ValidateDrinks(draft.Drinks, options, errors);
 
-        return errors.Count == 0 && restaurant is not null
-            ? DraftValidationResult.Valid(new ValidatedDraft(restaurant, drinks))
+        return errors.Count == 0 && restaurant is not null && pickup is not null
+            ? DraftValidationResult.Valid(new ValidatedDraft(restaurant, pickup, drinks))
             : DraftValidationResult.Invalid(errors);
     }
 
@@ -37,6 +38,17 @@ public static class OrderDraftRules
         }
 
         return restaurant;
+    }
+
+    private static ValidatedPickup? ValidatePickup(string? pickupLocal, OrderingOptions options, Dictionary<string, string[]> errors)
+    {
+        PickupCheck check = PickupRules.Check(pickupLocal, options.Settings, options.Pickup);
+        if (check.Error is not null)
+        {
+            Add(errors, OrderDraftFields.PickupLocal, check.Error);
+        }
+
+        return check.Pickup;
     }
 
     private static List<ValidatedDrink> ValidateDrinks(

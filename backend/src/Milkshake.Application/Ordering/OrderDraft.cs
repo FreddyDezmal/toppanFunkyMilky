@@ -3,14 +3,17 @@ namespace Milkshake.Application.Ordering;
 /// <summary>One drink as chosen in the browser: identifiers only, never prices.</summary>
 public sealed record DraftDrinkSelection(int? FlavourId, int? ConsistencyId, int? ToppingId);
 
-/// <summary>An in-progress order as sent by the browser. Not an order: nothing is stored.</summary>
-public sealed record OrderDraft(int? RestaurantId, IReadOnlyList<DraftDrinkSelection?> Drinks);
+/// <summary>
+/// An in-progress order as sent by the browser. Not an order: nothing is stored.
+/// <paramref name="PickupLocal"/> is a business-local time in <see cref="PickupRules.LocalFormat"/>.
+/// </summary>
+public sealed record OrderDraft(int? RestaurantId, string? PickupLocal, IReadOnlyList<DraftDrinkSelection?> Drinks);
 
 /// <summary>A drink whose choices are all active and priced right now.</summary>
 public sealed record ValidatedDrink(int Number, OrderingOption Flavour, OrderingOption Consistency, OrderingOption Topping);
 
 /// <summary>A draft whose selections are all valid right now. Still a draft – not ordered or paid.</summary>
-public sealed record ValidatedDraft(OrderingRestaurant Restaurant, IReadOnlyList<ValidatedDrink> Drinks);
+public sealed record ValidatedDraft(OrderingRestaurant Restaurant, ValidatedPickup Pickup, IReadOnlyList<ValidatedDrink> Drinks);
 
 /// <summary>A validated draft, field-level errors, or "ordering unavailable" (invalid configuration).</summary>
 public sealed record DraftValidationResult(ValidatedDraft? Draft, IReadOnlyDictionary<string, string[]> Errors, bool OrderingUnavailable)
@@ -32,6 +35,9 @@ public static class OrderDraftFields
 {
     /// <summary>The pickup restaurant.</summary>
     public const string RestaurantId = "restaurantId";
+
+    /// <summary>The pickup date and time (business-local).</summary>
+    public const string PickupLocal = "pickupLocal";
 
     /// <summary>The list of drinks (quantity).</summary>
     public const string Drinks = "drinks";

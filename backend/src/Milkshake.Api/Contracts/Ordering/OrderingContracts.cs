@@ -73,7 +73,6 @@ public sealed record OrderingOptionsResponse(
         new(option.Id, option.Name, new FeeResponse(option.FeeAmount, option.CurrencyCode));
 }
 
-
 /// <summary>One drink in a draft: identifiers only. Unknown fields (e.g. a price) are rejected.</summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed class DraftDrinkRequest
@@ -98,6 +97,12 @@ public sealed class ValidateDraftRequest
     /// <summary>An active restaurant id.</summary>
     public int? RestaurantId { get; init; }
 
+    /// <summary>
+    /// Pickup date and time in the business time zone, "yyyy-MM-ddTHH:mm" (no seconds, no offset),
+    /// between pickup.earliestLocal and pickup.latestLocal from GET /api/ordering/options.
+    /// </summary>
+    public string? PickupLocal { get; init; }
+
     /// <summary>One entry per milkshake.</summary>
     public IReadOnlyList<DraftDrinkRequest?>? Drinks { get; init; }
 
@@ -105,6 +110,7 @@ public sealed class ValidateDraftRequest
     public OrderDraft ToDraft() =>
         new(
             RestaurantId,
+            PickupLocal,
             Drinks?.Select(d => d is null ? null : new DraftDrinkSelection(d.FlavourId, d.ConsistencyId, d.ToppingId)).ToList() ?? []);
 }
 
@@ -115,10 +121,14 @@ public sealed record DraftDrinkResponse(
     OrderingOptionResponse Consistency,
     OrderingOptionResponse Topping);
 
+/// <summary>The chosen pickup time: business-local wall clock, the UTC instant, and the time zone.</summary>
+public sealed record DraftPickupResponse(string Local, DateTimeOffset Utc, string TimeZone);
+
 /// <summary>A draft whose selections are valid right now. Not an order: nothing has been stored or paid.</summary>
 public sealed record DraftSummaryResponse(
     bool IsDraft,
     OrderingRestaurantResponse Restaurant,
+    DraftPickupResponse Pickup,
     IReadOnlyList<DraftDrinkResponse> Drinks,
     string Note)
 {
@@ -134,6 +144,10 @@ public sealed record DraftSummaryResponse(
         return new DraftSummaryResponse(
             IsDraft: true,
             new OrderingRestaurantResponse(draft.Restaurant.Id, draft.Restaurant.Name, draft.Restaurant.Address),
+            new DraftPickupResponse(
+                draft.Pickup.Local.ToString(PickupRules.LocalFormat, CultureInfo.InvariantCulture),
+                draft.Pickup.Utc,
+                draft.Pickup.TimeZoneId),
             draft.Drinks.Select(d => new DraftDrinkResponse(d.Number, Option(d.Flavour), Option(d.Consistency), Option(d.Topping))).ToList(),
             DraftNote);
     }

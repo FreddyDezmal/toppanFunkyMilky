@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Milkshake.Api.Contracts.Management;
 using Milkshake.Api.Contracts.Ordering;
+using Milkshake.Application.Management;
 using Milkshake.Application.Ordering;
 using Milkshake.Domain.Settings;
 using Milkshake.Infrastructure.Persistence;
@@ -27,16 +28,19 @@ public sealed class OrderDraftValidationTests(PostgresApiFactory factory)
         using ManagerSession manager = await factory.CreateManagerSessionAsync();
         Menu menu = await CreateMenuAsync(manager);
         using HttpClient patron = await factory.CreatePatronClientAsync();
+        OrderingOptionsResponse options = await LoadOptionsAsync(patron);
+        string pickupLocal = options.Pickup.LatestLocal;   // the latest time only moves later, so it stays valid
         int auditRowsBefore = await CountAuditRowsAsync();
 
         using HttpResponseMessage response = await patron.SendWithCsrfAsync(
-            HttpMethod.Post, ValidatePath, new { restaurantId = menu.Restaurant.Id, drinks = new[] { menu.Drink(), menu.Drink() } });
+            HttpMethod.Post, ValidatePath, new { restaurantId = menu.Restaurant.Id, pickupLocal, drinks = new[] { menu.Drink(), menu.Drink() } });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         DraftSummaryResponse summary = await response.ReadJsonAsync<DraftSummaryResponse>();
         Assert.True(summary.IsDraft);
         Assert.Equal(DraftSummaryResponse.DraftNote, summary.Note);
         Assert.Equal(menu.Restaurant.Id, summary.Restaurant.Id);
+        Assert.Equal((pickupLocal, options.Pickup.LatestUtc, "Africa/Johannesburg"), (summary.Pickup.Local, summary.Pickup.Utc, summary.Pickup.TimeZone));
         Assert.Equal([1, 2], summary.Drinks.Select(d => d.Number));
         DraftDrinkResponse first = summary.Drinks[0];
         Assert.Equal((menu.Flavour.Name, 12.00m), (first.Flavour.Name, first.Flavour.Fee.Amount));
@@ -106,6 +110,7 @@ public sealed class OrderDraftValidationTests(PostgresApiFactory factory)
         });
 
         ValidationErrorBody body = await AssertValidationErrorAsync(response, OrderDraftFields.RestaurantId);
+        Assert.Contains(OrderDraftFields.PickupLocal, body.Errors.Keys);
         Assert.Contains(OrderDraftFields.Consistency(0), body.Errors.Keys);
         Assert.Contains(OrderDraftFields.Topping(0), body.Errors.Keys);
         Assert.Contains(OrderDraftFields.Flavour(1), body.Errors.Keys);
@@ -117,8 +122,7 @@ public sealed class OrderDraftValidationTests(PostgresApiFactory factory)
         using ManagerSession manager = await factory.CreateManagerSessionAsync();
         Menu menu = await CreateMenuAsync(manager);
         using HttpClient patron = await factory.CreatePatronClientAsync();
-        OrderingOptionsResponse loaded = await patron.GetFromJsonAsync<OrderingOptionsResponse>(new Uri("/api/ordering/options", UriKind.Relative))
-            ?? throw new InvalidOperationException("No options returned.");
+        OrderingOptionsResponse loaded = await LoadOptionsAsync(patron);
         Assert.Contains(loaded.Flavours, f => f.Id == menu.Flavour.Id);
 
         using HttpResponseMessage deactivate = await manager.Client.SendWithCsrfAsync(
@@ -126,7 +130,7 @@ public sealed class OrderDraftValidationTests(PostgresApiFactory factory)
         Assert.Equal(HttpStatusCode.OK, deactivate.StatusCode);
 
         using HttpResponseMessage response = await patron.SendWithCsrfAsync(
-            HttpMethod.Post, ValidatePath, new { restaurantId = menu.Restaurant.Id, drinks = new[] { menu.Drink() } });
+            HttpMethod.Post, ValidatePath, new { restaurantId = menu.Restaurant.Id, pickupLocal = loaded.Pickup.LatestLocal, drinks = new[] { menu.Drink() } });
 
         ValidationErrorBody body = await AssertValidationErrorAsync(response, OrderDraftFields.Flavour(0));
         Assert.Equal(OrderDraftMessages.NoLongerAvailable("flavour", 1), Assert.Single(body.Errors[OrderDraftFields.Flavour(0)]));
@@ -195,6 +199,83 @@ public sealed class OrderDraftValidationTests(PostgresApiFactory factory)
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    [Fact]
+    public async Task PickupTime_InThePastOrBeyondTheAdvanceLimit_IsRejected()
+    {
+        using ManagerSession manager = await factory.CreateManagerSessionAsync();
+        Menu menu = await CreateMenuAsync(manager);
+        using HttpClient patron = await factory.CreatePatronClientAsync();
+        OrderingOptionsResponse options = await LoadOptionsAsync(patron);
+        string anHourAgo = ShiftLocal(options.Pickup.EarliestLocal, TimeSpan.FromMinutes(-(options.Pickup.LeadTimeMinutes + 60)));
+        string twoDaysTooFar = ShiftLocal(options.Pickup.LatestLocal, TimeSpan.FromDays(2));
+
+        using HttpResponseMessage past = await patron.SendWithCsrfAsync(
+            HttpMethod.Post, ValidatePath, new { restaurantId = menu.Restaurant.Id, pickupLocal = anHourAgo, drinks = new[] { menu.Drink() } });
+        using HttpResponseMessage tooFar = await patron.SendWithCsrfAsync(
+            HttpMethod.Post, ValidatePath, new { restaurantId = menu.Restaurant.Id, pickupLocal = twoDaysTooFar, drinks = new[] { menu.Drink() } });
+
+        ValidationErrorBody pastBody = await AssertValidationErrorAsync(past, OrderDraftFields.PickupLocal);
+        KeyValuePair<string, string[]> pastError = Assert.Single(pastBody.Errors);   // everything else is valid
+        Assert.Equal(PickupMessages.InThePast, Assert.Single(pastError.Value));
+
+        ValidationErrorBody tooFarBody = await AssertValidationErrorAsync(tooFar, OrderDraftFields.PickupLocal);
+        DateTime latestLocal = DateTime.ParseExact(options.Pickup.LatestLocal, PickupRules.LocalFormat, CultureInfo.InvariantCulture);
+        Assert.Equal(
+            PickupMessages.TooFarAhead(options.Pickup.MaxAdvanceDays, latestLocal),
+            Assert.Single(tooFarBody.Errors[OrderDraftFields.PickupLocal]));
+    }
+
+    [Theory]
+    [InlineData("2026-11-20 14:30")]
+    [InlineData("2026-11-20T14:30:00Z")]
+    [InlineData("tomorrow at two")]
+    public async Task PickupTime_InAnyOtherFormat_IsRejected(string pickupLocal)
+    {
+        using HttpClient patron = await factory.CreatePatronClientAsync();
+
+        using HttpResponseMessage response = await patron.SendWithCsrfAsync(
+            HttpMethod.Post, ValidatePath, new { restaurantId = (int?)null, pickupLocal, drinks = Array.Empty<object>() });
+
+        ValidationErrorBody body = await AssertValidationErrorAsync(response, OrderDraftFields.PickupLocal);
+        Assert.Equal(PickupMessages.Format, Assert.Single(body.Errors[OrderDraftFields.PickupLocal]));
+    }
+
+    [Fact]
+    public async Task LeadTime_IsCheckedAgainstTheSettingInForceAtValidation()
+    {
+        using ManagerSession manager = await factory.CreateManagerSessionAsync();
+        Menu menu = await CreateMenuAsync(manager);
+        using HttpClient patron = await factory.CreatePatronClientAsync();
+        OrderingOptionsResponse loaded = await LoadOptionsAsync(patron);
+        int original = loaded.Pickup.LeadTimeMinutes;
+        int raised = original + 60;
+        Assert.InRange(raised, 1, SettingRules.MaxLeadTimeMinutes);
+
+        // The patron was offered the earliest time; a manager then lengthens the lead time.
+        await PutSettingAsync(manager, SettingKeys.MinPickupLeadTimeMinutes, raised.ToString(CultureInfo.InvariantCulture));
+        try
+        {
+            using HttpResponseMessage response = await patron.SendWithCsrfAsync(
+                HttpMethod.Post, ValidatePath, new { restaurantId = menu.Restaurant.Id, pickupLocal = loaded.Pickup.EarliestLocal, drinks = new[] { menu.Drink() } });
+
+            ValidationErrorBody body = await AssertValidationErrorAsync(response, OrderDraftFields.PickupLocal);
+            Assert.Contains($"{raised.ToString(CultureInfo.InvariantCulture)} minutes", Assert.Single(body.Errors[OrderDraftFields.PickupLocal]), StringComparison.Ordinal);
+        }
+        finally
+        {
+            await PutSettingAsync(manager, SettingKeys.MinPickupLeadTimeMinutes, original.ToString(CultureInfo.InvariantCulture));
+        }
+    }
+
+    private static async Task<OrderingOptionsResponse> LoadOptionsAsync(HttpClient patron) =>
+        await patron.GetFromJsonAsync<OrderingOptionsResponse>(new Uri("/api/ordering/options", UriKind.Relative))
+            ?? throw new InvalidOperationException("No options returned.");
+
+    private static string ShiftLocal(string local, TimeSpan by) =>
+        DateTime.ParseExact(local, PickupRules.LocalFormat, CultureInfo.InvariantCulture)
+            .Add(by)
+            .ToString(PickupRules.LocalFormat, CultureInfo.InvariantCulture);
 
     private async Task<Menu> CreateMenuAsync(ManagerSession manager) =>
         new(

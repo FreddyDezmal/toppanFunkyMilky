@@ -38,7 +38,8 @@ public sealed class OrderingController(IOrderingCatalogService catalog, IOrderDr
 
     /// <summary>
     /// Checks a draft against the options in force now: drink count within the configured limits, exactly one active
-    /// flavour, consistency and topping per drink, and an active restaurant. Stores nothing.
+    /// flavour, consistency and topping per drink, an active restaurant, and a pickup time inside the provisional
+    /// pickup window (business time zone). Stores nothing.
     /// </summary>
     /// <response code="200">Every selection is valid; the resolved draft summary.</response>
     /// <response code="400">Missing, unavailable or malformed selections, keyed by field (e.g. drinks[1].toppingId).</response>
