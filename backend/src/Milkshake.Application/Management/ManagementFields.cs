@@ -24,4 +24,20 @@ public static class ManagementFields
 
     /// <summary>A price period.</summary>
     public const string PriceId = "priceId";
+
+    
+    /// <summary>Setting value.</summary>
+    public const string Value = "value";
+
+    /// <summary>Discount tier: paid orders needed.</summary>
+    public const string MinPreviousOrders = "minPreviousOrders";
+
+    /// <summary>Discount tier: drinks an order needs.</summary>
+    public const string MinDrinksPerOrder = "minDrinksPerOrder";
+
+    /// <summary>Discount tier: rate as a fraction.</summary>
+    public const string DiscountRate = "discountRate";
+
+    /// <summary>Active flag.</summary>
+    public const string IsActive = "isActive";
 }

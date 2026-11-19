@@ -23,8 +23,8 @@ internal sealed class ManagerSession(HttpClient client, string email) : IDisposa
 internal static class ManagementTestHelpers
 {
     /// <summary>
-    /// Creates a manager directly through Identity, signs in through the API, and makes sure the pricing currency
-    /// setting exists (the Testing environment does not run the reference-data seeder).
+    /// Creates a manager directly through Identity, makes sure the reference settings and discount tiers exist
+    /// (the Testing environment does not run the seeder), and signs in through the API.
     /// </summary>
     public static async Task<ManagerSession> CreateManagerSessionAsync(this PostgresApiFactory factory)
     {
@@ -41,12 +41,7 @@ internal static class ManagementTestHelpers
                 throw new InvalidOperationException("Could not create the test manager.");
             }
 
-            MilkshakeDbContext db = scope.ServiceProvider.GetRequiredService<MilkshakeDbContext>();
-            if (!await db.SystemSettings.AnyAsync(s => s.Key == SettingKeys.CurrencyCode))
-            {
-                db.SystemSettings.Add(new SystemSetting(SettingKeys.CurrencyCode, "ZAR", SettingValueType.Text, "Test pricing currency."));
-                await db.SaveChangesAsync();
-            }
+            await EnsureReferenceDataAsync(scope.ServiceProvider.GetRequiredService<MilkshakeDbContext>());
         }
 
         HttpClient client = factory.CreateHttpsClient();
@@ -77,4 +72,32 @@ internal static class ManagementTestHelpers
     /// <summary>Reads a JSON body or fails clearly.</summary>
     public static async Task<T> ReadJsonAsync<T>(this HttpResponseMessage response) =>
         await response.Content.ReadFromJsonAsync<T>() ?? throw new InvalidOperationException("The response had no JSON body.");
+
+    /// <summary>URS reference settings and the three tiers (inactive), added only where missing.</summary>
+    private static async Task EnsureReferenceDataAsync(MilkshakeDbContext db)
+    {
+        HashSet<string> keys = [.. await db.SystemSettings.Select(s => s.Key).ToListAsync()];
+        SystemSetting[] settings =
+        [
+            new(SettingKeys.MinDrinksPerOrder, "1", SettingValueType.WholeNumber, "Minimum drinks per order."),
+            new(SettingKeys.MaxDrinksPerOrder, "10", SettingValueType.WholeNumber, "Maximum drinks per order."),
+            new(SettingKeys.VatRate, "0.15", SettingValueType.DecimalNumber, "VAT as a fraction."),
+            new(SettingKeys.MaxDiscountAmount, "50.00", SettingValueType.DecimalNumber, "Maximum discount per order."),
+            new(SettingKeys.MinPickupLeadTimeMinutes, "15", SettingValueType.WholeNumber, "Minimum pickup lead time."),
+            new(SettingKeys.CurrencyCode, "ZAR", SettingValueType.Text, "Pricing currency."),
+            new(SettingKeys.DisplayLocale, "en-ZA", SettingValueType.Text, "Display locale."),
+        ];
+        db.SystemSettings.AddRange(settings.Where(s => !keys.Contains(s.Key)));
+
+        HashSet<int> tierNumbers = [.. await db.DiscountTiers.Select(t => t.TierNumber).ToListAsync()];
+        DiscountTier[] tiers =
+        [
+            new(1, 5, 2, 0.05m, isActive: false),
+            new(2, 10, 3, 0.10m, isActive: false),
+            new(3, 20, 4, 0.15m, isActive: false),
+        ];
+        db.DiscountTiers.AddRange(tiers.Where(t => !tierNumbers.Contains(t.TierNumber)));
+
+        await db.SaveChangesAsync();
+    }
 }

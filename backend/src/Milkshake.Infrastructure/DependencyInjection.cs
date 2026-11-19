@@ -69,6 +69,9 @@ public static class DependencyInjection
         services.AddScoped<ICatalogManagementService, CatalogManagementService>();
         services.AddScoped<IRestaurantManagementService, RestaurantManagementService>();
         services.AddScoped<ICatalogPricingService, CatalogPricingService>();
+        services.AddScoped<ISettingsManagementService, SettingsManagementService>();
+        services.AddScoped<IDiscountTierManagementService, DiscountTierManagementService>();
+
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>(
                 name: "database",
