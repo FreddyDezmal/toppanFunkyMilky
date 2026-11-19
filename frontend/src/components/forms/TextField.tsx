@@ -3,14 +3,31 @@ interface TextFieldProps {
   label: string
   value: string
   onChange: (value: string) => void
-  type?: 'text' | 'email' | 'password' | 'tel'
+  type?: 'text' | 'email' | 'password' | 'tel' | 'datetime-local'
+  /** Keyboard hint for touch devices, e.g. "decimal" for prices. */
+  inputMode?: 'text' | 'numeric' | 'decimal'
   autoComplete?: string
   hint?: string
   error?: string
+  /** Announced as required to screen readers (default true). */
+  required?: boolean
+  disabled?: boolean
 }
 
 /** Labelled input whose hint and error are announced by screen readers (aria-describedby, aria-invalid). */
-export function TextField({ id, label, value, onChange, type = 'text', autoComplete, hint, error }: TextFieldProps) {
+export function TextField({
+  id,
+  label,
+  value,
+  onChange,
+  type = 'text',
+  inputMode,
+  autoComplete,
+  hint,
+  error,
+  required = true,
+  disabled = false,
+}: TextFieldProps) {
   const hintId = hint ? `${id}-hint` : undefined
   const errorId = error ? `${id}-error` : undefined
   const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined
@@ -25,12 +42,14 @@ export function TextField({ id, label, value, onChange, type = 'text', autoCompl
         name={id}
         type={type}
         value={value}
+        inputMode={inputMode}
         autoComplete={autoComplete}
-        aria-required="true"
+        disabled={disabled}
+        aria-required={required ? 'true' : undefined}
         aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy}
         onChange={(event) => onChange(event.target.value)}
-        className={`mt-1 block w-full rounded-lg border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 ${
+        className={`mt-1 block w-full rounded-lg border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 disabled:bg-slate-100 ${
           error ? 'border-rose-400 focus:ring-rose-300' : 'border-slate-300 focus:ring-brand-500'
         }`}
       />

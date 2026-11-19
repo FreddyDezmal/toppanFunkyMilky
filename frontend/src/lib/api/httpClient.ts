@@ -54,8 +54,14 @@ export function postJson<T>(path: string, body?: unknown, options: RequestOption
   return request<T>('POST', path, body, options)
 }
 
+
+/** PUTs JSON with the anti-forgery token. Resolves to the JSON body. */
+export function putJson<T>(path: string, body: unknown, options: RequestOptions = {}): Promise<T> {
+  return request<T>('PUT', path, body, options)
+}
+
 async function request<T>(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PUT',
   path: string,
   body: unknown,
   options: RequestOptions,

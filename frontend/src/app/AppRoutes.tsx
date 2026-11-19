@@ -2,10 +2,12 @@ import { Route, Routes } from 'react-router'
 import { AppLayout } from '../components/layout/AppLayout'
 import { RequireAuth } from '../features/auth/RequireAuth'
 import { ROLES } from '../features/auth/types'
+import { ManagementLayout } from '../features/management/ManagementLayout'
 import { AccountPage } from '../pages/AccountPage'
 import { HomePage } from '../pages/HomePage'
 import { LoginPage } from '../pages/LoginPage'
 import { ManagerPage } from '../pages/ManagerPage'
+import { CatalogPage } from '../pages/management/CatalogPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { RegisterPage } from '../pages/RegisterPage'
 
@@ -23,7 +25,10 @@ export function AppRoutes() {
         </Route>
 
         <Route element={<RequireAuth role={ROLES.manager} />}>
-          <Route path="manager" element={<ManagerPage />} />
+          <Route path="manager" element={<ManagementLayout />}>
+            <Route index element={<ManagerPage />} />
+            <Route path="catalog/:kind" element={<CatalogPage />} />
+          </Route>
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

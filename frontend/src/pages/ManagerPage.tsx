@@ -23,7 +23,7 @@ export function ManagerPage() {
   return (
     <section className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
       <h1 className="text-2xl font-bold tracking-tight">Management</h1>
-      <p className="mt-1 text-slate-600">Lookup management, prices and reports will appear here.</p>
+      <p className="mt-1 text-slate-600">Choose a section above to manage the menu. Reports arrive in a later milestone.</p>
       <p className="mt-6 text-sm" role="status">
         {state.kind === 'loading' ? 'Checking manager access…' : state.message}
       </p>
