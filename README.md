@@ -122,7 +122,8 @@ docs/                                 roadmap and working notes
 - Every POST/PUT/PATCH/DELETE needs the `X-XSRF-TOKEN` header; the frontend HTTP client handles this.
 - Endpoints require a signed-in user unless explicitly marked `[AllowAnonymous]`.
 - 5 wrong passwords lock an account for 15 minutes; every sign-in failure returns the same message.
-- Login and registration are limited to 10 requests per minute per IP (`RateLimiting:AuthPermitLimit`).
+- Login and registration are limited to 10 requests per minute per IP (`RateLimiting:AuthPermitLimit`); a full
+  end-to-end run uses most of that, so wait a minute before rerunning if you see "Too many attempts".
 - Sign-ins, failures, lockouts, logouts and manager provisioning are recorded in `milkshake.security_events`.
 
 ## Management (Milestone 10)
@@ -147,6 +148,26 @@ settings and discount tiers. All endpoints are under `/api/manager` and require 
   0–240 minutes; currency is read-only.
 - **Discount tiers** can be edited but **not activated** until the discount rules are confirmed (open questions Q-01 to Q-04).
 - Errors are RFC 9457 ProblemDetails (`application/problem+json`); validation errors list messages per field.
+
+## Ordering (Milestone 5)
+
+Patrons use **Order** in the app (`/order`): choose how many milkshakes, give each one a flavour, consistency and
+topping, choose a restaurant and pickup time, and review. Nothing is ordered or paid yet: the review is a server-checked
+**draft**, and "Continue to payment" stays disabled until checkout is built.
+
+| Endpoint | Access | Purpose |
+| --- | --- | --- |
+| `GET /api/ordering/options` | Patron | Active, priced flavours, consistencies and toppings with current fees; active restaurants; drink limits; pickup window |
+| `POST /api/ordering/draft/validate` | Patron + CSRF | Checks a draft against what is in force now; returns the summary or errors per field; stores nothing |
+
+- **The server decides:** the browser sends identifiers and a pickup time only. A price or any unknown field in the
+  request is rejected. Fees are shown for information; no totals, VAT or discount until pricing is confirmed (Q-01 to Q-04, Q-07).
+- **Draft storage:** the browser tab's `sessionStorage`, identifiers only, per user, cleared on sign-out.
+- **Provisional pickup rules** (Q-05, Q-06, Q-17, Q-18): times in the `Pickup.TimeZone` setting (`Africa/Johannesburg`);
+  earliest = now + `Pickup.MinLeadTimeMinutes`; latest = 23:59 local, `Pickup.MaxAdvanceDays` (7) days ahead; whole minutes.
+- **Limits:** 60 ordering requests per minute per patron (`RateLimiting:OrderingPermitLimit`); draft bodies up to 16 KB.
+- Managers cannot order (patrons only, Q-19). If the ordering settings are invalid, patrons see "Ordering is
+  temporarily unavailable" and the reason is logged on the server.
 
 ## Security notes
 
