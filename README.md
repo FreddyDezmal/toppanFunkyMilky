@@ -78,8 +78,21 @@ dotnet test Milkshake.slnx          # backend unit + integration tests (Docker m
 cd frontend
 npm test                            # component tests (Vitest)
 npm run test:e2e                    # end-to-end tests against the real stack (needs database secrets;
-                                    # creates one e2e-...@example.test patron per run in the dev database)
+                                    # creates e2e-...@example.test patrons per run in the dev database)
 ```
+
+The end-to-end **manager journey** (and its accessibility scans) runs only when manager credentials are set in the
+current terminal; otherwise it is skipped. Never store them in a file:
+
+```powershell
+$env:E2E_MANAGER_EMAIL = '<manager email>'
+$secure = Read-Host 'Manager password' -AsSecureString
+$env:E2E_MANAGER_PASSWORD = [System.Net.NetworkCredential]::new('', $secure).Password
+npm run test:e2e
+Remove-Item Env:E2E_MANAGER_EMAIL, Env:E2E_MANAGER_PASSWORD; Remove-Variable secure
+```
+
+Each manager run adds one deactivated `E2E Flavour <timestamp>` to the development database (nothing is deleted).
 
 ## Repository layout
 
@@ -102,7 +115,7 @@ docs/                                 roadmap and working notes
 | `POST /api/auth/login` | anyone | email + password; sets the session cookie |
 | `POST /api/auth/logout` | signed in | ends the session and invalidates the user's other sessions |
 | `GET /api/auth/me` | signed in | id, first name, email, mobile number, roles |
-| `GET /api/manager/ping` | Manager | role-enforcement probe until management features arrive |
+| `GET /api/manager/ping` | Manager | role-enforcement probe |
 
 - Session: ASP.NET Core Identity cookie `milkshake.session` (HttpOnly, Secure, SameSite=Strict, 2-hour sliding expiry).
   Nothing is stored in browser storage; React asks `/api/auth/me` who is signed in.
@@ -112,6 +125,29 @@ docs/                                 roadmap and working notes
 - Login and registration are limited to 10 requests per minute per IP (`RateLimiting:AuthPermitLimit`).
 - Sign-ins, failures, lockouts, logouts and manager provisioning are recorded in `milkshake.security_events`.
 
+## Management (Milestone 10)
+
+Managers use **Management** in the app (`/manager`): flavours, toppings, consistencies, their prices, restaurants,
+settings and discount tiers. All endpoints are under `/api/manager` and require the **Manager** role.
+
+| Area | Endpoints |
+| --- | --- |
+| Catalogue (`{kind}` = `flavours`, `toppings`, `consistencies`) | `GET/POST /catalog/{kind}`, `GET/PUT /catalog/{kind}/{id}`, `POST /catalog/{kind}/{id}/deactivate` · `/activate` |
+| Prices | `GET/POST /catalog/{kind}/{id}/prices`, `POST /catalog/{kind}/{id}/prices/{priceId}/cancel` |
+| Restaurants | `GET/POST /restaurants`, `GET/PUT /restaurants/{id}`, `POST /restaurants/{id}/deactivate` · `/activate` |
+| Settings | `GET /settings`, `PUT /settings/{key}` |
+| Discount tiers | `GET /discount-tiers`, `PUT /discount-tiers/{tierNumber}`, `POST /discount-tiers/{tierNumber}/activate` |
+
+- **Nothing is deleted:** records are deactivated (hidden from new orders, kept for history).
+- **Prices are effective-dated:** a new price starts now or later; prices that have taken effect are never edited;
+  the latest future price can be cancelled before it starts.
+- **Concurrency:** every response includes `version`; send it back with a change. If someone else saved first,
+  the API answers **409** and the UI offers a reload.
+- **Setting limits:** minimum drinks ≥ 1 and ≤ maximum; maximum drinks ≤ 50; VAT 0–1 (fraction); lead time
+  0–240 minutes; currency is read-only.
+- **Discount tiers** can be edited but **not activated** until the discount rules are confirmed (open questions Q-01 to Q-04).
+- Errors are RFC 9457 ProblemDetails (`application/problem+json`); validation errors list messages per field.
+
 ## Security notes
 
 - Secrets live in user secrets (development) or environment variables / a secrets store (production), never in Git.
@@ -119,3 +155,7 @@ docs/                                 roadmap and working notes
 - Every data change is recorded in `milkshake.audit_logs` in the same transaction as the change; password hashes,
   security stamps and tokens are stored only as `***`.
 - Passwords are never logged (verified by an automated test that searches every log line).
+- Management changes are version-checked (optimistic concurrency) and audited field by field with the manager's identity.
+- Check that the built frontend contains no server details:
+  `Select-String -CaseSensitive -Path frontend/dist/assets/*.js -Pattern 'Host=|Database=|Username=|supabase\.co|pooler'`
+  (no output expected).
