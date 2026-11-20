@@ -5,7 +5,7 @@
 **Period covered:** 20 November 2026
 **Status:** Milestone 8 (payments, "M8a") complete in test mode. Patrons pay through Paystack's hosted checkout; an
 order is confirmed only after the server verifies the payment with Paystack. Cancellation and refunds (B1, "M8b")
-follow next. Production activation is pending the stakeholder's own Paystack account.
+followed in M8b (separate report). The store stays in Paystack test mode (demonstration store, decided 20 November 2026).
 **Requirements traced:** roadmap AC-8.1 to AC-8.6, T8.1 to T8.6, MR-06, FR-06 (URS §2.2, §3.1, §4 as cited by the roadmap)
 
 Related: [payment architecture](../payments/payment-architecture.md) ·
@@ -133,14 +133,14 @@ outcome mapping).
 | Existing and new tests pass; accessibility checks | Done |
 | No secrets or card details exposed; documentation | Done |
 | Automated sandbox end-to-end journey | Not automated – **accepted deviation DV-2** (manual sandbox journey passed) |
-| Production activation | **Pending stakeholder** (business Paystack account; checklist in the setup guide) |
+| Production activation | **Not applicable** – decided 20 November 2026: the project is a demonstration store and stays in Paystack test mode (no real money). The checklist in the setup guide applies only if a real store goes live |
 
 ## 10. Open questions and deferred items
 
 | Item | Needed from | Effect |
 | --- | --- | --- |
-| Production Paystack account and live keys | Stakeholder | Payments stay in test mode |
-| Cancellation and refunds (B1.1–B1.4) | – | M8b, next; `RequiresRefund` payments wait for it |
+| Production Paystack account and live keys | Not needed | Decided 20 November 2026: payments stay in Paystack test mode for this demonstration store |
+| Cancellation and refunds (B1.1–B1.4) | – | Done in M8b, including automatic full refunds of `RequiresRefund` payments |
 | A2, I4 (no payment after pickup; 30-minute abandon grace) | Stakeholder | Provisional; both configurable in code |
 | Q-12 gateway confirmation | Stakeholder | Paystack chosen (A1) |
 | Manager view of payments and refunds | M12 / M8b | Not in M8 acceptance criteria |

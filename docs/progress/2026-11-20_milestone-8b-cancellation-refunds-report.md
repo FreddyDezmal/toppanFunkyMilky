@@ -5,7 +5,7 @@
 **Period covered:** 20 November 2026
 **Status:** M8b complete in test mode. Patrons cancel before pickup, free when unpaid and with a 10% fee when paid.
 Managers ask patrons to cancel, and patrons who accept get a full refund. Refunds go through Paystack and count as
-complete only when Paystack confirms them. Production activation remains pending with M8.
+complete only when Paystack confirms them. Like payments, refunds stay in Paystack test mode (demonstration store).
 **Requirements traced:** decision register B1.1–B1.5, R1–R10, Q1–Q4 (`docs/decisions/2026-11-20_pre-m8-decisions.md`);
 roadmap AC-7.3 (lifecycle) and AC-7.5 (audit), extended to cancellation; open question Q-10 answered by B1.
 
@@ -92,8 +92,8 @@ Run by the developer on Windows 11 with Docker Desktop; Vitest also run by the a
 
 | Suite | Count | Result |
 | --- | --- | --- |
-| Backend unit + integration (Testcontainers PostgreSQL 17) | 777 (655 at M8 + 122) | Passed after the fixes below (final count to be confirmed by this step's run) |
-| Vitest | 156 (131 at M8 + 25) | Passed (run by the assistant; to be confirmed on Windows) |
+| Backend unit + integration (Testcontainers PostgreSQL 17) | 777 (655 at M8 + 122) | Passed (777/777) after the fixes below |
+| Vitest | 156 (131 at M8 + 25) | Passed |
 | Playwright (with axe) | 9 | Passed |
 | TypeScript, oxlint, build `-warnaserror` | – | Passed |
 
@@ -132,7 +132,7 @@ checks it every 5 minutes (setup guide A6).
 | Item | Needed from | Effect |
 | --- | --- | --- |
 | B1.1–B1.4, I4, I8 confirmation | Stakeholder | Provisional business rules, configurable or easily changed |
-| Production Paystack account | Stakeholder | Refunds in test mode only |
+| Production Paystack account | Not needed | Refunds stay in test mode (demonstration store, decided 20 November 2026) |
 | Emails for requests, cancellations and refunds | M9 | Patrons currently see requests on the order page and Home |
 | Q-14 retention (POPIA) | Stakeholder | Requests and refunds are kept with their orders |
 
@@ -154,5 +154,6 @@ checks it every 5 minutes (setup guide A6).
 | `c4f93a0` | Paystack refund client and patron cancellation |
 | `4792010` | Manager requests, patron answers, refunds needing attention |
 | `378b5cc` | Refund webhooks and reconciliation; Home-notice query fix |
-| (Step 6 commit) | React cancellation screens and Management → Orders |
-| (this commit) | Hardening tests, My orders page (M11 brought forward) and M8b documentation |
+| `375e9df` | React cancellation screens and Management → Orders |
+| `b5a7256` | Hardening tests, My orders page (M11 brought forward) and M8b documentation |
+| (this commit) | Test mode kept permanently (no production activation); reports finalised |

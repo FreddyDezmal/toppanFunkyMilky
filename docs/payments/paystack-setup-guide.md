@@ -119,7 +119,10 @@ temporarily; this is optional because recovery works without webhooks.
 Logged: payment references, event types, reasons and HTTP status codes. Never logged: request bodies, the
 signature, the secret key, patron e-mail addresses or card details.
 
-### B5. Production activation checklist (pending stakeholder)
+### B5. Production activation checklist (only if a real store goes live)
+
+Not planned: on 20 November 2026 it was decided that this demonstration store stays in Paystack test mode, where
+no real money moves. The steps below are kept for reference.
 
 - [ ] Business Paystack account verified (compliance completed by the stakeholder)
 - [ ] Live secret key stored in the production secrets store (not in Git)
