@@ -161,6 +161,28 @@ internal sealed class AuditingSaveChangesInterceptor(TimeProvider timeProvider, 
                 sensitive && newValue is not null ? RedactedValue : newValue));
         }
 
+        // M11 (AC-11.1): every UPDATE the application issues is audited. Some updates change no business field on
+        // purpose – a "touch" that only advances updated_at so the row's version check guards a related change (a
+        // catalogue item when its prices change, the partner of the minimum/maximum drinks setting). Record what
+        // actually changed for those: the modified columns, normally just updated_at.
+        if (changes.Count == 0 && entry.State == EntityState.Modified)
+        {
+            foreach (PropertyEntry property in AllProperties(entry).Where(p => p.IsModified))
+            {
+                string column = property.Metadata.GetColumnName();
+                if (column == RowVersionColumn)
+                {
+                    continue;
+                }
+
+                bool sensitive = SensitiveColumns.Contains(column) || (isTokenTable && column == "value");
+                changes.Add(new AuditChange(
+                    column,
+                    sensitive && property.OriginalValue is not null ? RedactedValue : property.OriginalValue,
+                    sensitive && property.CurrentValue is not null ? RedactedValue : property.CurrentValue));
+            }
+        }
+
         if (changes.Count == 0)
         {
             return null;

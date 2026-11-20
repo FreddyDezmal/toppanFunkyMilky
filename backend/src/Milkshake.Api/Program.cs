@@ -80,6 +80,7 @@ builder.Services.AddOptions<RateLimiterOptions>().Configure<IConfiguration>((opt
     int orderingPermitLimit = configuration.GetValue("RateLimiting:OrderingPermitLimit", 60);
     int webhookPermitLimit = configuration.GetValue("RateLimiting:WebhookPermitLimit", 300);
     int emailResendPermitLimit = configuration.GetValue("RateLimiting:EmailResendPermitLimit", 20);
+    int auditPermitLimit = configuration.GetValue("RateLimiting:AuditPermitLimit", 60);
 
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.AddPolicy(RateLimitPolicies.Auth, httpContext =>
@@ -125,6 +126,18 @@ builder.Services.AddOptions<RateLimiterOptions>().Configure<IConfiguration>((opt
             _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = emailResendPermitLimit,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+
+    options.AddPolicy(RateLimitPolicies.Audit, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) is string userId
+                ? "user:" + userId
+                : "ip:" + (httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = auditPermitLimit,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
             }));

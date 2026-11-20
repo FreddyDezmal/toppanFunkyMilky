@@ -123,6 +123,7 @@ public static class DependencyInjection
         });
         services.AddScoped<IEmailDispatcher, EmailDispatcher>();
         services.AddScoped<IManagerEmailService, ManagerEmailService>();
+        services.AddScoped<IAuditQueryService, AuditQueryService>();
         services.AddHostedService<EmailDispatchWorker>();
 
         services.AddHealthChecks()

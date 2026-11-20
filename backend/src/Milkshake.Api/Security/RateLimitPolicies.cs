@@ -14,4 +14,7 @@ public static class RateLimitPolicies
 
     /// <summary>Management → Emails resend (M9), per signed-in manager: a resend reaches a patron's inbox.</summary>
     public const string EmailResend = "email-resend";
+
+    /// <summary>Management audit history (M11), per signed-in manager: bounded queries over a large table.</summary>
+    public const string Audit = "audit";
 }
