@@ -23,6 +23,7 @@ internal sealed partial class EmailDispatcher(
     IEmailSender sender,
     IOptions<EmailOptions> options,
     TimeProvider clock,
+    IHostEnvironment environment,
     ILogger<EmailDispatcher> logger) : IEmailDispatcher
 {
     public async Task<int> DispatchAsync(CancellationToken cancellationToken)
@@ -36,6 +37,13 @@ internal sealed partial class EmailDispatcher(
         if (settings.PublicBaseUrl is not { IsAbsoluteUri: true } site)
         {
             LogNoPublicBaseUrl(logger);
+            return 0;
+        }
+
+        // Links patrons follow must be trusted HTTPS; plain http is only for a developer's own machine.
+        if (site.Scheme != Uri.UriSchemeHttps && !environment.IsDevelopment())
+        {
+            LogInsecurePublicBaseUrl(logger);
             return 0;
         }
 
@@ -181,6 +189,9 @@ internal sealed partial class EmailDispatcher(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Emails are queued but not sent: Email:PublicBaseUrl is not configured.")]
     private static partial void LogNoPublicBaseUrl(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Emails are queued but not sent: Email:PublicBaseUrl must use https outside development.")]
+    private static partial void LogInsecurePublicBaseUrl(ILogger logger);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Email {NotificationId} ({Kind}) was suppressed: its recipient is not on the allow-list.")]
     private static partial void LogSuppressed(ILogger logger, int notificationId, NotificationKind kind);

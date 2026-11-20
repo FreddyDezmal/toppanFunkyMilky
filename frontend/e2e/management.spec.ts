@@ -50,7 +50,9 @@ test('a patron cannot open the management screens', async ({ page }) => {
 test.describe('manager journey', () => {
   test.skip(!managerEmail || !managerPassword, 'Set E2E_MANAGER_EMAIL and E2E_MANAGER_PASSWORD to run the manager journey.')
 
-  test('manages a flavour and its prices, meets a settings limit and sees discounts blocked', async ({ page }) => {
+  test('manages a flavour and its prices, meets a settings limit, sees discounts blocked and checks email delivery', async ({ page }) => {
+    // Five management sections with accessibility scans: allow as long as the ordering journeys do.
+    test.setTimeout(120_000)
     const name = `E2E Flavour ${Date.now()}`
 
     // Sign in and open the flavours list.
@@ -110,5 +112,16 @@ test.describe('manager journey', () => {
     await expect(page.getByText('Discounts are switched off for now')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Activate tier 1' })).toBeDisabled()
     await expectNoSeriousAccessibilityProblems(page, 'Discount tiers')
+
+    // Emails (M9): delivery status with filters, read-only here (nothing is resent).
+    await section(page, 'Emails').click()
+    await expect(page.getByRole('heading', { name: 'Emails', level: 1 })).toBeVisible()
+    await expect(page.getByRole('group', { name: 'Show emails by status' })).toBeVisible()
+    await expect(page.getByText('Loading emails…')).toHaveCount(0)
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    await page.getByRole('group', { name: 'Show emails by status' }).getByRole('button', { name: /^Failed/ }).click()
+    await expect(page.getByRole('group', { name: 'Show emails by status' }).getByRole('button', { name: /^Failed/ })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByText('Loading emails…')).toHaveCount(0)
+    await expectNoSeriousAccessibilityProblems(page, 'Emails')
   })
 })

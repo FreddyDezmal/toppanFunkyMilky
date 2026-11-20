@@ -62,14 +62,16 @@ Decisions D1–D7 are in the M9 decision register. Made during implementation:
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| AC-9.1 Order and payment confirmation on payment success (combined per Q-08) | **Met** (combined, D1) | `NotificationCreationTests` (one email queued when the payment is verified, to the patron's account address); manual check: email captured in Mailpit |
+| AC-9.1 Order and payment confirmation on payment success (combined per Q-08) | **Met** (combined, D1) | `NotificationCreationTests` (one email queued when the payment is verified, to the patron's account address; two simultaneous confirmations queue one); `PaystackWebhookTests` (repeated and 5 simultaneous duplicate webhooks queue one receipt; failed and wrong-amount payments queue none); manual checks in Mailpit and a real inbox |
 | AC-9.2 Final receipt: order number, drinks with flavour/consistency/topping, unit prices, discount, VAT, total, restaurant, pickup time, payment reference | **Met** | `EmailTemplateTests` (each item asserted, including the fee of each choice and the drink price) |
 | AC-9.3 Values from the order snapshot, not current configuration | **Met** | `EmailNotificationFactoryTests`; the payload is copied from the stored order, payment, refund or request and saved with the email |
 | AC-9.4 A failed send is logged and retried automatically; never rolls back a payment | **Met** | `EmailDispatcherTests` (backoff, rate-limit wait, 8 attempts, lease recovery, sender exceptions; outage leaves order and payment confirmed) |
 | AC-9.5 Managers see delivery status and resend | **Met** | `ManagerEmailsTests` (list, filters, resend, 409/404, CSRF, roles, rate limit, audit); Vitest `emails.test.tsx` |
 | MR-05, MR-08, FR-07 (URS §3.1, §4) | **Met** | Through AC-9.1 to AC-9.4 |
 | R-08 Delivery failures or spam filtering | **Partly mitigated** | Retry queue, delivery log and resend, never blocks payment. Sender-domain authentication (SPF/DKIM/DMARC) not done: the demonstration store has no domain |
-| M8b notes: cancellation, request and refund emails; reason only to the patron | **Met** | Matrix emails 2–5; all go to the order's patron only |
+| M8b notes: cancellation, request and refund emails; reason only to the patron | **Met** | Matrix emails 2–5; all go to the order's patron only; a refund still pending at Paystack queues no outcome email; two simultaneous cancellations queue one email |
+| Prompt §11 trusted HTTPS links | **Met** | Outside Development the dispatcher sends nothing unless `Email:PublicBaseUrl` is https (dispatcher tests) |
+| Prompt §9, §14 accessible templates | **Met** | `lang`, charset, title, presentation tables, one `<h1>`, link text, plain-text version (template tests); Emails page scanned with axe in Playwright |
 | D5 Identity emails | **Deferred** | Documented; no screen promises a confirmation or reset email |
 
 ## 5. Security controls with evidence
@@ -84,28 +86,30 @@ Decisions D1–D7 are in the M9 decision register. Made during implementation:
 | No bank or card requests | Failed-refund email states we never ask for them (tested) |
 | Management endpoints | ManagerOnly (patron 403, anonymous 401), CSRF (400 without token), 20 resends per minute (429), audited with the manager's email |
 | Secrets | Resend key only in user secrets; no keys in `appsettings`, Git or the built bundle (scans clean) |
-| Logging and audit | Logs carry email ids, kinds and keys only; audit masks address, name and content |
+| Logging and audit | Logs carry email ids, kinds and keys only; audit masks address, name and content; no email repeats the recipient's address (template tests) |
+| Trusted links | https required outside Development (tested) |
+| Dependencies | `dotnet list package --vulnerable --include-transitive`: none; `npm audit`: 0 vulnerabilities (20 November 2026). M9 added no packages |
 
 ## 6. Test results (executed 20 November 2026)
 
 | Suite | Count | Result |
 | --- | --- | --- |
-| Backend unit + integration (Testcontainers PostgreSQL 17, Mailpit) | 929 (777 at M8b + 152) | Passed (929/929) |
+| Backend unit + integration (Testcontainers PostgreSQL 17, Mailpit) | 944 (777 at M8b + 167) | Passed (944/944) |
 | Vitest | 164 (156 at M8b + 8) | Passed |
 | TypeScript, oxlint, build `-warnaserror` | – | Passed |
-| Playwright (with axe) | 9 | 7 passed; the 2 manager tests skipped (they run only with `E2E_MANAGER_*` set in the terminal) |
+| Playwright (with axe), including the manager journey and the Emails page | 9 | Passed (9/9) after the test fixes below |
 
 New in M9:
 
 | Area | Tests |
 | --- | --- |
 | Outbox domain (`EmailNotificationTests`) | 29 |
-| Templates (`EmailTemplateTests`) | 38 |
+| Templates (`EmailTemplateTests`) | 48 |
 | Payload factory (`EmailNotificationFactoryTests`) | 15 |
 | Outbox persistence | 15 |
 | Senders (Resend stub 17, Mailpit container 2) | 19 |
-| Email creation in the business transaction | 9 |
-| Dispatcher | 13 |
+| Email creation in the business transaction | 12 (plus email checks added to 4 webhook tests) |
+| Dispatcher | 15 |
 | Management → Emails API | 14 |
 | Management → Emails page (Vitest) | 8 |
 
@@ -117,6 +121,10 @@ New in M9:
 | A stored payload with missing fields could have rendered an email with blanks or stopped the dispatcher | Payloads are read strictly; such emails end as Failed (E4, tests added) |
 | Filtering on a record built inside an EF Core query cannot be translated (as in M8b) | The email list filters and sorts on the joined rows, then builds the records |
 | For the Resend check, the developer's usual address was already registered as a patron (created 18 November during M4 testing; password unknown, no reset yet, D5) | A Gmail plus address was used for both the Resend account and a new patron; the old account was left unchanged |
+| With manager credentials set, the ordering journey failed once: it picked the first flavour, which was the "E2E Flavour" the manager journey had just added in parallel and then deactivated (the app correctly reported it as no longer available). Pre-existing test interference, not an M9 change | The ordering journeys skip options created by tests (`chooseFirstStableOption`); 9/9 passed with the manager journey |
+| A final check against the M9 prompt found five gaps: three business-event cases without explicit tests, no concurrency test for business events, no https rule for links, no accessibility check of the email HTML or the Emails page, and no dependency audit | All closed: tests added, https rule added, Emails page added to the manager journey, audits run (0 findings) |
+| The new email-structure test found that the emails had no heading | The brand line is now the email's `<h1>` |
+| The longer manager journey exceeded Playwright's default 30-second limit | It allows 120 seconds, like the ordering journeys |
 | The development database lacked the new table, so saves would have failed locally once the interceptor existed | Migration reviewed and applied to Supabase before running the app again |
 
 ## 8. Manual check (20 November 2026)
@@ -140,7 +148,6 @@ in Mailpit and showed as Sent under Management → Emails.
 | D1 (single receipt at payment), emails 2–5, E6 confirmation | Stakeholder | Provisional; easily changed |
 | Identity emails (D5) | Later phase | Email confirmation, password reset, change password not available |
 | Q-14 retention (POPIA) | Stakeholder | Email records kept with their orders |
-| Playwright manager journey with M9 | Developer (manager credentials in the terminal) | Optional; the patron journeys passed with M9 |
 | Sender domain with SPF/DKIM/DMARC (R-08) | A real store's domain | Needed before emailing real patrons from a real domain |
 
 ## 10. Integration notes for Milestone 11

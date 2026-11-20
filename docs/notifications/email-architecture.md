@@ -39,12 +39,15 @@ Paystack), managers, or identity events (D5, see section 8).
 
 ## 3. Template rules
 
-- **One link only:** `{Email:PublicBaseUrl}orders/{reference}` (the reference is URL-escaped). No tokens, no
-  accept/decline or other one-click actions: the patron always signs in to act.
+- **One link only:** `{Email:PublicBaseUrl}orders/{reference}` (the reference is URL-escaped), which must be https
+  outside Development (otherwise nothing is sent). No tokens, no accept/decline or other one-click actions: the patron
+  always signs in to act.
 - **Every value HTML-encoded**; the recipient's name, the cancellation reason and restaurant and flavour names are
   tested with `<script>`. Subjects have control characters removed (no header injection).
-- **No images, scripts, styles blocks or tracking**; inline styles and a 600-pixel table layout for mail clients;
+- **No images, scripts, style blocks or tracking**; inline styles and a 600-pixel table layout for mail clients;
   every email also has a plain-text version.
+- **Accessible:** `lang`, charset, the subject as title, layout tables marked `role="presentation"`, one `<h1>`,
+  link text that says where it goes. The recipient's address is never repeated in the content.
 - **Formatting as the app showed it:** amounts in the stored display locale and currency (another currency is shown as
   `USD 29.90`), times in the restaurant's time zone (UTC if unknown).
 - **Wording:** a pending refund is never described as completed; we never ask for card or bank details.
@@ -91,7 +94,7 @@ runs or API instances never take the same email. Each result is saved on its own
 | --- | --- | --- |
 | Mailpit or Resend down | Emails wait and retry (up to 8 attempts over about 2 hours) | Nothing; check Management → Emails → Waiting. If they ended as Failed, use **Send again** once the provider is back |
 | API stopped while sending | The lease expires after 5 minutes; the next run takes the email back with the same idempotency key | Nothing |
-| `Email:PublicBaseUrl` missing, or provider `None` | Nothing is sent; emails stay Pending (a warning is logged for the missing URL) | Configure, restart; queued emails go out |
+| `Email:PublicBaseUrl` missing or not https outside Development, or provider `None` | Nothing is sent; emails stay Pending (a warning is logged for the address) | Configure, restart; queued emails go out |
 | Email Failed (rejected or unrenderable) | Logged with its id and kind | Check the log line; fix the cause; **Send again** (for a rejected address, the patron must correct their account email first – a resend uses the stored address) |
 | Email Suppressed | The recipient was not on the allow-list for a real-inbox sender | Expected in the demonstration store; it cannot be resent |
 | Patron says no email arrived | Find the order under Management → Emails | Check status; **Send again** if Sent or Failed |

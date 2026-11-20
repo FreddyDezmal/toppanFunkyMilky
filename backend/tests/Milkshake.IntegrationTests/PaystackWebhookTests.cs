@@ -10,6 +10,7 @@ using Milkshake.Api;
 using Milkshake.Api.Contracts.Ordering;
 using Milkshake.Application.Payments;
 using Milkshake.Domain.Auditing;
+using Milkshake.Domain.Notifications;
 using Milkshake.Domain.Orders;
 using Milkshake.Domain.Payments;
 using Milkshake.IntegrationTests.Infrastructure;
@@ -69,6 +70,7 @@ public sealed class PaystackWebhookTests(PostgresApiFactory factory) : IDisposab
         Assert.Equal(1, await ReceiptsAsync(502));
         Assert.Equal(1, await PaymentUpdateAuditsAsync(payment));
         Assert.Equal((PaymentStatus.Succeeded, OrderStatus.Confirmed), await StateAsync(order, payment));
+        Assert.Equal(1, await ConfirmationEmailsAsync(order));   // M9: one receipt, however often Paystack notifies
     }
 
     [Fact]
@@ -85,6 +87,7 @@ public sealed class PaystackWebhookTests(PostgresApiFactory factory) : IDisposab
             Assert.All(responses, r => Assert.Contains(r.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.ServiceUnavailable }));
             Assert.Equal(1, await ReceiptsAsync(503));
             Assert.Equal((PaymentStatus.Succeeded, OrderStatus.Confirmed), await StateAsync(order, payment));
+            Assert.Equal(1, await ConfirmationEmailsAsync(order));   // M9: simultaneous duplicates queue one receipt
         }
         finally
         {
@@ -132,6 +135,7 @@ public sealed class PaystackWebhookTests(PostgresApiFactory factory) : IDisposab
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal((PaymentStatus.Failed, OrderStatus.PaymentFailed), await StateAsync(order, payment));
+        Assert.Equal(0, await ConfirmationEmailsAsync(order));   // M9: a failed payment sends no receipt
     }
 
     [Theory]
@@ -147,6 +151,7 @@ public sealed class PaystackWebhookTests(PostgresApiFactory factory) : IDisposab
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal((PaymentStatus.RequiresRefund, OrderStatus.PendingPayment), await StateAsync(order, payment));
+        Assert.Equal(0, await ConfirmationEmailsAsync(order));   // M9: an unaccepted payment sends no receipt
     }
 
     [Fact]
@@ -270,6 +275,15 @@ public sealed class PaystackWebhookTests(PostgresApiFactory factory) : IDisposab
         PaymentStatus payment = await db.Payments.Where(p => p.Reference == paymentReference).Select(p => p.Status).SingleAsync();
         OrderStatus order = await db.Orders.Where(o => o.Reference == orderReference).Select(o => o.Status).SingleAsync();
         return (payment, order);
+    }
+
+    /// <summary>M9: order-confirmation emails queued for the order.</summary>
+    private async Task<int> ConfirmationEmailsAsync(string orderReference)
+    {
+        await using AsyncServiceScope scope = factory.Services.CreateAsyncScope();
+        MilkshakeDbContext db = scope.ServiceProvider.GetRequiredService<MilkshakeDbContext>();
+        int orderId = await db.Orders.Where(o => o.Reference == orderReference).Select(o => o.Id).SingleAsync();
+        return await db.EmailNotifications.CountAsync(n => n.OrderId == orderId && n.Kind == NotificationKind.OrderConfirmed);
     }
 
     private async Task<int> ReceiptsAsync(long transactionId)

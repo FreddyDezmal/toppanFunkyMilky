@@ -195,6 +195,42 @@ public class EmailTemplateTests
         Assert.DoesNotContain("\n", email.Subject);
     }
 
+    [Theory]
+    [InlineData(NotificationKind.OrderConfirmed)]
+    [InlineData(NotificationKind.CancellationRequested)]
+    [InlineData(NotificationKind.OrderCancelled)]
+    [InlineData(NotificationKind.RefundProcessed)]
+    [InlineData(NotificationKind.RefundFailed)]
+    public void Every_email_has_an_accessible_structure(NotificationKind kind)
+    {
+        RenderedEmail email = Render(kind, PayloadFor(kind));
+
+        // Language and character set for screen readers, the subject as the document title, layout tables marked as
+        // presentation so they are not read as data tables, and one main heading.
+        Assert.Contains("<html lang=\"en\">", email.Html);
+        Assert.Contains("<meta charset=\"utf-8\">", email.Html);
+        Assert.Matches("<title>[^<]+</title>", email.Html);
+        int tables = Regex.Matches(email.Html, "<table").Count;
+        Assert.Equal(tables, Regex.Matches(email.Html, "<table role=\"presentation\"").Count);
+        Assert.Single(Regex.Matches(email.Html, "<h1[ >]"));
+        Assert.Matches("<h1[^>]*>Milky Shaky Custom Drinks</h1>", email.Html);
+        Assert.Matches("<a href=\"[^\"]+\"[^>]*>[^<]+</a>", email.Html);   // the link has visible text
+    }
+
+    [Theory]
+    [InlineData(NotificationKind.OrderConfirmed)]
+    [InlineData(NotificationKind.CancellationRequested)]
+    [InlineData(NotificationKind.OrderCancelled)]
+    [InlineData(NotificationKind.RefundProcessed)]
+    [InlineData(NotificationKind.RefundFailed)]
+    public void No_email_repeats_the_recipients_address(NotificationKind kind)
+    {
+        RenderedEmail email = Render(kind, PayloadFor(kind));
+
+        Assert.DoesNotContain("thandi@example.test", email.Html);
+        Assert.DoesNotContain("thandi@example.test", email.Text);
+    }
+
     [Fact]
     public void Script_in_the_recipient_name_is_encoded_in_html()
     {

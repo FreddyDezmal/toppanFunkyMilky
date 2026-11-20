@@ -10,7 +10,7 @@ How to run the emails locally, and how to configure the optional real-inbox prov
 | `Email:Provider` | `None` (emails stay queued) | `Mailpit` | `None`, `Mailpit` or `Resend` |
 | `Email:FromAddress` | – | `orders@milkyshaky.test` | Required by both senders |
 | `Email:FromName` | `Milky Shaky Custom Drinks` | same | |
-| `Email:PublicBaseUrl` | – | `http://localhost:5173/` | The site address for the order link; without it nothing is sent |
+| `Email:PublicBaseUrl` | – | `http://localhost:5173/` | The site address for the order link; without it nothing is sent. Must be `https://` outside Development |
 | `Email:AllowedRecipients:0…` | empty | – | Only used for senders that reach real inboxes (Resend). Empty means every email is suppressed |
 | `Email:Dispatch:Enabled` | `true` | | Off in automated tests (they call the dispatcher directly) |
 | `Email:Dispatch:IntervalSeconds` / `BatchSize` / `LeaseMinutes` | 30 / 10 / 5 | | Keep the lease longer than batch × sender timeout |
@@ -57,7 +57,9 @@ nothing else is attempted.
    ```
 
 3. For the check only, set in user secrets (not in `appsettings`): `Email:Provider` = `Resend`, `Email:FromAddress` =
-   the sender Resend allows for the account, `Email:AllowedRecipients:0` = the account owner's address.
+   `onboarding@resend.dev` (Resend's test sender while no domain is verified), `Email:AllowedRecipients:0` = the
+   Resend account's own address. If your usual address is already taken by a patron in the development database, a
+   Gmail plus address (`name+milkyshaky@gmail.com`) works for both the Resend account and a new patron.
 4. Place and pay for an order as a patron **whose account email is that address**. Every other patron's email is
    marked Suppressed.
 5. Afterwards remove the overrides (`dotnet user-secrets remove "Email:Provider" …`) to return to Mailpit.

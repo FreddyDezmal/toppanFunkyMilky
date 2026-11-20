@@ -123,6 +123,75 @@ public sealed class NotificationCreationTests(PostgresApiFactory factory)
     }
 
     [Fact]
+    public async Task ARefundStillPendingAtPaystack_QueuesNoOutcomeEmail()
+    {
+        (int orderId, _) = await PaidOrderAsync();
+        Refund created = await CancelAsync(orderId, byRestaurant: false);
+
+        await using (AsyncServiceScope scope = factory.Services.CreateAsyncScope())
+        {
+            MilkshakeDbContext db = Db(scope);
+            Refund refund = await db.Refunds.SingleAsync(r => r.Id == created.Id);
+            long providerId = Random.Shared.NextInt64(1, long.MaxValue);
+            refund.Submitted(providerId);
+            refund.ApplyVerifiedOutcome(VerifiedRefundOutcome.Pending, refund.AmountMinor, providerId, "Pending", DateTimeOffset.UtcNow);
+            await db.SaveChangesAsync();
+            Assert.Equal(RefundStatus.Pending, refund.Status);
+        }
+
+        await using AsyncServiceScope check = factory.Services.CreateAsyncScope();
+        Assert.False(await Db(check).EmailNotifications.AnyAsync(n => n.RefundId == created.Id));
+    }
+
+    [Fact]
+    public async Task TwoSimultaneousConfirmations_OfOneOrder_QueueOneReceipt()
+    {
+        (int orderId, _) = await PlacedOrderAsync();
+        int paymentId = await StartPaymentAsync(orderId);
+
+        // Two workers (e.g. the webhook and the reconciliation job) verify the same payment at the same time.
+        await using AsyncServiceScope first = factory.Services.CreateAsyncScope();
+        await using AsyncServiceScope second = factory.Services.CreateAsyncScope();
+        var contexts = new[] { Db(first), Db(second) };
+        foreach (MilkshakeDbContext db in contexts)
+        {
+            Pay(await db.Orders.SingleAsync(o => o.Id == orderId), await db.Payments.SingleAsync(p => p.Id == paymentId));
+        }
+
+        int saved = await SaveConcurrentlyAsync(contexts);
+
+        await using AsyncServiceScope check = factory.Services.CreateAsyncScope();
+        Assert.Equal(1, saved);
+        Assert.Equal(1, await Db(check).EmailNotifications.CountAsync(n => n.OrderId == orderId && n.Kind == NotificationKind.OrderConfirmed));
+        Assert.Equal(OrderStatus.Confirmed, (await Db(check).Orders.AsNoTracking().SingleAsync(o => o.Id == orderId)).Status);
+    }
+
+    [Fact]
+    public async Task TwoSimultaneousCancellations_OfOneOrder_QueueOneEmail()
+    {
+        (int orderId, _) = await PaidOrderAsync();
+
+        await using AsyncServiceScope first = factory.Services.CreateAsyncScope();
+        await using AsyncServiceScope second = factory.Services.CreateAsyncScope();
+        var contexts = new[] { Db(first), Db(second) };
+        foreach (MilkshakeDbContext db in contexts)
+        {
+            Order order = await db.Orders.SingleAsync(o => o.Id == orderId);
+            Payment paid = await db.Payments.AsNoTracking().SingleAsync(p => p.OrderId == orderId && p.Status == PaymentStatus.Succeeded);
+            order.Cancel(Before(order));
+            db.Refunds.Add(Refund.ForCancellation(order, paid, Refund.NewReference(), 0.10m, requestedByRestaurant: false));
+        }
+
+        int saved = await SaveConcurrentlyAsync(contexts);
+
+        await using AsyncServiceScope check = factory.Services.CreateAsyncScope();
+        MilkshakeDbContext read = Db(check);
+        Assert.Equal(1, saved);
+        Assert.Equal(1, await read.EmailNotifications.CountAsync(n => n.OrderId == orderId && n.Kind == NotificationKind.OrderCancelled));
+        Assert.Equal(1, await read.Refunds.CountAsync(r => r.OrderId == orderId));
+    }
+
+    [Fact]
     public async Task ACancellationRequest_QueuesItsEmail_AndAcceptingItQueuesARestaurantCancellation()
     {
         (int orderId, _) = await PaidOrderAsync();
@@ -220,6 +289,24 @@ public sealed class NotificationCreationTests(PostgresApiFactory factory)
     }
 
     // ---- helpers -------------------------------------------------------------------------------------------------
+
+    /// <summary>Saves every context at once; returns how many succeeded (the others lost on the row version or a unique key).</summary>
+    private static async Task<int> SaveConcurrentlyAsync(IEnumerable<MilkshakeDbContext> contexts)
+    {
+        bool[] results = await Task.WhenAll(contexts.Select(async db =>
+        {
+            try
+            {
+                await db.SaveChangesAsync();
+                return true;
+            }
+            catch (DbUpdateException)
+            {
+                return false;
+            }
+        }));
+        return results.Count(saved => saved);
+    }
 
     /// <summary>A moment before the pickup time, so the order may still be cancelled whatever the time of day.</summary>
     private static DateTimeOffset Before(Order order) => order.PickupAtUtc.AddMinutes(-5);

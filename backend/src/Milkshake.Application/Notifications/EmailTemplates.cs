@@ -300,7 +300,7 @@ public static class EmailTemplates
                 "<body style=\"margin:0;padding:0;background:#fdf2f8;font-family:Arial,Helvetica,sans-serif;\">" +
                 "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#fdf2f8;\"><tr><td align=\"center\" style=\"padding:24px 12px;\">" +
                 "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;background:#ffffff;border-radius:12px;\">" +
-                "<tr><td style=\"padding:24px 28px 8px;font-size:22px;font-weight:bold;color:#db2777;\">" + E(Brand) + "</td></tr>" +
+                "<tr><td style=\"padding:24px 28px 8px;\"><h1 style=\"margin:0;font-size:22px;line-height:28px;font-weight:bold;color:#db2777;\">" + E(Brand) + "</h1></td></tr>" +
                 "<tr><td style=\"padding:8px 28px 8px;\">" + _html + "</td></tr>" +
                 "<tr><td style=\"padding:16px 28px 24px;font-size:13px;line-height:20px;color:#64748b;border-top:1px solid #e2e8f0;\">" + E(footer) + "</td></tr>" +
                 "</table></td></tr></table></body></html>";

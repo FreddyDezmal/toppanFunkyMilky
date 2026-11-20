@@ -197,6 +197,24 @@ public sealed class EmailDispatcherTests(PostgresApiFactory factory) : IDisposab
         Assert.Empty(_sender.Attempts);
     }
 
+    [Theory]
+    [InlineData("http://shop.example.test/")]
+    [InlineData("ftp://shop.example.test/")]
+    public async Task OutsideDevelopment_APlainHttpSiteAddress_KeepsEmailsQueued(string address)
+    {
+        (EmailNotification queued, _) = await QueueAsync();
+        using WebApplicationFactory<ApiAssemblyMarker> insecure = App.WithWebHostBuilder(builder => builder.UseSetting("Email:PublicBaseUrl", address));
+
+        await using (AsyncServiceScope scope = insecure.Services.CreateAsyncScope())
+        {
+            Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IEmailDispatcher>().DispatchAsync(CancellationToken.None));
+        }
+
+        EmailNotification stored = await StoredAsync(queued.Id);
+        Assert.Equal((NotificationStatus.Pending, 0), (stored.Status, stored.AttemptCount));
+        Assert.Empty(_sender.Attempts);
+    }
+
     [Fact]
     public async Task AHeldLease_IsRespected_AndAnExpiredOneIsTakenBack()
     {
