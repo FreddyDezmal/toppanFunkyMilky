@@ -13,15 +13,16 @@ using Milkshake.Infrastructure.Persistence;
 namespace Milkshake.Infrastructure.Ordering;
 
 /// <summary>
-/// Patron cancellation (M8b). Order of work:
+/// Patron cancellation and answers to manager requests (M8b). Order of work:
 /// 1. The patron's own order; a cancelled one is answered with its current state (a repeat is harmless).
 /// 2. Before the pickup time only (B1.1).
 /// 3. Unpaid: an open payment attempt is checked with the provider first (R6). If it was just paid, nothing is
 ///    cancelled and the patron sees the refund they would get; otherwise the attempt is closed and the order cancelled
 ///    for free (B1.3).
-/// 4. Paid: the refund the patron confirmed must equal the server's (paid − fee, R5). The order's cancellation and its
+/// 4. Paid: the refund the patron confirmed must equal the server's – paid less the fee for the patron's own
+///    cancellation (B1.4, R5), everything paid when they accept the restaurant's request (Q1). The cancellation and its
 ///    refund are saved in ONE transaction, then the provider is asked to return the money (R4).
-/// Pending manager requests for the order lapse when it is cancelled.
+/// Pending manager requests for the order lapse when the patron cancels it themselves.
 /// </summary>
 internal sealed partial class OrderCancellationService(
     MilkshakeDbContext db,
@@ -34,10 +35,60 @@ internal sealed partial class OrderCancellationService(
     public async Task<OrderCancellationView?> GetAsync(string orderReference, CancellationToken cancellationToken)
     {
         Order? order = await FindAsync(orderReference, tracked: false, cancellationToken);
-        return order is null ? null : await ViewAsync(order, await FeeRateAsync(cancellationToken), cancellationToken);
+        return order is null ? null : await ViewAsync(order.Id, await FeeRateAsync(cancellationToken), cancellationToken);
     }
 
-    public async Task<CancelOrderResult> CancelAsync(string orderReference, decimal expectedRefund, CancellationToken cancellationToken)
+    public Task<CancelOrderResult> CancelAsync(string orderReference, decimal expectedRefund, CancellationToken cancellationToken) =>
+        CancelAsync(orderReference, expectedRefund, acceptRequest: false, cancellationToken);
+
+    public Task<CancelOrderResult> AcceptRequestAsync(string orderReference, decimal expectedRefund, CancellationToken cancellationToken) =>
+        CancelAsync(orderReference, expectedRefund, acceptRequest: true, cancellationToken);
+
+    public async Task<CancelOrderResult> DeclineRequestAsync(string orderReference, CancellationToken cancellationToken)
+    {
+        Order? order = await FindAsync(orderReference, tracked: false, cancellationToken);
+        if (order is null)
+        {
+            return new CancelOrderResult(CancelOrderOutcome.NotFound);
+        }
+
+        decimal? feeRate = await FeeRateAsync(cancellationToken);
+        DateTimeOffset now = clock.GetUtcNow();
+        CancellationRequest? request = await PendingRequestAsync(order.Id, cancellationToken);
+        if (request is null || !request.IsOpenAt(order, now) || order.Status == OrderStatus.Cancelled)
+        {
+            return await ResultAsync(CancelOrderOutcome.NoOpenRequest, order.Id, feeRate, cancellationToken);
+        }
+
+        request.Decline(order, now);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // Answered, or the order cancelled, at the same moment.
+            db.ChangeTracker.Clear();
+            return await ResultAsync(CancelOrderOutcome.NoOpenRequest, order.Id, feeRate, cancellationToken);
+        }
+
+        LogDeclined(logger, order.Reference);
+        return await ResultAsync(CancelOrderOutcome.Declined, order.Id, feeRate, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<PendingCancellationRequest>> PendingRequestsAsync(CancellationToken cancellationToken)
+    {
+        Guid patronId = currentUser.UserId ?? throw new InvalidOperationException("Requires a signed-in patron.");
+        DateTimeOffset now = clock.GetUtcNow();
+        return await db.CancellationRequests.AsNoTracking()
+            .Where(r => r.Status == CancellationRequestStatus.Pending)
+            .Join(db.Orders.AsNoTracking().Where(o => o.PatronId == patronId && o.Status != OrderStatus.Cancelled && o.PickupAtUtc > now),
+                r => r.OrderId, o => o.Id, (r, o) => new PendingCancellationRequest(o.Reference, r.Reason, r.CreatedAt, o.PickupAtUtc))
+            .OrderBy(r => r.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
+    private async Task<CancelOrderResult> CancelAsync(string orderReference, decimal expectedRefund, bool acceptRequest, CancellationToken cancellationToken)
     {
         Order? order = await FindAsync(orderReference, tracked: true, cancellationToken);
         if (order is null)
@@ -50,12 +101,22 @@ internal sealed partial class OrderCancellationService(
 
         if (order.Status == OrderStatus.Cancelled)
         {
-            return await ResultAsync(CancelOrderOutcome.AlreadyCancelled, order, feeRate, cancellationToken);
+            return await ResultAsync(CancelOrderOutcome.AlreadyCancelled, order.Id, feeRate, cancellationToken);
         }
 
         if (!order.CanBeCancelledAt(now))
         {
-            return await ResultAsync(CancelOrderOutcome.PickupPassed, order, feeRate, cancellationToken);
+            return await ResultAsync(acceptRequest ? CancelOrderOutcome.NoOpenRequest : CancelOrderOutcome.PickupPassed, order.Id, feeRate, cancellationToken);
+        }
+
+        CancellationRequest? accepted = null;
+        if (acceptRequest)
+        {
+            accepted = await PendingRequestAsync(order.Id, cancellationToken);
+            if (accepted is null || !accepted.IsOpenAt(order, now))
+            {
+                return await ResultAsync(CancelOrderOutcome.NoOpenRequest, order.Id, feeRate, cancellationToken);
+            }
         }
 
         if (OrderStatusTransitions.AwaitsPayment(order.Status))
@@ -67,25 +128,64 @@ internal sealed partial class OrderCancellationService(
                 CancelOrderOutcome? blocked = await CloseOpenAttemptAsync(order, open, now, cancellationToken);
                 if (blocked is not null)
                 {
-                    return await ResultAsync(blocked.Value, order, feeRate, cancellationToken);
+                    return await ResultAsync(blocked.Value, order.Id, feeRate, cancellationToken);
                 }
             }
         }
 
+        Refund? refund = null;
+        Payment? paid = null;
         if (order.Status == OrderStatus.Confirmed)
         {
-            return await CancelPaidAsync(order, expectedRefund, feeRate, now, cancellationToken);
-        }
+            paid = await db.Payments.AsNoTracking().SingleAsync(p => p.OrderId == order.Id && p.Status == PaymentStatus.Succeeded, cancellationToken);
+            if (feeRate is null && !acceptRequest)
+            {
+                return new CancelOrderResult(CancelOrderOutcome.Unavailable);
+            }
 
-        if (expectedRefund != 0m)
+            decimal expected = acceptRequest ? Paid(paid) : Quote(order, paid, feeRate!.Value).RefundAmount;
+            if (expectedRefund != expected)
+            {
+                return await ResultAsync(CancelOrderOutcome.RefundChanged, order.Id, feeRate, cancellationToken);
+            }
+        }
+        else if (expectedRefund != 0m)
         {
             db.ChangeTracker.Clear();
-            return await ResultAsync(CancelOrderOutcome.RefundChanged, order, feeRate, cancellationToken);
+            return await ResultAsync(CancelOrderOutcome.RefundChanged, order.Id, feeRate, cancellationToken);
         }
 
+        accepted?.Accept(order, now);
         order.Cancel(now);
-        await LapseRequestsAsync(order, now, cancellationToken);
-        return await SaveCancellationAsync(order, feeRate, refund: null, paymentReference: null, cancellationToken);
+        if (paid is not null)
+        {
+            refund = Refund.ForCancellation(order, paid, Refund.NewReference(), acceptRequest ? 0m : feeRate!.Value, requestedByRestaurant: acceptRequest);
+            db.Refunds.Add(refund);
+        }
+
+        await LapseOtherRequestsAsync(order, now, cancellationToken);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // A simultaneous request or notification changed the order first (row version, or one refund per payment).
+            db.ChangeTracker.Clear();
+            Order current = await db.Orders.AsNoTracking().SingleAsync(o => o.Id == order.Id, cancellationToken);
+            CancelOrderOutcome outcome = current.Status == OrderStatus.Cancelled ? CancelOrderOutcome.AlreadyCancelled : CancelOrderOutcome.RefundChanged;
+            return await ResultAsync(outcome, order.Id, feeRate, cancellationToken);
+        }
+
+        LogCancelled(logger, order.Reference, acceptRequest, refund?.Reference);
+        if (refund is not null)
+        {
+            // The cancellation is stored; if the provider cannot be reached now, the reconciliation job retries.
+            await refunds.SubmitAsync(refund, paid!.Reference, CancellationToken.None);
+        }
+
+        return await ResultAsync(CancelOrderOutcome.Cancelled, order.Id, feeRate, cancellationToken);
     }
 
     /// <summary>
@@ -146,55 +246,8 @@ internal sealed partial class OrderCancellationService(
         return CancelOrderOutcome.RefundChanged;
     }
 
-    private async Task<CancelOrderResult> CancelPaidAsync(Order order, decimal expectedRefund, decimal? feeRate, DateTimeOffset now, CancellationToken cancellationToken)
-    {
-        Payment payment = await db.Payments.AsNoTracking().SingleAsync(
-            p => p.OrderId == order.Id && p.Status == PaymentStatus.Succeeded, cancellationToken);
-        if (feeRate is null)
-        {
-            return new CancelOrderResult(CancelOrderOutcome.Unavailable);
-        }
-
-        CancellationQuote quote = Quote(order, payment, feeRate.Value);
-        if (expectedRefund != quote.RefundAmount)
-        {
-            return await ResultAsync(CancelOrderOutcome.RefundChanged, order, feeRate, cancellationToken);
-        }
-
-        order.Cancel(now);
-        Refund refund = Refund.ForCancellation(order, payment, Refund.NewReference(), feeRate.Value, requestedByRestaurant: false);
-        db.Refunds.Add(refund);
-        await LapseRequestsAsync(order, now, cancellationToken);
-        return await SaveCancellationAsync(order, feeRate, refund, payment.Reference, cancellationToken);
-    }
-
-    private async Task<CancelOrderResult> SaveCancellationAsync(
-        Order order, decimal? feeRate, Refund? refund, string? paymentReference, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException)
-        {
-            // A simultaneous request or notification changed the order first (row version, or one refund per payment).
-            db.ChangeTracker.Clear();
-            Order current = await db.Orders.AsNoTracking().SingleAsync(o => o.Id == order.Id, cancellationToken);
-            CancelOrderOutcome outcome = current.Status == OrderStatus.Cancelled ? CancelOrderOutcome.AlreadyCancelled : CancelOrderOutcome.RefundChanged;
-            return await ResultAsync(outcome, current, feeRate, cancellationToken);
-        }
-
-        LogCancelled(logger, order.Reference, refund?.Reference);
-        if (refund is not null)
-        {
-            // The cancellation is stored; if the provider cannot be reached now, the reconciliation job retries.
-            await refunds.SubmitAsync(refund, paymentReference!, CancellationToken.None);
-        }
-
-        return await ResultAsync(CancelOrderOutcome.Cancelled, order, feeRate, cancellationToken);
-    }
-
-    private async Task LapseRequestsAsync(Order order, DateTimeOffset now, CancellationToken cancellationToken)
+    /// <summary>A manager's request still pending for an order the patron cancelled themselves is now moot.</summary>
+    private async Task LapseOtherRequestsAsync(Order order, DateTimeOffset now, CancellationToken cancellationToken)
     {
         List<CancellationRequest> pending = await db.CancellationRequests
             .Where(r => r.OrderId == order.Id && r.Status == CancellationRequestStatus.Pending)
@@ -204,6 +257,9 @@ internal sealed partial class OrderCancellationService(
             request.LapseIfDue(order, now);
         }
     }
+
+    private Task<CancellationRequest?> PendingRequestAsync(int orderId, CancellationToken cancellationToken) =>
+        db.CancellationRequests.SingleOrDefaultAsync(r => r.OrderId == orderId && r.Status == CancellationRequestStatus.Pending, cancellationToken);
 
     private async Task<Order?> FindAsync(string orderReference, bool tracked, CancellationToken cancellationToken)
     {
@@ -217,18 +273,21 @@ internal sealed partial class OrderCancellationService(
         return await orders.SingleOrDefaultAsync(o => o.PatronId == patronId && o.Reference == orderReference, cancellationToken);
     }
 
-    private async Task<CancelOrderResult> ResultAsync(CancelOrderOutcome outcome, Order order, decimal? feeRate, CancellationToken cancellationToken) =>
-        new(outcome, await ViewAsync(order, feeRate, cancellationToken));
+    private async Task<CancelOrderResult> ResultAsync(CancelOrderOutcome outcome, int orderId, decimal? feeRate, CancellationToken cancellationToken) =>
+        new(outcome, await ViewAsync(orderId, feeRate, cancellationToken));
 
-    internal async Task<OrderCancellationView> ViewAsync(Order order, decimal? feeRate, CancellationToken cancellationToken)
+    private async Task<OrderCancellationView> ViewAsync(int orderId, decimal? feeRate, CancellationToken cancellationToken)
     {
-        Order current = await db.Orders.AsNoTracking().SingleAsync(o => o.Id == order.Id, cancellationToken);
+        DateTimeOffset now = clock.GetUtcNow();
+        Order current = await db.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId, cancellationToken);
         Payment? paid = await db.Payments.AsNoTracking().SingleOrDefaultAsync(
             p => p.OrderId == current.Id && p.Status == PaymentStatus.Succeeded, cancellationToken);
         List<Refund> stored = await db.Refunds.AsNoTracking().Where(r => r.OrderId == current.Id).OrderBy(r => r.Id).ToListAsync(cancellationToken);
+        CancellationRequest? pending = await db.CancellationRequests.AsNoTracking()
+            .SingleOrDefaultAsync(r => r.OrderId == current.Id && r.Status == CancellationRequestStatus.Pending, cancellationToken);
 
         CancellationBlock? block = current.Status == OrderStatus.Cancelled ? CancellationBlock.AlreadyCancelled
-            : !current.CanBeCancelledAt(clock.GetUtcNow()) ? CancellationBlock.PickupPassed
+            : !current.CanBeCancelledAt(now) ? CancellationBlock.PickupPassed
             : null;
         var none = new CancellationQuote(false, block, paid is not null, 0m, 0m, 0m, 0m, current.CurrencyCode);
 
@@ -237,17 +296,26 @@ internal sealed partial class OrderCancellationService(
             : feeRate is null ? none      // a paid order waits until the fee rate setting is fixed
             : Quote(current, paid, feeRate.Value);
 
-        return new OrderCancellationView(current.Reference, current.Status, quote, stored.Select(ToView).ToList());
+        CancellationRequestView? openRequest = pending is not null && pending.IsOpenAt(current, now) && block is null
+            ? ToView(pending, isOpen: true, paid is null ? 0m : Paid(paid))
+            : null;
+
+        return new OrderCancellationView(current.Reference, current.Status, quote, openRequest, stored.Select(ToView).ToList());
     }
+
+    private static decimal Paid(Payment payment) => MinorUnits.FromMinor(payment.AmountMinor, payment.CurrencyCode);
 
     private static CancellationQuote Quote(Order order, Payment payment, decimal feeRate)
     {
-        decimal paid = MinorUnits.FromMinor(payment.AmountMinor, payment.CurrencyCode);
+        decimal paid = Paid(payment);
         decimal fee = Refund.CancellationFee(order, feeRate);
         return new CancellationQuote(true, null, true, paid, feeRate, fee, paid - fee, payment.CurrencyCode);
     }
 
-    private static RefundView ToView(Refund refund) => new(
+    internal static CancellationRequestView ToView(CancellationRequest request, bool isOpen, decimal refundAmount) =>
+        new(request.Id, request.Reason, request.Status, isOpen, refundAmount, request.CreatedAt, request.ClosedAt);
+
+    internal static RefundView ToView(Refund refund) => new(
         refund.Reference,
         refund.Kind,
         refund.Status,
@@ -271,9 +339,12 @@ internal sealed partial class OrderCancellationService(
         return null;
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Order {OrderReference} was cancelled by its patron (refund {RefundReference}).")]
-    private static partial void LogCancelled(ILogger logger, string orderReference, string? refundReference);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Order {OrderReference} was cancelled (accepting a manager request: {AcceptedRequest}; refund {RefundReference}).")]
+    private static partial void LogCancelled(ILogger logger, string orderReference, bool acceptedRequest, string? refundReference);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "The Refund.FeeRate setting is missing or invalid; paid orders cannot be cancelled until it is fixed.")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "The patron declined the cancellation request for order {OrderReference}.")]
+    private static partial void LogDeclined(ILogger logger, string orderReference);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "The Refund.FeeRate setting is missing or invalid; paid orders cannot be cancelled by their patron until it is fixed.")]
     private static partial void LogFeeRateUnavailable(ILogger logger);
 }

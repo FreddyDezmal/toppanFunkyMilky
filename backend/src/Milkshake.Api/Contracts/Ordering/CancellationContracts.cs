@@ -13,6 +13,37 @@ public sealed class CancelOrderRequest
     public decimal? ExpectedRefund { get; init; }
 }
 
+/// <summary>POST …/cancellation-request/decline takes no data; any field is rejected.</summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed class DeclineCancellationRequest;
+
+/// <summary>A manager's cancellation request. <see cref="RefundAmount"/>: everything paid, returned in full on acceptance.</summary>
+public sealed record CancellationRequestResponse(
+    int Id,
+    string Reason,
+    string Status,
+    bool IsOpen,
+    decimal RefundAmount,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? ClosedAt)
+{
+    public static CancellationRequestResponse From(CancellationRequestView view)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+        return new CancellationRequestResponse(view.Id, view.Reason, view.Status.ToString(), view.IsOpen, view.RefundAmount, view.CreatedAt, view.ClosedAt);
+    }
+}
+
+/// <summary>GET /api/ordering/cancellation-requests: one of the patron's orders with a request waiting for an answer.</summary>
+public sealed record PendingCancellationRequestResponse(string OrderReference, string Reason, DateTimeOffset CreatedAt, DateTimeOffset PickupAtUtc)
+{
+    public static PendingCancellationRequestResponse From(PendingCancellationRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return new PendingCancellationRequestResponse(request.OrderReference, request.Reason, request.CreatedAt, request.PickupAtUtc);
+    }
+}
+
 /// <summary>One refund as stored. A refund is complete only when <see cref="Status"/> is "Processed".</summary>
 public sealed record RefundResponse(
     string Reference,
@@ -47,6 +78,7 @@ public sealed record CancellationResponse(
     decimal Fee,
     decimal RefundAmount,
     string CurrencyCode,
+    CancellationRequestResponse? OpenRequest,
     IReadOnlyList<RefundResponse> Refunds)
 {
     public static CancellationResponse From(OrderCancellationView view)
@@ -55,6 +87,7 @@ public sealed record CancellationResponse(
         CancellationQuote quote = view.Quote;
         return new CancellationResponse(view.OrderReference, view.OrderStatus.ToString(), quote.CanCancel, quote.Block?.ToString(),
             quote.IsPaid, quote.PaidAmount, quote.FeeRate, quote.Fee, quote.RefundAmount, quote.CurrencyCode,
+            view.OpenRequest is null ? null : CancellationRequestResponse.From(view.OpenRequest),
             view.Refunds.Select(RefundResponse.From).ToList());
     }
 }
@@ -70,4 +103,6 @@ public static class CancellationMessages
     public const string PaymentInProgressDetail = "Please wait a moment and try again.";
     public const string UnavailableTitle = "Cancellation is temporarily unavailable.";
     public const string UnavailableDetail = "Nothing was cancelled. Please try again in a few minutes.";
+    public const string NoOpenRequestTitle = "There is no cancellation request waiting for your answer.";
+    public const string NoOpenRequestDetail = "It may have been answered already, or the pickup time has passed.";
 }

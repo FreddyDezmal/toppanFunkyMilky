@@ -37,8 +37,32 @@ public sealed record RefundView(
     DateTimeOffset CreatedAt,
     DateTimeOffset? CompletedAt);
 
-/// <summary>The cancellation side of one of the patron's orders: what cancelling would mean, and any refunds.</summary>
-public sealed record OrderCancellationView(string OrderReference, OrderStatus OrderStatus, CancellationQuote Quote, IReadOnlyList<RefundView> Refunds);
+/// <summary>
+/// A manager's cancellation request (B1.2). <see cref="IsOpen"/>: still waiting for the patron (pending and before the
+/// pickup time). <see cref="RefundAmount"/>: what the patron gets back on accepting – everything paid (Q1).
+/// </summary>
+public sealed record CancellationRequestView(
+    int Id,
+    string Reason,
+    CancellationRequestStatus Status,
+    bool IsOpen,
+    decimal RefundAmount,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? ClosedAt);
+
+/// <summary>
+/// The cancellation side of one of the patron's orders: what cancelling would mean, a manager's open request (if any),
+/// and any refunds.
+/// </summary>
+public sealed record OrderCancellationView(
+    string OrderReference,
+    OrderStatus OrderStatus,
+    CancellationQuote Quote,
+    CancellationRequestView? OpenRequest,
+    IReadOnlyList<RefundView> Refunds);
+
+/// <summary>An order with a manager's request waiting for the patron's answer (the Home page notice, Q3).</summary>
+public sealed record PendingCancellationRequest(string OrderReference, string Reason, DateTimeOffset CreatedAt, DateTimeOffset PickupAtUtc);
 
 public enum CancelOrderOutcome
 {
@@ -64,6 +88,12 @@ public enum CancelOrderOutcome
 
     /// <summary>The payment provider or the fee setting is unavailable; nothing was cancelled.</summary>
     Unavailable,
+
+    /// <summary>There is no manager request waiting for an answer (answered, lapsed or never made).</summary>
+    NoOpenRequest,
+
+    /// <summary>The patron declined the manager's request; the order stays as it was.</summary>
+    Declined,
 }
 
 public sealed record CancelOrderResult(CancelOrderOutcome Outcome, OrderCancellationView? View = null);
@@ -79,4 +109,16 @@ public interface IOrderCancellationService
     /// order is cancelled together with its refund record before Paystack is asked to return the money.
     /// </summary>
     Task<CancelOrderResult> CancelAsync(string orderReference, decimal expectedRefund, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Accepts the manager's open request (B1.2): the order is cancelled and, if paid, refunded in full (Q1). The refund
+    /// the patron confirmed (everything paid, or 0) must still match the server's.
+    /// </summary>
+    Task<CancelOrderResult> AcceptRequestAsync(string orderReference, decimal expectedRefund, CancellationToken cancellationToken);
+
+    /// <summary>Declines the manager's open request; the order is not changed.</summary>
+    Task<CancelOrderResult> DeclineRequestAsync(string orderReference, CancellationToken cancellationToken);
+
+    /// <summary>The patron's orders with a manager request waiting for an answer, oldest first.</summary>
+    Task<IReadOnlyList<PendingCancellationRequest>> PendingRequestsAsync(CancellationToken cancellationToken);
 }

@@ -373,11 +373,72 @@ public sealed partial class OrderingController(
             return ValidationProblem(ModelState);
         }
 
-        CancelOrderResult result = await cancellations.CancelAsync(reference, expectedRefund, cancellationToken);
+        return CancellationResult(await cancellations.CancelAsync(reference, expectedRefund, cancellationToken));
+    }
+
+    /// <summary>
+    /// Accepts the manager's request to cancel the order (B1.2): it is cancelled and, if paid, refunded in full (Q1).
+    /// <c>expectedRefund</c> is the amount the patron confirmed (everything paid, or 0) and is only compared.
+    /// </summary>
+    /// <response code="200">Cancelled; the body shows the refund, if any.</response>
+    /// <response code="400">Missing <c>expectedRefund</c> or unknown fields.</response>
+    /// <response code="404">No such order for this patron.</response>
+    /// <response code="409">No request is waiting for an answer, the refund changed, or a payment is being prepared. Nothing was cancelled.</response>
+    /// <response code="503">The payment provider is unavailable; nothing was cancelled.</response>
+    [HttpPost("orders/{reference}/cancellation-request/accept")]
+    [RequestBodyLimit(1024)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ProducesResponseType<CancellationResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<CancellationResponse>> AcceptCancellationRequest(string reference, CancelOrderRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.ExpectedRefund is not { } expectedRefund || expectedRefund < 0m)
+        {
+            ModelState.AddModelError("expectedRefund", CancellationMessages.ExpectedRefundRequired);
+            return ValidationProblem(ModelState);
+        }
+
+        return CancellationResult(await cancellations.AcceptRequestAsync(reference, expectedRefund, cancellationToken));
+    }
+
+    /// <summary>Declines the manager's request to cancel the order; the order is not changed.</summary>
+    /// <response code="200">Declined.</response>
+    /// <response code="404">No such order for this patron.</response>
+    /// <response code="409">No request is waiting for an answer.</response>
+    [HttpPost("orders/{reference}/cancellation-request/decline")]
+    [RequestBodyLimit(1024)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ProducesResponseType<CancellationResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<CancellationResponse>> DeclineCancellationRequest(
+        string reference,
+        [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] DeclineCancellationRequest? request,
+        CancellationToken cancellationToken)
+    {
+        _ = request;
+        return CancellationResult(await cancellations.DeclineRequestAsync(reference, cancellationToken));
+    }
+
+    /// <summary>The patron's orders with a manager's cancellation request waiting for an answer (the Home page notice).</summary>
+    /// <response code="200">Oldest first; empty when there are none.</response>
+    [HttpGet("cancellation-requests")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ProducesResponseType<IReadOnlyList<PendingCancellationRequestResponse>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<PendingCancellationRequestResponse>>> PendingCancellationRequests(CancellationToken cancellationToken) =>
+        Ok((await cancellations.PendingRequestsAsync(cancellationToken)).Select(PendingCancellationRequestResponse.From).ToList());
+
+    private ActionResult<CancellationResponse> CancellationResult(CancelOrderResult result)
+    {
         switch (result.Outcome)
         {
             case CancelOrderOutcome.Cancelled:
             case CancelOrderOutcome.AlreadyCancelled:
+            case CancelOrderOutcome.Declined:
                 return Ok(CancellationResponse.From(result.View!));
             case CancelOrderOutcome.NotFound:
                 return Problem(statusCode: StatusCodes.Status404NotFound, title: OrderMessages.NotFoundTitle);
@@ -386,6 +447,9 @@ public sealed partial class OrderingController(
                     HttpContext, StatusCodes.Status409Conflict, CancellationMessages.RefundChangedTitle, detail: CancellationMessages.RefundChangedDetail);
                 changed.Extensions["cancellation"] = CancellationResponse.From(result.View!);
                 return Conflict(changed);
+            case CancelOrderOutcome.NoOpenRequest:
+                return Problem(statusCode: StatusCodes.Status409Conflict, title: CancellationMessages.NoOpenRequestTitle,
+                    detail: CancellationMessages.NoOpenRequestDetail);
             case CancelOrderOutcome.PaymentInProgress:
                 return Problem(statusCode: StatusCodes.Status409Conflict, title: CancellationMessages.PaymentInProgressTitle,
                     detail: CancellationMessages.PaymentInProgressDetail);
