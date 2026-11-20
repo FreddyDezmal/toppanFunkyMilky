@@ -599,6 +599,271 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Milkshake.Domain.Orders.Order", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseHiLo(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .HasColumnName("currency_code")
+                        .IsFixedLength();
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("discount_amount");
+
+                    b.Property<bool>("DiscountCapApplied")
+                        .HasColumnType("boolean")
+                        .HasColumnName("discount_cap_applied");
+
+                    b.Property<decimal?>("DiscountRate")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)")
+                        .HasColumnName("discount_rate");
+
+                    b.Property<int?>("DiscountTierNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("discount_tier_number");
+
+                    b.Property<Guid>("IdempotencyKey")
+                        .HasColumnType("uuid")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<Guid>("PatronId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patron_id");
+
+                    b.Property<DateTimeOffset>("PickupAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("pickup_at_utc");
+
+                    b.Property<string>("PickupTimeZone")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("pickup_time_zone");
+
+                    b.Property<DateTimeOffset>("PricedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("priced_at_utc");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character(12)")
+                        .HasColumnName("reference")
+                        .IsFixedLength();
+
+                    b.Property<string>("RequestFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("request_fingerprint")
+                        .IsFixedLength();
+
+                    b.Property<string>("RestaurantAddress")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("restaurant_address");
+
+                    b.Property<int>("RestaurantId")
+                        .HasColumnType("integer")
+                        .HasColumnName("restaurant_id");
+
+                    b.Property<string>("RestaurantName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("restaurant_name");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("subtotal");
+
+                    b.Property<decimal>("Taxable")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("taxable");
+
+                    b.Property<decimal>("Total")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("total");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<decimal>("Vat")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("vat");
+
+                    b.Property<decimal>("VatRate")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)")
+                        .HasColumnName("vat_rate");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_orders");
+
+                    b.HasIndex("Reference")
+                        .IsUnique()
+                        .HasDatabaseName("ix_orders_reference");
+
+                    b.HasIndex("RestaurantId")
+                        .HasDatabaseName("ix_orders_restaurant_id");
+
+                    b.HasIndex("PatronId", "CreatedAt")
+                        .HasDatabaseName("ix_orders_patron_id_created_at");
+
+                    b.HasIndex("PatronId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_orders_patron_id_idempotency_key");
+
+                    b.HasIndex("PatronId", "Status")
+                        .HasDatabaseName("ix_orders_patron_id_status");
+
+                    b.ToTable("orders", "milkshake", t =>
+                        {
+                            t.HasCheckConstraint("ck_orders_amounts_non_negative", "subtotal >= 0 AND discount_amount >= 0 AND taxable >= 0 AND vat >= 0 AND total >= 0");
+
+                            t.HasCheckConstraint("ck_orders_discount_rate", "(discount_tier_number IS NULL AND discount_rate IS NULL) OR (discount_tier_number >= 1 AND discount_rate >= 0 AND discount_rate <= 1)");
+
+                            t.HasCheckConstraint("ck_orders_discount_within_subtotal", "discount_amount <= subtotal");
+
+                            t.HasCheckConstraint("ck_orders_reference", "reference ~ '^MS-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$'");
+
+                            t.HasCheckConstraint("ck_orders_request_fingerprint", "request_fingerprint ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_orders_status", "status IN ('PendingPayment', 'Confirmed', 'PaymentFailed', 'Cancelled')");
+
+                            t.HasCheckConstraint("ck_orders_taxable", "taxable = subtotal - discount_amount");
+
+                            t.HasCheckConstraint("ck_orders_total", "total = taxable + vat");
+
+                            t.HasCheckConstraint("ck_orders_vat_rate", "vat_rate >= 0 AND vat_rate <= 1");
+                        });
+                });
+
+            modelBuilder.Entity("Milkshake.Domain.Orders.OrderItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseHiLo(b.Property<int>("Id"));
+
+                    b.Property<decimal>("ConsistencyFee")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("consistency_fee");
+
+                    b.Property<int>("ConsistencyId")
+                        .HasColumnType("integer")
+                        .HasColumnName("consistency_id");
+
+                    b.Property<string>("ConsistencyName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("consistency_name");
+
+                    b.Property<decimal>("FlavourFee")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("flavour_fee");
+
+                    b.Property<int>("FlavourId")
+                        .HasColumnType("integer")
+                        .HasColumnName("flavour_id");
+
+                    b.Property<string>("FlavourName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("flavour_name");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("integer")
+                        .HasColumnName("order_id");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("price");
+
+                    b.Property<decimal>("ToppingFee")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("topping_fee");
+
+                    b.Property<int>("ToppingId")
+                        .HasColumnType("integer")
+                        .HasColumnName("topping_id");
+
+                    b.Property<string>("ToppingName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("topping_name");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_items");
+
+                    b.HasIndex("ConsistencyId")
+                        .HasDatabaseName("ix_order_items_consistency_id");
+
+                    b.HasIndex("FlavourId")
+                        .HasDatabaseName("ix_order_items_flavour_id");
+
+                    b.HasIndex("ToppingId")
+                        .HasDatabaseName("ix_order_items_topping_id");
+
+                    b.HasIndex("OrderId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_order_items_order_id_number");
+
+                    b.ToTable("order_items", "milkshake", t =>
+                        {
+                            t.HasCheckConstraint("ck_order_items_fees_non_negative", "flavour_fee >= 0 AND consistency_fee >= 0 AND topping_fee >= 0");
+
+                            t.HasCheckConstraint("ck_order_items_number", "number >= 1");
+
+                            t.HasCheckConstraint("ck_order_items_price", "price = flavour_fee + consistency_fee + topping_fee");
+                        });
+                });
+
             modelBuilder.Entity("Milkshake.Domain.Restaurants.Restaurant", b =>
                 {
                     b.Property<int>("Id")
@@ -973,6 +1238,54 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
                     b.Navigation("Topping");
                 });
 
+            modelBuilder.Entity("Milkshake.Domain.Orders.Order", b =>
+                {
+                    b.HasOne("Milkshake.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("PatronId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_orders_users_patron_id");
+
+                    b.HasOne("Milkshake.Domain.Restaurants.Restaurant", null)
+                        .WithMany()
+                        .HasForeignKey("RestaurantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_orders_restaurants_restaurant_id");
+                });
+
+            modelBuilder.Entity("Milkshake.Domain.Orders.OrderItem", b =>
+                {
+                    b.HasOne("Milkshake.Domain.Catalog.Consistency", null)
+                        .WithMany()
+                        .HasForeignKey("ConsistencyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_items_consistencies_consistency_id");
+
+                    b.HasOne("Milkshake.Domain.Catalog.Flavour", null)
+                        .WithMany()
+                        .HasForeignKey("FlavourId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_items_flavours_flavour_id");
+
+                    b.HasOne("Milkshake.Domain.Orders.Order", null)
+                        .WithMany("Items")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_items_orders_order_id");
+
+                    b.HasOne("Milkshake.Domain.Catalog.Topping", null)
+                        .WithMany()
+                        .HasForeignKey("ToppingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_items_toppings_topping_id");
+                });
+
             modelBuilder.Entity("Milkshake.Domain.Catalog.Consistency", b =>
                 {
                     b.Navigation("Prices");
@@ -986,6 +1299,11 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Milkshake.Domain.Catalog.Topping", b =>
                 {
                     b.Navigation("Prices");
+                });
+
+            modelBuilder.Entity("Milkshake.Domain.Orders.Order", b =>
+                {
+                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }

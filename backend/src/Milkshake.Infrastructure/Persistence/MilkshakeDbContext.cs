@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Milkshake.Domain.Auditing;
 using Milkshake.Domain.Catalog;
+using Milkshake.Domain.Orders;
 using Milkshake.Domain.Restaurants;
 using Milkshake.Domain.Settings;
 using Milkshake.Infrastructure.Identity;
@@ -51,6 +52,10 @@ public sealed class MilkshakeDbContext(DbContextOptions<MilkshakeDbContext> opti
     
     /// <summary>Sign-in, sign-out and provisioning events.</summary>
     public DbSet<SecurityEvent> SecurityEvents => Set<SecurityEvent>();
+
+    public DbSet<Order> Orders => Set<Order>();
+
+    public DbSet<OrderItem> OrderItems => Set<OrderItem>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder builder)
