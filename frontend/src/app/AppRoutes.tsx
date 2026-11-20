@@ -10,6 +10,7 @@ import { LoginPage } from '../pages/LoginPage'
 import { ManagerPage } from '../pages/ManagerPage'
 import { CatalogPage } from '../pages/management/CatalogPage'
 import { DiscountTiersPage } from '../pages/management/DiscountTiersPage'
+import { OrdersPage } from '../pages/management/OrdersPage'
 import { PricesPage } from '../pages/management/PricesPage'
 import { RestaurantsPage } from '../pages/management/RestaurantsPage'
 import { SettingsPage } from '../pages/management/SettingsPage'
@@ -49,6 +50,7 @@ export function AppRoutes() {
             <Route index element={<ManagerPage />} />
             <Route path="catalog/:kind" element={<CatalogPage />} />
             <Route path="catalog/:kind/:id/prices" element={<PricesPage />} />
+            <Route path="orders" element={<OrdersPage />} />
             <Route path="restaurants" element={<RestaurantsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="discount-tiers" element={<DiscountTiersPage />} />

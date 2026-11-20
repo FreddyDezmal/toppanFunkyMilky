@@ -213,3 +213,57 @@ export interface PaymentStatus {
   checking: boolean
   payment: { reference: string; status: PaymentAttemptStatus; message: string | null } | null
 }
+
+/** One refund as stored by the server (M8b). It is complete only when `status` is "Processed". */
+export interface RefundInfo {
+  reference: string
+  kind: 'PatronCancellation' | 'RestaurantCancellation' | 'UnacceptedPayment'
+  status: 'Initiating' | 'Pending' | 'Processed' | 'Failed'
+  amount: number
+  fee: number
+  /** Paystack needs details we do not collect: the restaurant handles it by hand. */
+  needsAttention: boolean
+  /** UTC ISO 8601. */
+  createdAt: string
+  /** UTC ISO 8601, once Processed or Failed. */
+  completedAt: string | null
+}
+
+/** A manager's request to cancel the order (B1.2). `refundAmount`: everything paid, returned in full on accepting. */
+export interface CancellationRequestInfo {
+  id: number
+  reason: string
+  status: 'Pending' | 'Accepted' | 'Declined' | 'Lapsed'
+  isOpen: boolean
+  refundAmount: number
+  /** UTC ISO 8601. */
+  createdAt: string
+  closedAt: string | null
+}
+
+/**
+ * GET /api/ordering/orders/{reference}/cancellation: whether the order can be cancelled now and what the patron would
+ * get back (paid − fee), all calculated by the server; a manager's open request; and the order's refunds.
+ */
+export interface OrderCancellation {
+  orderReference: string
+  orderStatus: OrderStatus
+  canCancel: boolean
+  cannotCancelReason: 'AlreadyCancelled' | 'PickupPassed' | null
+  isPaid: boolean
+  paidAmount: number
+  feeRate: number
+  fee: number
+  refundAmount: number
+  currencyCode: string
+  openRequest: CancellationRequestInfo | null
+  refunds: RefundInfo[]
+}
+
+/** GET /api/ordering/cancellation-requests: an order whose manager request waits for the patron's answer. */
+export interface PendingCancellationRequest {
+  orderReference: string
+  reason: string
+  createdAt: string
+  pickupAtUtc: string
+}

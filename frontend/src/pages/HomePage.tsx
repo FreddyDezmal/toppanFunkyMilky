@@ -1,6 +1,7 @@
 import { Link } from 'react-router'
 import { hasRole, useAuth } from '../features/auth/authContext'
 import { ROLES } from '../features/auth/types'
+import { CancellationRequestNotice } from '../features/ordering/CancellationRequestNotice'
 import { SystemStatusCard } from '../features/system-status/SystemStatusCard'
 
 export function HomePage() {
@@ -14,6 +15,8 @@ export function HomePage() {
           Foundation build: this page confirms that the frontend can reach the API, and the API can reach the database.
         </p>
       </div>
+
+      {hasRole(user, ROLES.patron) && <CancellationRequestNotice />}
 
       <section aria-labelledby="order-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
         <h2 id="order-heading" className="text-xl font-semibold">
@@ -45,4 +48,4 @@ export function HomePage() {
       <SystemStatusCard />
     </div>
   )
-}
+}

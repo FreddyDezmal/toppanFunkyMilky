@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { fetchOrder, fetchOrderingOptions } from '../../features/ordering/api'
 import { describeOrderingError } from '../../features/ordering/errors'
+import { CancellationPanel } from '../../features/ordering/CancellationPanel'
 import { formatLocalTime, timeZoneLabel } from '../../features/ordering/format'
 import { RETURN_PARAM } from '../../features/ordering/payment'
 import { PaymentPanel } from '../../features/ordering/PaymentPanel'
@@ -177,6 +178,8 @@ export function OrderDetailsPage() {
         returning={returning}
         onOrderChanged={reloadOrder}
       />
+
+      <CancellationPanel reference={order.reference} orderStatus={order.status} locale={locale} onOrderChanged={reloadOrder} />
 
       <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-6">
         <Link to="/order" className={LINK_CLASS}>

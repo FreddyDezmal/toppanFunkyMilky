@@ -3,7 +3,9 @@ import type {
   CatalogItem,
   CatalogKind,
   DiscountTier,
+  ManagerOrder,
   PriceHistory,
+  RefundNeedingAttention,
   Restaurant,
   Setting,
   StatusFilter,
@@ -88,4 +90,18 @@ export function updateDiscountTier(
   input: { minPreviousOrders: number; minDrinksPerOrder: number; discountRate: number; version: number },
 ): Promise<DiscountTier> {
   return putJson<DiscountTier>(`${MANAGER}/discount-tiers/${tierNumber}`, input)
+}
+/** One order by its reference (as typed; the server tolerates case and spaces). */
+export function getManagerOrder(reference: string, signal?: AbortSignal): Promise<ManagerOrder> {
+  return getJson<ManagerOrder>(`${MANAGER}/orders/${encodeURIComponent(reference.trim())}`, { signal })
+}
+
+/** Asks the patron to accept cancelling their order; nothing changes until they accept (B1.2). */
+export function requestCancellation(reference: string, reason: string): Promise<ManagerOrder> {
+  return postJson<ManagerOrder>(`${MANAGER}/orders/${encodeURIComponent(reference)}/cancellation-requests`, { reason })
+}
+
+/** Refunds that failed at Paystack or need the patron's bank details (Q4). */
+export function listRefundsNeedingAttention(signal?: AbortSignal): Promise<RefundNeedingAttention[]> {
+  return getJson<RefundNeedingAttention[]>(`${MANAGER}/refunds/attention`, { signal })
 }

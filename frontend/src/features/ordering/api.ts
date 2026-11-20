@@ -2,10 +2,12 @@ import { getJson, postJson } from '../../lib/api/httpClient'
 import type {
   DraftSummary,
   DrinkSelection,
+  OrderCancellation,
   OrderDraft,
   OrderingOptions,
   PaymentCheckout,
   PaymentStatus,
+  PendingCancellationRequest,
   PlacedOrder,
   Quote,
 } from './types'
@@ -86,4 +88,32 @@ export function startPayment(reference: string, idempotencyKey: string, signal?:
 /** Asks the server to check the order's open payment with the provider, then returns what it stored. */
 export function refreshPayment(reference: string, signal?: AbortSignal): Promise<PaymentStatus> {
   return postJson<PaymentStatus>(`${ORDERING}/orders/${encodeURIComponent(reference)}/payments/refresh`, {}, { signal })
+}
+
+/** The order's cancellation quote, a manager's open request and its refunds (M8b). */
+export function fetchCancellation(reference: string, signal?: AbortSignal): Promise<OrderCancellation> {
+  return getJson<OrderCancellation>(`${ORDERING}/orders/${encodeURIComponent(reference)}/cancellation`, { signal })
+}
+
+/**
+ * Cancels the order. `expectedRefund` is the refund the patron confirmed (0 if unpaid); the server only compares it and
+ * answers 409 with the new figures in `cancellation` if they changed.
+ */
+export function cancelOrder(reference: string, expectedRefund: number): Promise<OrderCancellation> {
+  return postJson<OrderCancellation>(`${ORDERING}/orders/${encodeURIComponent(reference)}/cancel`, { expectedRefund })
+}
+
+/** Accepts the manager's request: the order is cancelled and, if paid, refunded in full. */
+export function acceptCancellationRequest(reference: string, expectedRefund: number): Promise<OrderCancellation> {
+  return postJson<OrderCancellation>(`${ORDERING}/orders/${encodeURIComponent(reference)}/cancellation-request/accept`, { expectedRefund })
+}
+
+/** Declines the manager's request; the order is not changed. */
+export function declineCancellationRequest(reference: string): Promise<OrderCancellation> {
+  return postJson<OrderCancellation>(`${ORDERING}/orders/${encodeURIComponent(reference)}/cancellation-request/decline`, {})
+}
+
+/** The patron's orders with a manager request waiting for an answer (Home page notice). */
+export function fetchPendingCancellationRequests(signal?: AbortSignal): Promise<PendingCancellationRequest[]> {
+  return getJson<PendingCancellationRequest[]>(`${ORDERING}/cancellation-requests`, { signal })
 }

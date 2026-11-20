@@ -44,6 +44,7 @@ export const SETTING_KEYS = {
   maxDrinksPerOrder: 'Orders.MaxDrinksPerOrder',
   vatRate: 'Tax.VatRate',
   maxDiscountAmount: 'Discounts.MaxDiscountAmount',
+  refundFeeRate: 'Refund.FeeRate',
   minPickupLeadTimeMinutes: 'Pickup.MinLeadTimeMinutes',
   pickupMaxAdvanceDays: 'Pickup.MaxAdvanceDays',
   pickupTimeZone: 'Pickup.TimeZone',
@@ -56,6 +57,7 @@ const SETTING_LABELS: Record<string, string> = {
   [SETTING_KEYS.maxDrinksPerOrder]: 'Maximum drinks per order',
   [SETTING_KEYS.vatRate]: 'VAT rate',
   [SETTING_KEYS.maxDiscountAmount]: 'Maximum discount amount',
+  [SETTING_KEYS.refundFeeRate]: 'Cancellation fee rate',
   [SETTING_KEYS.minPickupLeadTimeMinutes]: 'Minimum pickup lead time',
   [SETTING_KEYS.pickupMaxAdvanceDays]: 'Maximum days ahead for pickup',
   [SETTING_KEYS.pickupTimeZone]: 'Pickup time zone',
@@ -107,3 +109,57 @@ export interface DiscountTier {
   activationBlockedReason: string | null
   version: number
 }
+/** GET /api/manager/orders/{reference}: an order as a manager sees it (M8b, Q3). */
+export interface ManagerOrder {
+  reference: string
+  status: 'PendingPayment' | 'Confirmed' | 'PaymentFailed' | 'Cancelled'
+  isPaid: boolean
+  patronFirstName: string
+  patronEmail: string
+  restaurantName: string
+  /** UTC ISO 8601. */
+  pickupAtUtc: string
+  pickupTimeZone: string
+  total: number
+  currencyCode: string
+  placedAt: string
+  canRequestCancellation: boolean
+  requests: ManagerCancellationRequest[]
+  refunds: ManagerRefund[]
+}
+
+export interface ManagerCancellationRequest {
+  id: number
+  reason: string
+  status: 'Pending' | 'Accepted' | 'Declined' | 'Lapsed'
+  isOpen: boolean
+  refundAmount: number
+  createdAt: string
+  closedAt: string | null
+}
+
+export interface ManagerRefund {
+  reference: string
+  kind: 'PatronCancellation' | 'RestaurantCancellation' | 'UnacceptedPayment'
+  status: 'Initiating' | 'Pending' | 'Processed' | 'Failed'
+  amount: number
+  fee: number
+  needsAttention: boolean
+  createdAt: string
+  completedAt: string | null
+}
+
+/** GET /api/manager/refunds/attention: a refund to handle by hand at Paystack (Q4). */
+export interface RefundNeedingAttention {
+  orderReference: string
+  refundReference: string
+  kind: ManagerRefund['kind']
+  status: ManagerRefund['status']
+  amount: number
+  currencyCode: string
+  providerMessage: string | null
+  createdAt: string
+}
+
+/** Longest cancellation reason a manager may give (B1.2). */
+export const REASON_MAX_LENGTH = 50

@@ -52,6 +52,9 @@ export function ManagementLayout() {
         <NavLink to="/manager/restaurants" className={sectionLinkClass}>
           Restaurants
         </NavLink>
+        <NavLink to="/manager/orders" className={sectionLinkClass}>
+          Orders
+        </NavLink>
         <NavLink to="/manager/settings" className={sectionLinkClass}>
           Settings
         </NavLink>
@@ -62,4 +65,4 @@ export function ManagementLayout() {
       <Outlet />
     </DisplayFormatContext>
   )
-}
+}

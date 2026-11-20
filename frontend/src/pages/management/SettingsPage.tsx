@@ -11,6 +11,7 @@ function displayValue(setting: Setting, locale?: string, currencyCode?: string):
   const number = Number(setting.value)
   switch (setting.key) {
     case SETTING_KEYS.vatRate:
+    case SETTING_KEYS.refundFeeRate:
       return Number.isFinite(number) ? `${formatPercent(number, locale)} (${setting.value})` : setting.value
     case SETTING_KEYS.maxDiscountAmount:
       return currencyCode && Number.isFinite(number) ? formatMoney(number, currencyCode, locale) : setting.value
@@ -146,4 +147,4 @@ export function SettingsPage() {
       )}
     </section>
   )
-}
+}
