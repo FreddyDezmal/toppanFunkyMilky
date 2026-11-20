@@ -73,8 +73,10 @@ Pending ──claim──▶ Sending ──sent───────────
 | Permanent failures | provider rejection (4xx other than 409/429), invalid recipient, unrenderable email |
 | Idempotency | Resend receives the notification key (`…#resend-N` after a manager resend), so a retried request is not delivered twice |
 
-The claim is one SQL statement (`UPDATE … WHERE id IN (SELECT … FOR UPDATE SKIP LOCKED) RETURNING id`), so several
-runs or API instances never take the same email. Each result is saved on its own, straight after sending.
+The claim runs in one short transaction: the due rows are locked with `SELECT … FOR UPDATE SKIP LOCKED`, then
+claimed through the domain and saved normally, so the claim is audited as `system:email-dispatcher` (M11; in M9 it was
+a raw `UPDATE`). Several runs or API instances never take the same email. Each result is saved on its own, straight
+after sending.
 
 ## 5. Guarantees and where they are enforced
 

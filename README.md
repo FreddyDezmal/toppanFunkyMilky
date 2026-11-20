@@ -266,6 +266,24 @@ patron's account.
   [`docs/notifications/email-setup-guide.md`](docs/notifications/email-setup-guide.md),
   report `docs/progress/2026-11-20_milestone-9-email-notifications-report.md`.
 
+## Audit trail (Milestone 11)
+
+Every insert, update and delete on the application's tables is recorded in `milkshake.audit_logs` – who, what, old
+value, new value, action and when – in the same transaction as the change. Sign-ins and sign-outs are in
+`milkshake.security_events`.
+
+- **Who acted:** `user` (with the user id), `anonymous`, or a named system process such as
+  `system:payment-reconciliation`, `system:paystack-webhook` or `system:email-dispatcher`.
+- **Append-only:** database triggers refuse UPDATE, DELETE and TRUNCATE on both tables, and the application refuses to
+  change them (migration `AppendOnlyAuditAndActors`).
+- **Search (managers):** `GET /api/manager/audit/changes` (filters `from`, `to`, `user`, `actor`, `entity`, `action`,
+  `q`, `cursor`, `limit`) and `GET /api/manager/audit/security`. Read-only, 60 requests per minute, newest first with
+  keyset paging; account details and IP addresses are masked. The screen comes in M12.
+- **Coverage:** automated tests count every row written against every audit row across the real write paths, and a
+  source scan rejects raw-SQL or bulk writes that would bypass the audit.
+- Docs: [`docs/audit/audit-architecture.md`](docs/audit/audit-architecture.md), decisions
+  `docs/decisions/2026-11-20_m11-audit-decisions.md`, report `docs/progress/2026-11-20_milestone-11-audit-report.md`.
+
 ## Security notes
 
 - The Paystack secret key is used only by the API; the frontend never sees it, and no card data reaches the application.
