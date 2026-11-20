@@ -7,7 +7,7 @@
 and emails for cancellation requests, cancellations and refund outcomes. Emails are queued in the same transaction as
 the business change and sent by a background dispatcher with retries, so an email-provider outage never affects a
 payment, cancellation or refund. Managers see delivery status and can send an email again. Local delivery is captured
-by Mailpit; no real email has been sent (the optional Resend check awaits approval).
+by Mailpit; one approved real-inbox check through Resend succeeded (section 8).
 **Requirements traced:** URS §3.1 and §4 (confirmation and receipt emails), roadmap AC-9.1–AC-9.5, T9.1–T9.4, R-08;
 M9 decisions D1–D7 (`docs/decisions/2026-11-20_m9-email-decisions.md`); M8b integration notes.
 
@@ -27,7 +27,7 @@ Related: [email architecture](../notifications/email-architecture.md) ·
   never asks for card or bank details, pending refunds never described as completed.
 - **Dispatcher:** every 30 seconds; row claims with `FOR UPDATE SKIP LOCKED` and a 5-minute lease; backoff 1–60 minutes,
   8 attempts; provider idempotency keys; allow-list suppression for real-inbox senders (D4).
-- **Senders (D3):** Mailpit (SMTP capture) by default in development; Resend adapter ready for an approved manual check.
+- **Senders (D3):** Mailpit (SMTP capture) by default in development; Resend verified with one approved real-inbox check.
 - **Management → Emails (AC-9.5, D6):** status list with counts and filters; **Send again** for sent or failed emails
   (ManagerOnly, CSRF, rate-limited, audited).
 - **Migration** `AddEmailNotifications` reviewed (no DROP/ALTER/DELETE/UPDATE) and applied to Supabase.
@@ -123,12 +123,20 @@ New in M9:
 With Mailpit running, the developer paid an order with a Paystack test card: the order confirmation and receipt arrived
 in Mailpit and showed as Sent under Management → Emails.
 
+**Real inbox (Resend), approved by the developer the same day:**
+- **Configuration:** sender `onboarding@resend.dev`, Resend's test sender for accounts without a verified domain.
+  The only allow-listed recipient was the developer's own Resend account address (a Gmail plus address).
+- **Where the settings lived:** the API key (sending access only), provider, sender and allow-list were set as
+  temporary user-secret overrides and never entered in the conversation.
+- **Result:** a patron registered with that address paid an order, and the receipt arrived in the developer's Gmail
+  inbox. Resend only accepts recipients equal to the account owner's address, and every other recipient is suppressed
+  by the allow-list before Resend is called.
+
 ## 9. Open items
 
 | Item | Needed from | Effect |
 | --- | --- | --- |
 | D1 (single receipt at payment), emails 2–5, E6 confirmation | Stakeholder | Provisional; easily changed |
-| Optional Resend real-inbox check | Developer approval of sender, recipient and settings | Adapter tested with a stub; not yet used |
 | Identity emails (D5) | Later phase | Email confirmation, password reset, change password not available |
 | Q-14 retention (POPIA) | Stakeholder | Email records kept with their orders |
 | Playwright re-run | Developer | Expected unaffected (emails are sent in the background) |
