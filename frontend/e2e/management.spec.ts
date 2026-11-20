@@ -134,5 +134,12 @@ test.describe('manager journey', () => {
     await expect(page.getByRole('heading', { name: 'Weekly' })).toBeVisible()
     await expect(page.getByRole('alert')).toHaveCount(0)
     await expectNoSeriousAccessibilityProblems(page, 'Reports – Trends')
+    await page.getByRole('tab', { name: 'Audit Lookup' }).click()
+    await expect(page.getByRole('heading', { name: 'Audit history' })).toBeVisible()
+    await expect(page.getByText('Loading changes…')).toHaveCount(0)
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    // The flavour this journey created and changed is in the lookup history (Flavours is the default table).
+    await expect(page.getByRole('list', { name: 'Lookup changes' })).toBeVisible()
+    await expectNoSeriousAccessibilityProblems(page, 'Reports – Audit Lookup')
   })
 })

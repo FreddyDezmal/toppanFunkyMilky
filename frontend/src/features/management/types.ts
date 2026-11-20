@@ -246,3 +246,43 @@ export interface OrderTrends {
   months: TrendPoint[]
   years: TrendPoint[]
 }
+
+/** One changed field of an audit record: values as stored (JSON); personal data arrives masked as "***". */
+export interface AuditFieldChange {
+  field: string
+  old: unknown
+  new: unknown
+}
+
+/** One audit record (AC-11.1): who, what, old, new, action and when. */
+export interface AuditChange {
+  id: number
+  occurredAt: string
+  action: 'Insert' | 'Update' | 'Delete'
+  entity: string
+  recordId: string
+  /** user, anonymous or system:…; null for records written before actors were recorded. */
+  actor: string | null
+  userId: string | null
+  user: string | null
+  changes: AuditFieldChange[]
+  traceId: string | null
+}
+
+export type SecurityEventType = 'LoginSucceeded' | 'LoginFailed' | 'LoginLockedOut' | 'Logout'
+
+/** One sign-in, sign-out or lockout (T11.3); addresses and IPs masked except managers' addresses. */
+export interface SecurityEvent {
+  id: number
+  occurredAt: string
+  eventType: SecurityEventType
+  userId: string | null
+  user: string | null
+  ipAddress: string | null
+}
+
+/** A page of audit history, newest first; nextCursor is null on the last page. */
+export interface AuditPage<T> {
+  items: T[]
+  nextCursor: string | null
+}

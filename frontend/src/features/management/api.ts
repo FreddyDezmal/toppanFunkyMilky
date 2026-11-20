@@ -1,5 +1,7 @@
 import { getJson, postJson, putJson } from '../../lib/api/httpClient'
 import type {
+  AuditChange,
+  AuditPage,
   CatalogItem,
   CatalogKind,
   DiscountTier,
@@ -13,6 +15,8 @@ import type {
   RefundNeedingAttention,
   ReportStatusFilter,
   Restaurant,
+  SecurityEvent,
+  SecurityEventType,
   Setting,
   StatusFilter,
 } from './types'
@@ -169,4 +173,43 @@ export function getOrderTrends(filter: { from?: string; to?: string }, signal?: 
   }
   const search = query.toString()
   return getJson<OrderTrends>(`${MANAGER}/reports/trends${search ? `?${search}` : ''}`, { signal })
+}
+
+/** Filters of the audit history (AC-11.4); from and to are UTC instants (ISO 8601), to exclusive. */
+export interface AuditFilter {
+  from?: string
+  to?: string
+  user?: string
+  actor?: string
+  entity?: string
+  action?: AuditChange['action']
+  q?: string
+}
+
+function auditQuery(values: Record<string, string | undefined>, cursor?: string | null): string {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(values)) {
+    if (value?.trim()) {
+      query.set(key, value.trim())
+    }
+  }
+  if (cursor) {
+    query.set('cursor', cursor)
+  }
+  const search = query.toString()
+  return search ? `?${search}` : ''
+}
+
+/** One page of field-level change history, newest first (AC-11.4, AC-12.4, AC-12.5). */
+export function listAuditChanges(filter: AuditFilter, cursor?: string | null, signal?: AbortSignal): Promise<AuditPage<AuditChange>> {
+  return getJson<AuditPage<AuditChange>>(`${MANAGER}/audit/changes${auditQuery({ ...filter }, cursor)}`, { signal })
+}
+
+/** One page of sign-in, sign-out and lockout events, newest first (T11.3). */
+export function listSecurityEvents(
+  filter: { from?: string; to?: string; user?: string; eventType?: SecurityEventType },
+  cursor?: string | null,
+  signal?: AbortSignal,
+): Promise<AuditPage<SecurityEvent>> {
+  return getJson<AuditPage<SecurityEvent>>(`${MANAGER}/audit/security${auditQuery({ ...filter }, cursor)}`, { signal })
 }

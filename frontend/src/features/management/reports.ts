@@ -77,3 +77,42 @@ export function describeReportError(error: unknown): string {
   }
   return describeError(error)
 }
+
+/** How far the time zone is ahead of UTC at this instant, in milliseconds. */
+function zoneOffset(instant: number, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(new Date(instant))
+  const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value ?? 0)
+  const wall = Date.UTC(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'), part('second'))
+  return wall - Math.floor(instant / 1000) * 1000
+}
+
+/** The day after a yyyy-MM-dd date. */
+export function nextDay(date: string): string {
+  const [year, month, day] = date.split('-').map(Number)
+  return new Date(Date.UTC(year ?? 2000, (month ?? 1) - 1, (day ?? 1) + 1)).toISOString().slice(0, 10)
+}
+
+/** Local midnight of a yyyy-MM-dd date in the business time zone, as a UTC ISO instant (the audit API's format). */
+export function startOfDayUtc(date: string, timeZone?: string): string {
+  const [year, month, day] = date.split('-').map(Number)
+  const wall = Date.UTC(year ?? 2000, (month ?? 1) - 1, day ?? 1)
+  try {
+    if (!timeZone) {
+      throw new RangeError('No time zone.')
+    }
+    // Two passes: the offset at the first guess may differ from the offset at local midnight (clock changes).
+    const first = wall - zoneOffset(wall, timeZone)
+    return new Date(wall - zoneOffset(first, timeZone)).toISOString()
+  } catch {
+    return new Date((year ?? 2000), (month ?? 1) - 1, day ?? 1).toISOString()
+  }
+}

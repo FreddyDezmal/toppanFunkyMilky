@@ -1,13 +1,14 @@
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { getOrderReport, getOrderTrends } from '../../features/management/api'
+import { AuditPanel } from '../../features/management/AuditPanel'
 import { useDisplayFormat } from '../../features/management/displayFormat'
 import { describeReportError, pageNumbers, shortMonth, shortWeekday, slashed, todayIn } from '../../features/management/reports'
 import { TrendChart } from '../../features/management/TrendChart'
 import type { OrderReport, OrderReportRow, OrderTrends, ReportStatusFilter, TrendPoint } from '../../features/management/types'
 import { paymentText } from '../../features/ordering/history'
 
-type Tab = 'orders' | 'trends'
+type Tab = 'orders' | 'trends' | 'audit'
 
 type Params = Record<'tab' | 'from' | 'to' | 'q' | 'status' | 'page', string | null>
 
@@ -43,19 +44,20 @@ function tabClass(active: boolean) {
 
 /**
  * /manager/reports — the management dashboard of URS §3.4.4: a date filter (single date or range, in the business time
- * zone) shared by the Orders tab (AC-12.2) and the Trends tab (AC-12.3). The tab and filters live in the address, so a
+ * zone) shared by the Orders tab (AC-12.2), the Trends tab (AC-12.3) and the Audit Lookup tab (AC-12.4, AC-12.5). The tab and filters live in the address, so a
  * view can be refreshed, bookmarked or shared with another manager.
  */
 export function ReportsPage() {
   const { timeZone } = useDisplayFormat()
   const [params, setParams] = useSearchParams()
-  const tab: Tab = params.get('tab') === 'trends' ? 'trends' : 'orders'
+  const requested = params.get('tab')
+  const tab: Tab = requested === 'trends' || requested === 'audit' ? requested : 'orders'
   const from = params.get('from') ?? ''
   const to = params.get('to') ?? ''
   const [rangeMode, setRangeMode] = useState(to !== '' && to !== from)
   const tabsId = useId()
 
-  // The Orders tab shows today until a date is chosen; Trends shows all orders ("None").
+  // The Orders tab shows today until a date is chosen; Trends and Audit Lookup show everything ("None").
   const ordersFrom = from || todayIn(timeZone)
 
   function update(changes: Partial<Params>) {
@@ -137,6 +139,7 @@ export function ReportsPage() {
           </button>
         </div>
         {tab === 'trends' && !from && <p className="mt-2 text-sm text-slate-600">No date chosen: showing all orders.</p>}
+        {tab === 'audit' && !from && <p className="mt-2 text-sm text-slate-600">No date chosen: showing all changes, newest first.</p>}
 
         <div role="tablist" aria-label="Reports" className="mt-6 flex gap-2 border-b border-slate-200">
           <button
@@ -161,6 +164,17 @@ export function ReportsPage() {
           >
             Trends
           </button>
+          <button
+            type="button"
+            role="tab"
+            id={`${tabsId}-audit`}
+            aria-selected={tab === 'audit'}
+            aria-controls={`${tabsId}-panel`}
+            onClick={() => update({ tab: 'audit', page: null })}
+            className={tabClass(tab === 'audit')}
+          >
+            Audit Lookup
+          </button>
         </div>
       </section>
 
@@ -179,8 +193,10 @@ export function ReportsPage() {
             page={Math.max(1, Number.parseInt(params.get('page') ?? '1', 10) || 1)}
             update={update}
           />
-        ) : (
+        ) : tab === 'trends' ? (
           <TrendsPanel from={from} to={rangeMode ? to : ''} />
+        ) : (
+          <AuditPanel from={from} to={rangeMode ? to : ''} />
         )}
       </section>
     </div>
