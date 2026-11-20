@@ -40,6 +40,22 @@ they are built as configurable or easily changed where practical.
 | --- | --- | --- |
 | C1 / DV-1 | AC-5.6: the Done button stays enabled and explains missing choices; recorded as an accepted deviation | Approved |
 
+## M8 payment design (approved 20 November 2026)
+
+| ID | Decision |
+| --- | --- |
+| Scope | M8a: payments now; M8b: cancellation and refunds (B1) straight after, with their own design review and the lifecycle change (paid Confirmed → Cancelled with refund) |
+| P1 | Tables `payments` (one row per attempt) and `payment_events` (verified webhook receipts: event type, Paystack transaction id, reference, time; never the raw payload). Restrict-only foreign keys; audited |
+| P2 | Attempt statuses: Initiating, Pending, Succeeded, Failed, Abandoned, Superseded, RequiresRefund |
+| P3 | Partial unique indexes: one Succeeded payment per order; at most one open (Initiating/Pending) attempt per order. Extra or unacceptable charges are kept as RequiresRefund |
+| P4 | Initiation: ownership and eligibility (awaits payment, pickup not passed – A2); check an open attempt with Paystack first; insert and commit an Initiating row with our reference before calling Paystack; no database transaction held during the call |
+| P5 | Webhook: anonymous, CSRF-exempt, HMAC-SHA512 over the raw body (constant-time compare), size-limited, deduplicated by unique (event, transaction id), re-verified with Paystack's Verify Transaction API and checked for reference, amount in cents and currency |
+| P6 | Payment and order change in one SaveChanges. Success → Confirmed; failure → PaymentFailed; abandoned → order unchanged; success on a cancelled or already paid order, or with a mismatched amount/currency → RequiresRefund, order untouched |
+| P7 | Recovery: server-side verification when the patron returns or views an order with an open attempt, plus a background job every 5 minutes for open attempts up to 72 hours old |
+| P8 | Redirect only to https://checkout.paystack.com; server-configured return URL; secret key server-side only |
+| P9 | A payment started before the pickup time but verified after it still confirms the order (provisional) |
+| P10 | Automated tests use a simulated Paystack HTTP client and test-signed webhooks; one manual sandbox payment with a Paystack test card |
+
 ## Open points
 
 None. Both points were decided on 20 November 2026: the fee is 10% of the VAT-exclusive amount (better for the

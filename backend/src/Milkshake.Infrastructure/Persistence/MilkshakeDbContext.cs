@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Milkshake.Domain.Auditing;
 using Milkshake.Domain.Catalog;
 using Milkshake.Domain.Orders;
+using Milkshake.Domain.Payments;
 using Milkshake.Domain.Restaurants;
 using Milkshake.Domain.Settings;
 using Milkshake.Infrastructure.Identity;
@@ -56,6 +57,10 @@ public sealed class MilkshakeDbContext(DbContextOptions<MilkshakeDbContext> opti
     public DbSet<Order> Orders => Set<Order>();
 
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+
+    public DbSet<Payment> Payments => Set<Payment>();
+
+    public DbSet<PaymentEvent> PaymentEvents => Set<PaymentEvent>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder builder)

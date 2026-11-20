@@ -864,6 +864,183 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Milkshake.Domain.Payments.Payment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseHiLo(b.Property<int>("Id"));
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_minor");
+
+                    b.Property<string>("CheckoutUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("checkout_url");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .HasColumnName("currency_code")
+                        .IsFixedLength();
+
+                    b.Property<Guid>("IdempotencyKey")
+                        .HasColumnType("uuid")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("integer")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("ProviderMessage")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_message");
+
+                    b.Property<long?>("ProviderTransactionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("provider_transaction_id");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character(16)")
+                        .HasColumnName("reference")
+                        .IsFixedLength();
+
+                    b.Property<string>("RefundReason")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("refund_reason");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTimeOffset?>("VerifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("verified_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payments");
+
+                    b.HasIndex("Reference")
+                        .IsUnique()
+                        .HasDatabaseName("ix_payments_reference");
+
+                    b.HasIndex("OrderId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_payments_order_id_idempotency_key");
+
+                    b.HasIndex("Provider", "ProviderTransactionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_payments_provider_provider_transaction_id")
+                        .HasFilter("provider_transaction_id IS NOT NULL");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("ix_payments_status_created_at");
+
+                    b.HasIndex(new[] { "OrderId" }, "ux_payments_one_open_per_order")
+                        .IsUnique()
+                        .HasDatabaseName("ux_payments_one_open_per_order")
+                        .HasFilter("status IN ('Initiating', 'Pending')");
+
+                    b.HasIndex(new[] { "OrderId" }, "ux_payments_one_success_per_order")
+                        .IsUnique()
+                        .HasDatabaseName("ux_payments_one_success_per_order")
+                        .HasFilter("status = 'Succeeded'");
+
+                    b.ToTable("payments", "milkshake", t =>
+                        {
+                            t.HasCheckConstraint("ck_payments_amount_positive", "amount_minor > 0");
+
+                            t.HasCheckConstraint("ck_payments_checkout_url", "checkout_url IS NULL OR checkout_url LIKE 'https://%'");
+
+                            t.HasCheckConstraint("ck_payments_currency", "currency_code ~ '^[A-Z]{3}$'");
+
+                            t.HasCheckConstraint("ck_payments_reference", "reference ~ '^MSP-[0-9A-HJKMNP-TV-Z]{12}$'");
+
+                            t.HasCheckConstraint("ck_payments_refund_reason", "(status = 'RequiresRefund' AND refund_reason IS NOT NULL AND refund_reason IN ('OrderNotPayable', 'AlreadyPaid', 'AmountMismatch')) OR (status <> 'RequiresRefund' AND refund_reason IS NULL)");
+
+                            t.HasCheckConstraint("ck_payments_status", "status IN ('Initiating', 'Pending', 'Succeeded', 'Failed', 'Abandoned', 'Superseded', 'RequiresRefund')");
+                        });
+                });
+
+            modelBuilder.Entity("Milkshake.Domain.Payments.PaymentEvent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseHiLo(b.Property<int>("Id"));
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider");
+
+                    b.Property<long>("ProviderTransactionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("provider_transaction_id");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payment_events");
+
+                    b.HasIndex("Reference")
+                        .HasDatabaseName("ix_payment_events_reference");
+
+                    b.HasIndex("Provider", "EventType", "ProviderTransactionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_payment_events_provider_event_type_provider_transaction_id");
+
+                    b.ToTable("payment_events", "milkshake");
+                });
+
             modelBuilder.Entity("Milkshake.Domain.Restaurants.Restaurant", b =>
                 {
                     b.Property<int>("Id")
@@ -1284,6 +1461,16 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_order_items_toppings_topping_id");
+                });
+
+            modelBuilder.Entity("Milkshake.Domain.Payments.Payment", b =>
+                {
+                    b.HasOne("Milkshake.Domain.Orders.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payments_orders_order_id");
                 });
 
             modelBuilder.Entity("Milkshake.Domain.Catalog.Consistency", b =>
