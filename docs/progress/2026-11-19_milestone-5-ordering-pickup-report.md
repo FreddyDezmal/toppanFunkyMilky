@@ -99,7 +99,7 @@ paid: the draft lives in the browser tab until the patron signs out, and payment
 | AC-5.3 Exactly N drink containers for N drinks | One card per milkshake | ✅ (Vitest "creates one card per milkshake") |
 | AC-5.4 Flavour, Thick-or-not, Topping compulsory drop-downs from active lookups | Three required drop-downs per milkshake, active and priced options only | ✅ |
 | AC-5.5 Price per drink, discount and total shown, read-only, refreshed on each selection | Current fee per choice shown and labelled not final | ⏳ **Deferred to M6** by decision E5 (Q-01 to Q-04, Q-07) |
-| AC-5.6 Done enabled only when every field in the container is completed | Done is always enabled; pressing it with a missing choice names the missing field and moves focus to it | ⚠ **Deviation DV-1**, pending developer confirmation (section 10) |
+| AC-5.6 Done enabled only when every field in the container is completed | Done is always enabled; pressing it with a missing choice names the missing field and moves focus to it | ⚠ **Deviation DV-1**, accepted by the developer on 20 November 2026 (section 10) |
 | AC-5.7 Restaurant and pickup time required before payment; invalid times rejected | Both required before review; window enforced in the browser and on the server | ✅ (payment itself arrives in a later milestone) |
 | AC-5.8 All validation repeated on the server; tampered requests rejected | `OrderDraftRules` on every validation; strict JSON; forged prices and ids rejected | ✅ |
 | FR-03 Place an order (draft part) | Draft built and validated; order creation is M7 | ✅ for M5 scope |
@@ -216,7 +216,8 @@ Nothing about a draft is ever written to the database.
 **Decision needed from the developer:**
 - **DV-1 – AC-5.6:** the roadmap says Done is enabled only when the milkshake is complete. M5 keeps Done enabled and,
   when pressed early, names each missing choice and moves focus to it (disabled buttons give keyboard and screen-reader
-  users no explanation). Either keep this as an accepted deviation, or disable Done until all three choices are made.
+  users no explanation). **Decision (20 November 2026): kept as an accepted deviation.** For the stakeholder to note at UAT;
+  disabling Done until all three choices are made remains a small change if they require the literal criterion.
 
 ---
 

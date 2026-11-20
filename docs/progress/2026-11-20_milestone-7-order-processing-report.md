@@ -129,7 +129,7 @@ Vitest 10 (placement 5, order page 2, submission key 3); Playwright placement jo
 | Q-14 Data retention (POPIA) | Stakeholder | A patron with orders cannot be deleted (restrict foreign key); retention/anonymisation rules needed |
 | Manager view of orders | M12 | Not in M7 acceptance criteria |
 | Patron order list page | M11 | API ready (`GET /api/ordering/orders`); no UI yet |
-| DV-1 (AC-5.6 Done button) | Final verification | Unchanged |
+| DV-1 (AC-5.6 Done button) | – | Decided 20 November 2026: kept as an accepted deviation (see M5 report) |
 | AC-6.6 calculation sheet sign-off | Stakeholder | Unchanged |
 
 ## 10. Integration notes for Milestone 8 (payments)
