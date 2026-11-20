@@ -132,7 +132,7 @@ public sealed class AuditIntegrityTests(PostgresApiFactory factory) : IDisposabl
     }
 
     [Fact]
-    public async Task TheEmailDispatcher_IsAttributedToItself()
+    public async Task TheEmailDispatchersClaimAndResult_AreAuditedAndAttributedToIt()
     {
         int emailId = await QueueEmailAsync();
 
@@ -141,8 +141,11 @@ public sealed class AuditIntegrityTests(PostgresApiFactory factory) : IDisposabl
             await scope.ServiceProvider.GetRequiredService<IEmailDispatcher>().DispatchAsync(CancellationToken.None);
         }
 
+        // The claim (to Sending) and the result (to Sent) are both ordinary audited saves (M11; the M9 claim was raw SQL).
         List<AuditLog> updates = await AuditsAsync("email_notifications", emailId, AuditAction.Update);
-        Assert.NotEmpty(updates);
+        Assert.Equal(2, updates.Count);
+        Assert.Contains("\"Sending\"", updates[0].Changes, StringComparison.Ordinal);
+        Assert.Contains("\"Sent\"", updates[1].Changes, StringComparison.Ordinal);
         Assert.All(updates, a => Assert.Equal((AuditActors.EmailDispatcher, (Guid?)null), (a.Actor, a.UserId)));
     }
 

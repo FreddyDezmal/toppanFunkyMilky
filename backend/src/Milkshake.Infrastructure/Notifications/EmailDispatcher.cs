@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -13,8 +14,9 @@ namespace Milkshake.Infrastructure.Notifications;
 
 /// <summary>
 /// One dispatch run (M9, decision D7), the same reliability approach as payment reconciliation:
-/// 1. claim a batch of due emails in one statement (FOR UPDATE SKIP LOCKED), each with a lease, so two dispatchers
-///    never send the same email and an email held by a dispatcher that stopped is picked up again after its lease;
+/// 1. claim a batch of due emails in one short transaction (row locks with FOR UPDATE SKIP LOCKED, then an ordinary
+///    audited save, M11), each with a lease, so two dispatchers never send the same email and an email held by a
+///    dispatcher that stopped is picked up again after its lease;
 /// 2. per email: suppress it if the sender reaches real inboxes and the recipient is not allow-listed (D4), render it,
 ///    send it with its idempotency key, and record the result straight away.
 /// Temporary failures wait with exponential backoff (1, 2, 4 … minutes, up to 8 attempts); permanent ones and
@@ -50,17 +52,11 @@ internal sealed partial class EmailDispatcher(
             return 0;
         }
 
-        DateTimeOffset now = clock.GetUtcNow();
-        List<int> claimed = await ClaimAsync(now, settings.Dispatch, cancellationToken);
-        if (claimed.Count == 0)
+        List<EmailNotification> emails = await ClaimAsync(clock.GetUtcNow(), settings.Dispatch, cancellationToken);
+        if (emails.Count == 0)
         {
             return 0;
         }
-
-        List<EmailNotification> emails = await db.EmailNotifications
-            .Where(n => claimed.Contains(n.Id))
-            .OrderBy(n => n.NextAttemptAt).ThenBy(n => n.Id)
-            .ToListAsync(cancellationToken);
 
         int handled = 0;
         foreach (EmailNotification email in emails)
@@ -77,26 +73,50 @@ internal sealed partial class EmailDispatcher(
 
     /// <summary>
     /// Due emails (pending and due, or held by a dispatcher whose lease expired) become Sending with a new lease and one
-    /// more attempt, in one statement. Locked rows are skipped, so concurrent dispatchers take different emails.
-    /// Raw SQL, so the claim itself is not in the audit trail; every outcome after it is.
+    /// more attempt. In one short transaction: lock the due rows, skipping rows another dispatcher holds; apply the
+    /// domain's <see cref="EmailNotification.Claim"/>; save normally, so each claim is audited as the email dispatcher
+    /// (M11, AC-11.1). No email is sent while the transaction is open.
     /// </summary>
-    private async Task<List<int>> ClaimAsync(DateTimeOffset now, EmailOptions.DispatchSettings dispatch, CancellationToken cancellationToken)
+    private async Task<List<EmailNotification>> ClaimAsync(DateTimeOffset now, EmailOptions.DispatchSettings dispatch, CancellationToken cancellationToken)
     {
-        DateTimeOffset until = now + TimeSpan.FromMinutes(Math.Max(1, dispatch.LeaseMinutes));
+        TimeSpan lease = TimeSpan.FromMinutes(Math.Max(1, dispatch.LeaseMinutes));
         int batch = Math.Max(1, dispatch.BatchSize);
-        return await db.Database.SqlQuery<int>($"""
-            UPDATE milkshake.email_notifications AS n
-            SET status = 'Sending', attempt_count = n.attempt_count + 1, last_attempt_at = {now}, locked_until = {until}, updated_at = {now}
-            WHERE n.id IN (
-                SELECT c.id
+        IExecutionStrategy strategy = db.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async () =>
+        {
+            db.ChangeTracker.Clear();   // a retried attempt starts clean
+            await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+            // Reads and locks only; the change itself is the audited save below.
+            List<int> due = await db.Database.SqlQuery<int>($"""
+                SELECT c.id AS "Value"
                 FROM milkshake.email_notifications AS c
                 WHERE (c.status = 'Pending' AND c.next_attempt_at <= {now})
                    OR (c.status = 'Sending' AND c.locked_until <= {now})
                 ORDER BY c.next_attempt_at, c.id
                 LIMIT {batch}
-                FOR UPDATE SKIP LOCKED)
-            RETURNING n.id AS "Value"
-            """).ToListAsync(cancellationToken);
+                FOR UPDATE SKIP LOCKED
+                """).ToListAsync(cancellationToken);
+            if (due.Count == 0)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return new List<EmailNotification>();
+            }
+
+            List<EmailNotification> emails = await db.EmailNotifications
+                .Where(n => due.Contains(n.Id))
+                .OrderBy(n => n.NextAttemptAt).ThenBy(n => n.Id)
+                .ToListAsync(cancellationToken);
+            foreach (EmailNotification email in emails)
+            {
+                email.Claim(now, lease);
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return emails;
+        });
     }
 
     private async Task<bool> DeliverAsync(EmailNotification email, Uri site, EmailOptions settings, CancellationToken cancellationToken)
