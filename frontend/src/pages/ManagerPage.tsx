@@ -4,7 +4,7 @@ import { describeError } from '../lib/api/describeError'
 
 type PingState = { kind: 'loading' } | { kind: 'ok'; message: string } | { kind: 'error'; message: string }
 
-/** Management area. Lookup management and reports arrive in later milestones. */
+/** Management area: lookup management, orders, emails and reports are in the sections above. */
 export function ManagerPage() {
   const [state, setState] = useState<PingState>({ kind: 'loading' })
 
@@ -23,7 +23,7 @@ export function ManagerPage() {
   return (
     <section className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
       <h1 className="text-2xl font-bold tracking-tight">Management</h1>
-      <p className="mt-1 text-slate-600">Choose a section above to manage the menu. Reports arrive in a later milestone.</p>
+      <p className="mt-1 text-slate-600">Choose a section above to manage the menu, find orders or see reports.</p>
       <p className="mt-6 text-sm" role="status">
         {state.kind === 'loading' ? 'Checking manager access…' : state.message}
       </p>

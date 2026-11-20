@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router'
 import { getManagerOrder, listRefundsNeedingAttention, requestCancellation } from '../../features/management/api'
 import { useDisplayFormat } from '../../features/management/displayFormat'
 import { REASON_MAX_LENGTH, type ManagerOrder, type ManagerRefund, type RefundNeedingAttention } from '../../features/management/types'
@@ -46,11 +47,14 @@ function formatDateTime(iso: string, locale?: string, timeZone?: string): string
 
 /**
  * /manager/orders — find an order by reference and ask its patron to accept cancelling it (B1.2, Q3); refunds that need
- * handling by hand at Paystack (Q4). Managers never cancel or refund directly.
+ * handling by hand at Paystack (Q4). Managers never cancel or refund directly. ?reference=… (linked from Reports) opens
+ * that order straight away.
  */
 export function OrdersPage() {
   const { locale } = useDisplayFormat()
-  const [reference, setReference] = useState('')
+  const [searchParams] = useSearchParams()
+  const linkedReference = searchParams.get('reference')?.trim() ?? ''
+  const [reference, setReference] = useState(linkedReference)
   const [order, setOrder] = useState<ManagerOrder | null>(null)
   const [findError, setFindError] = useState<string | null>(null)
   const [finding, setFinding] = useState(false)
@@ -73,6 +77,30 @@ export function OrdersPage() {
     )
     return () => controller.abort()
   }, [])
+
+  useEffect(() => {
+    if (!linkedReference) {
+      return
+    }
+    const controller = new AbortController()
+    getManagerOrder(linkedReference, controller.signal).then(
+      (loaded) => {
+        if (!controller.signal.aborted) {
+          setOrder(loaded)
+          setFindError(null)
+        }
+      },
+      (error: unknown) => {
+        if (!controller.signal.aborted) {
+          setOrder(null)
+          setFindError(
+            error instanceof ApiError && error.status === 404 ? `No order has the reference ${linkedReference.toUpperCase()}.` : describeError(error),
+          )
+        }
+      },
+    )
+    return () => controller.abort()
+  }, [linkedReference])
 
   async function find(value: string) {
     const wanted = value.trim()

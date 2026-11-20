@@ -70,6 +70,16 @@ describe('Management → Orders', () => {
     expect(within(card).getByRole('link', { name: 'thandi@example.test' })).toHaveAttribute('href', 'mailto:thandi@example.test')
   })
 
+  it('opens the order linked from Reports straight away', async () => {
+    renderManagerAt(`/manager/orders?reference=${REF}`, {
+      [ATTENTION]: () => jsonResponse([]),
+      [`GET /api/manager/orders/${REF}`]: () => jsonResponse(managerOrder()),
+    })
+
+    expect(await screen.findByRole('region', { name: `Order ${REF}` })).toHaveTextContent('Confirmed')
+    expect(screen.getByRole('textbox', { name: 'Order reference' })).toHaveValue(REF)
+  })
+
   it('says when no order has the reference', async () => {
     renderManagerAt('/manager/orders', {
       [ATTENTION]: () => jsonResponse([]),

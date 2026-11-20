@@ -7,8 +7,11 @@ import type {
   EmailDeliveryList,
   EmailStatus,
   ManagerOrder,
+  OrderReport,
+  OrderTrends,
   PriceHistory,
   RefundNeedingAttention,
+  ReportStatusFilter,
   Restaurant,
   Setting,
   StatusFilter,
@@ -126,4 +129,44 @@ export function listEmails(filter: { status?: EmailStatus; order?: string }, sig
 /** Queues a sent or failed email to be sent again (same content and recipient); the server sends it shortly. */
 export function resendEmail(id: number): Promise<EmailDelivery> {
   return postJson<EmailDelivery>(`${MANAGER}/emails/${id}/resend`)
+}
+
+/** Filters of the orders report: a business-local date, or an inclusive range (at most 366 days). */
+export interface OrderReportFilter {
+  from: string
+  to?: string
+  status?: ReportStatusFilter
+  q?: string
+  page?: number
+}
+
+/** One page of the orders report: one row per milkshake, newest order first (AC-12.2). */
+export function getOrderReport(filter: OrderReportFilter, signal?: AbortSignal): Promise<OrderReport> {
+  const query = new URLSearchParams({ from: filter.from })
+  if (filter.to && filter.to !== filter.from) {
+    query.set('to', filter.to)
+  }
+  if (filter.status && filter.status !== 'all') {
+    query.set('status', filter.status)
+  }
+  if (filter.q?.trim()) {
+    query.set('q', filter.q.trim())
+  }
+  if (filter.page && filter.page > 1) {
+    query.set('page', String(filter.page))
+  }
+  return getJson<OrderReport>(`${MANAGER}/reports/orders?${query.toString()}`, { signal })
+}
+
+/** Order volumes by weekday, month and year (AC-12.3); without from, all orders. */
+export function getOrderTrends(filter: { from?: string; to?: string }, signal?: AbortSignal): Promise<OrderTrends> {
+  const query = new URLSearchParams()
+  if (filter.from) {
+    query.set('from', filter.from)
+    if (filter.to && filter.to !== filter.from) {
+      query.set('to', filter.to)
+    }
+  }
+  const search = query.toString()
+  return getJson<OrderTrends>(`${MANAGER}/reports/trends${search ? `?${search}` : ''}`, { signal })
 }

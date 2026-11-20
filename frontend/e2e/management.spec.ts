@@ -123,5 +123,16 @@ test.describe('manager journey', () => {
     await expect(page.getByRole('group', { name: 'Show emails by status' }).getByRole('button', { name: /^Failed/ })).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByText('Loading emails…')).toHaveCount(0)
     await expectNoSeriousAccessibilityProblems(page, 'Emails')
+
+    // Reports (M12): today's orders, then trends for all orders; read-only.
+    await section(page, 'Reports').click()
+    await expect(page.getByRole('heading', { name: 'Reporting history', level: 1 })).toBeVisible()
+    await expect(page.getByText('Loading orders…')).toHaveCount(0)
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    await expectNoSeriousAccessibilityProblems(page, 'Reports – Orders')
+    await page.getByRole('tab', { name: 'Trends' }).click()
+    await expect(page.getByRole('heading', { name: 'Weekly' })).toBeVisible()
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    await expectNoSeriousAccessibilityProblems(page, 'Reports – Trends')
   })
 })

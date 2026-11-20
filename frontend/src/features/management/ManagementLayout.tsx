@@ -4,7 +4,7 @@ import { listSettings } from './api'
 import { DisplayFormatContext, type DisplayFormat } from './displayFormat'
 import { CATALOG_KINDS, CATALOG_LABELS, SETTING_KEYS, type Setting } from './types'
 
-type Format = Pick<DisplayFormat, 'locale' | 'currencyCode'>
+type Format = Pick<DisplayFormat, 'locale' | 'currencyCode' | 'timeZone'>
 
 function sectionLinkClass({ isActive }: { isActive: boolean }) {
   return `rounded-md px-3 py-1.5 text-sm font-medium ${
@@ -16,6 +16,7 @@ function formatFrom(settings: Setting[]): Format {
   return {
     locale: settings.find((s) => s.key === SETTING_KEYS.displayLocale)?.value,
     currencyCode: settings.find((s) => s.key === SETTING_KEYS.currencyCode)?.value,
+    timeZone: settings.find((s) => s.key === SETTING_KEYS.pickupTimeZone)?.value,
   }
 }
 
@@ -57,6 +58,9 @@ export function ManagementLayout() {
         </NavLink>
         <NavLink to="/manager/emails" className={sectionLinkClass}>
           Emails
+        </NavLink>
+        <NavLink to="/manager/reports" className={sectionLinkClass}>
+          Reports
         </NavLink>
         <NavLink to="/manager/settings" className={sectionLinkClass}>
           Settings

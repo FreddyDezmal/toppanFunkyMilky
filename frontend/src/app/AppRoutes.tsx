@@ -13,6 +13,7 @@ import { DiscountTiersPage } from '../pages/management/DiscountTiersPage'
 import { EmailsPage } from '../pages/management/EmailsPage'
 import { OrdersPage } from '../pages/management/OrdersPage'
 import { PricesPage } from '../pages/management/PricesPage'
+import { ReportsPage } from '../pages/management/ReportsPage'
 import { RestaurantsPage } from '../pages/management/RestaurantsPage'
 import { SettingsPage } from '../pages/management/SettingsPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
@@ -55,6 +56,7 @@ export function AppRoutes() {
             <Route path="catalog/:kind/:id/prices" element={<PricesPage />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="emails" element={<EmailsPage />} />
+            <Route path="reports" element={<ReportsPage />} />
             <Route path="restaurants" element={<RestaurantsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="discount-tiers" element={<DiscountTiersPage />} />

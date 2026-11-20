@@ -1,3 +1,5 @@
+import type { PaymentLabel, RefundLabel } from '../ordering/types'
+
 /** The three priced catalogue lists, as they appear in API routes. */
 export const CATALOG_KINDS = ['flavours', 'toppings', 'consistencies'] as const
 export type CatalogKind = (typeof CATALOG_KINDS)[number]
@@ -191,4 +193,56 @@ export interface EmailDeliveryList {
   items: EmailDelivery[]
   /** Emails in each status overall. */
   counts: Record<EmailStatus, number>
+}
+
+/** Which orders a report shows, by payment status (URS §3.4.4). */
+export type ReportStatusFilter = 'all' | 'paid' | 'unpaid' | 'cancelled'
+
+/** One milkshake in the orders report; date (yyyy-MM-dd) and time (HH:mm) are when it was placed, business-local. */
+export interface OrderReportRow {
+  reference: string
+  date: string
+  time: string
+  placedAtUtc: string
+  /** Pickup time in the order's own time zone, "yyyy-MM-ddTHH:mm". */
+  pickupLocal: string
+  restaurant: string
+  drinkNumber: number
+  flavour: string
+  topping: string
+  consistency: string
+  paymentStatus: PaymentLabel
+  refundStatus: RefundLabel | null
+}
+
+/** A page of the orders report with the totals of the whole filtered result (AC-12.2). */
+export interface OrderReport {
+  from: string
+  to: string
+  timeZone: string
+  totalOrders: number
+  totalDrinks: number
+  page: number
+  pageSize: number
+  totalPages: number
+  rows: OrderReportRow[]
+}
+
+/** One bar: a weekday (Monday…Sunday), a month (yyyy-MM) or a year (yyyy). */
+export interface TrendPoint {
+  label: string
+  orders: number
+  paidOrders: number
+}
+
+/** Order volumes by weekday, month and year (AC-12.3); from and to are null for all orders. */
+export interface OrderTrends {
+  from: string | null
+  to: string | null
+  timeZone: string
+  totalOrders: number
+  totalPaidOrders: number
+  weekdays: TrendPoint[]
+  months: TrendPoint[]
+  years: TrendPoint[]
 }
