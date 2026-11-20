@@ -158,16 +158,30 @@ topping, choose a restaurant and pickup time, and review. Nothing is ordered or 
 | Endpoint | Access | Purpose |
 | --- | --- | --- |
 | `GET /api/ordering/options` | Patron | Active, priced flavours, consistencies and toppings with current fees; active restaurants; drink limits; pickup window |
-| `POST /api/ordering/draft/validate` | Patron + CSRF | Checks a draft against what is in force now; returns the summary or errors per field; stores nothing |
+| `POST /api/ordering/draft/validate` | Patron + CSRF | Checks a draft against what is in force now; returns the summary with estimated prices, or errors per field; stores nothing |
+| `POST /api/ordering/quote` | Patron + CSRF | Live, non-binding price estimate for the milkshakes being chosen (identifiers only); stores nothing |
 
 - **The server decides:** the browser sends identifiers and a pickup time only. A price or any unknown field in the
-  request is rejected. Fees are shown for information; no totals, VAT or discount until pricing is confirmed (Q-01 to Q-04, Q-07).
+  request is rejected. Every price, VAT amount and total is calculated by the server (see Pricing below).
 - **Draft storage:** the browser tab's `sessionStorage`, identifiers only, per user, cleared on sign-out.
 - **Provisional pickup rules** (Q-05, Q-06, Q-17, Q-18): times in the `Pickup.TimeZone` setting (`Africa/Johannesburg`);
   earliest = now + `Pickup.MinLeadTimeMinutes`; latest = 23:59 local, `Pickup.MaxAdvanceDays` (7) days ahead; whole minutes.
 - **Limits:** 60 ordering requests per minute per patron (`RateLimiting:OrderingPermitLimit`); draft bodies up to 16 KB.
 - Managers cannot order (patrons only, Q-19). If the ordering settings are invalid, patrons see "Ordering is
   temporarily unavailable" and the reason is logged on the server.
+
+## Pricing, VAT and discounts (Milestone 6)
+
+- **One server-side engine** (`Milkshake.Domain/Pricing/PriceCalculator`, used through `IOrderPricingService`) calculates
+  every amount; React only formats what the API returns. Requests containing a price, VAT rate, discount or total are rejected.
+- **Drink price** = flavour + consistency + topping fee, read at one pricing instant per request (effective-dated fees).
+- **VAT** is added to the VAT-exclusive subtotal at the `Tax.VatRate` setting (provisional decision P1, Q-07). VAT and
+  discount are each rounded once per order to 2 decimals, half away from zero.
+- **Frequent-customer discount** is applied before VAT and capped at the maximum discount, but is **switched off**
+  (`DiscountPolicy.RulesConfirmed = false`) until Q-01 to Q-04 are answered and order history exists (M7); patrons see 0 "(none)".
+- Prices on screen are **estimates**; the final amount is calculated when the order is placed (M7).
+- Details, decisions and open questions: `docs/progress/2026-11-19_milestone-6-pricing-vat-discounts-report.md`.
+  Stakeholder calculation sheet (AC-6.6): `docs/pricing/m6-calculation-sign-off.csv`.
 
 ## Security notes
 
