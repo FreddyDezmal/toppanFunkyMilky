@@ -192,10 +192,12 @@ public sealed class PaymentRecoveryTests(PostgresApiFactory factory) : IDisposab
         (HttpClient patron, string order, string payment) = await PendingPaymentAsync();
         patron.Dispose();
         _gateway.OnVerify = _ => throw new PaymentGatewayException("down");
+        _gateway.OnCreateRefund = _ => throw new PaymentGatewayException("down");
+        _gateway.OnGetRefund = _ => throw new PaymentGatewayException("down");
 
-        int changed = await ReconcileAsync();
+        // The run may still close other tests' expired manager requests (no provider needed); this payment is untouched.
+        await ReconcileAsync();
 
-        Assert.Equal(0, changed);
         Assert.Equal((PaymentStatus.Pending, OrderStatus.PendingPayment), await StateAsync(order, payment));
     }
 

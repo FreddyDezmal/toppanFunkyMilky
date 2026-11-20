@@ -24,10 +24,20 @@ public sealed class PaymentReconciliationOptions
     public int BatchSize { get; set; } = 50;
 }
 
-/// <summary>Checks one batch of open attempts with the provider, oldest first (decision P7b).</summary>
+/// <summary>
+/// One reconciliation run (decision P7b, M8b R4, R7, Q2), each part in batches, oldest first:
+/// 1. open payment attempts are settled with the provider;
+/// 2. payments the order could not accept (late or duplicate) get a full refund (Q2);
+/// 3. refunds the provider has not accepted yet are sent again (our reference makes this safe);
+/// 4. pending refunds are checked with the provider until Processed or Failed;
+/// 5. manager requests left unanswered at the pickup time, or made moot by a cancellation, are marked Lapsed.
+/// If the provider is unavailable the provider steps stop for this run; nothing is changed.
+/// </summary>
 internal sealed partial class PaymentReconciler(
     MilkshakeDbContext db,
     PaymentSettler settler,
+    IPaymentGateway gateway,
+    RefundSubmitter refunds,
     TimeProvider clock,
     IOptions<PaymentReconciliationOptions> options,
     ILogger<PaymentReconciler> logger) : IPaymentReconciler
@@ -71,6 +81,20 @@ internal sealed partial class PaymentReconciler(
             }
         }
 
+        try
+        {
+            changed += await RefundUnacceptedPaymentsAsync(cancellationToken);
+            changed += await SubmitWaitingRefundsAsync(cancellationToken);
+            changed += await CheckPendingRefundsAsync(cancellationToken);
+        }
+        catch (PaymentGatewayException)
+        {
+            // The provider is unavailable: the refund steps stop for this run; the next one tries again.
+            LogProviderUnavailable(logger);
+        }
+
+        changed += await LapseRequestsAsync(cancellationToken);
+
         if (changed > 0)
         {
             LogReconciled(logger, changed);
@@ -79,11 +103,149 @@ internal sealed partial class PaymentReconciler(
         return changed;
     }
 
+    /// <summary>Q2: a full refund, without a fee, for each late or duplicate payment that has none yet.</summary>
+    private async Task<int> RefundUnacceptedPaymentsAsync(CancellationToken cancellationToken)
+    {
+        db.ChangeTracker.Clear();
+        List<Payment> unaccepted = await db.Payments.AsNoTracking()
+            .Where(p => p.Status == PaymentStatus.RequiresRefund && !db.Refunds.Any(r => r.PaymentId == p.Id))
+            .OrderBy(p => p.UpdatedAt)
+            .Take(Batch)
+            .ToListAsync(cancellationToken);
+
+        int changed = 0;
+        foreach (Payment payment in unaccepted)
+        {
+            if (payment.RefundReason == RefundReason.AmountMismatch)
+            {
+                // The amount actually taken is not the one we asked for, and we do not store it: refunding a guess could
+                // return too much or too little. Left for manual handling at Paystack.
+                LogMismatchNeedsManualRefund(logger, payment.Reference);
+                continue;
+            }
+
+            db.ChangeTracker.Clear();
+            Refund refund = Refund.ForUnacceptedPayment(payment, Refund.NewReference());
+            db.Refunds.Add(refund);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                // Another run created it at the same moment (one refund per payment).
+                continue;
+            }
+
+            changed++;
+            await refunds.SubmitAsync(refund, payment.Reference, cancellationToken);
+        }
+
+        return changed;
+    }
+
+    /// <summary>R4: refunds stored but not yet accepted by the provider (it was unreachable, or the process stopped).</summary>
+    private async Task<int> SubmitWaitingRefundsAsync(CancellationToken cancellationToken)
+    {
+        DateTimeOffset before = clock.GetUtcNow() - PaymentService.InitiatingGrace;
+        db.ChangeTracker.Clear();
+        var waiting = await db.Refunds
+            .Where(r => r.Status == RefundStatus.Initiating && r.CreatedAt < before)
+            .Join(db.Payments, r => r.PaymentId, p => p.Id, (r, p) => new { Refund = r, PaymentReference = p.Reference })
+            .OrderBy(x => x.Refund.CreatedAt)
+            .Take(Batch)
+            .ToListAsync(cancellationToken);
+
+        int changed = 0;
+        foreach (var item in waiting)
+        {
+            GatewayRefund answer = await gateway.CreateRefundAsync(
+                new RefundRequest(item.Refund.Reference, item.PaymentReference, item.Refund.AmountMinor, item.Refund.CurrencyCode, item.Refund.Kind.ToString()),
+                cancellationToken);
+            changed += await ApplyAsync(item.Refund, answer);
+        }
+
+        return changed;
+    }
+
+    /// <summary>R4: pending refunds are checked with the provider; only its answer completes them.</summary>
+    private async Task<int> CheckPendingRefundsAsync(CancellationToken cancellationToken)
+    {
+        db.ChangeTracker.Clear();
+        List<Refund> pending = await db.Refunds
+            .Where(r => r.Status == RefundStatus.Pending)
+            .OrderBy(r => r.UpdatedAt)
+            .Take(Batch)
+            .ToListAsync(cancellationToken);
+
+        int changed = 0;
+        foreach (Refund refund in pending)
+        {
+            changed += await ApplyAsync(refund, await gateway.GetRefundAsync(refund.Reference, cancellationToken));
+        }
+
+        return changed;
+    }
+
+    private async Task<int> ApplyAsync(Refund refund, GatewayRefund answer)
+    {
+        if (!refunds.Apply(refund, answer))
+        {
+            return 0;
+        }
+
+        try
+        {
+            await db.SaveChangesAsync(CancellationToken.None);
+            return 1;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // A notification applied the same answer at the same moment.
+            db.Entry(refund).State = EntityState.Detached;
+            return 0;
+        }
+    }
+
+    /// <summary>R7: requests nobody answered before the pickup time, or whose order the patron cancelled, are closed.</summary>
+    private async Task<int> LapseRequestsAsync(CancellationToken cancellationToken)
+    {
+        DateTimeOffset now = clock.GetUtcNow();
+        db.ChangeTracker.Clear();
+        var due = await db.CancellationRequests
+            .Where(r => r.Status == CancellationRequestStatus.Pending)
+            .Join(db.Orders.Where(o => o.PickupAtUtc <= now || o.Status == OrderStatus.Cancelled), r => r.OrderId, o => o.Id,
+                (r, o) => new { Request = r, Order = o })
+            .Take(Batch)
+            .ToListAsync(cancellationToken);
+
+        int changed = due.Count(item => item.Request.LapseIfDue(item.Order, now));
+        if (changed > 0)
+        {
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // A patron answered at the same moment; the next run sees it.
+                return 0;
+            }
+        }
+
+        return changed;
+    }
+
+    private int Batch => Math.Max(1, options.Value.BatchSize);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Payment reconciliation stopped early: the payment provider is unavailable.")]
     private static partial void LogProviderUnavailable(ILogger logger);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Payment reconciliation settled {Count} payment attempt(s).")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Payment reconciliation changed {Count} payment(s), refund(s) or request(s).")]
     private static partial void LogReconciled(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Payment {PaymentReference} was received with a different amount and cannot be refunded automatically; refund it manually at Paystack.")]
+    private static partial void LogMismatchNeedsManualRefund(ILogger logger, string paymentReference);
 }
 
 /// <summary>

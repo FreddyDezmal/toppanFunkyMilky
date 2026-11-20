@@ -47,12 +47,20 @@ public sealed partial class PaystackWebhookController(
                 return Unauthorized();
         }
 
-        if (Parse(body) is not { } notification)
+        NotificationOutcome outcome;
+        if (ParseRefund(body) is { } refund)
+        {
+            outcome = await notifications.HandleRefundAsync(refund, cancellationToken);
+        }
+        else if (Parse(body) is { } notification)
+        {
+            outcome = await notifications.HandleAsync(notification, cancellationToken);
+        }
+        else
         {
             return BadRequest();
         }
 
-        NotificationOutcome outcome = await notifications.HandleAsync(notification, cancellationToken);
         return outcome == NotificationOutcome.RetryLater ? StatusCode(StatusCodes.Status503ServiceUnavailable) : Ok();
     }
 
@@ -78,6 +86,41 @@ public sealed partial class PaystackWebhookController(
 
         return null;
     }
+
+    /// <summary>
+    /// A refund.* event (M8b): only our refund reference and the transaction reference are read; Paystack's sample
+    /// payloads carry no refund id. Null when the body is not a refund event with at least one reference.
+    /// </summary>
+    private static RefundNotification? ParseRefund(byte[] body)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(body);
+            JsonElement root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.Object &&
+                root.TryGetProperty("event", out JsonElement type) && type.ValueKind == JsonValueKind.String &&
+                type.GetString() is { Length: > 0 and <= 50 } eventType && eventType.StartsWith("refund.", StringComparison.Ordinal) &&
+                root.TryGetProperty("data", out JsonElement data) && data.ValueKind == JsonValueKind.Object)
+            {
+                string? refundReference = Text(data, "refund_reference");
+                string? transactionReference = Text(data, "transaction_reference");
+                return refundReference is null && transactionReference is null
+                    ? null
+                    : new RefundNotification(eventType, refundReference, transactionReference);
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return null;
+    }
+
+    private static string? Text(JsonElement data, string name) =>
+        data.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.String &&
+        value.GetString() is { Length: > 0 and <= 100 } text
+            ? text
+            : null;
 
     [LoggerMessage(Level = LogLevel.Error, Message = "A Paystack notification arrived but Payments:Paystack:SecretKey is not configured; it was refused so Paystack retries.")]
     private static partial void LogNotConfigured(ILogger logger);

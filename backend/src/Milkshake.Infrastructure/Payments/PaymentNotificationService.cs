@@ -17,6 +17,7 @@ namespace Milkshake.Infrastructure.Payments;
 internal sealed partial class PaymentNotificationService(
     MilkshakeDbContext db,
     IPaymentGateway gateway,
+    RefundSubmitter refunds,
     TimeProvider clock,
     ILogger<PaymentNotificationService> logger) : IPaymentNotificationService
 {
@@ -85,6 +86,53 @@ internal sealed partial class PaymentNotificationService(
         return await SaveAsync(NotificationOutcome.Processed);
     }
 
+    public async Task<NotificationOutcome> HandleRefundAsync(RefundNotification notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+
+        // Paystack treats references case-insensitively; ours are stored in upper case.
+        string? refundReference = notification.RefundReference?.Trim().ToUpperInvariant();
+        Refund? refund = Refund.IsValidReference(refundReference)
+            ? await db.Refunds.SingleOrDefaultAsync(r => r.Reference == refundReference && r.Provider == gateway.Name, cancellationToken)
+            : null;
+        if (refund is null && Payment.IsValidReference(notification.TransactionReference))
+        {
+            refund = await db.Refunds.SingleOrDefaultAsync(
+                r => r.Provider == gateway.Name && db.Payments.Any(p => p.Id == r.PaymentId && p.Reference == notification.TransactionReference),
+                cancellationToken);
+        }
+
+        if (refund is null)
+        {
+            LogUnknownReference(logger, notification.EventType);
+            return NotificationOutcome.Ignored;
+        }
+
+        // Receipts are not needed: the provider's answer is applied idempotently and Processed / Failed are final.
+        GatewayRefund answer;
+        try
+        {
+            answer = await gateway.GetRefundAsync(refund.Reference, cancellationToken);
+        }
+        catch (PaymentGatewayException)
+        {
+            return NotificationOutcome.RetryLater;
+        }
+
+        if (!answer.Found)
+        {
+            LogNotConfirmed(logger, refund.Reference);
+            return NotificationOutcome.RetryLater;
+        }
+
+        if (!refunds.Apply(refund, answer))
+        {
+            return NotificationOutcome.Duplicate;
+        }
+
+        return await SaveAsync(NotificationOutcome.Processed);
+    }
+
     private async Task<NotificationOutcome> SaveAsync(NotificationOutcome outcome)
     {
         try
@@ -121,8 +169,8 @@ internal sealed partial class PaymentNotificationService(
     [LoggerMessage(Level = LogLevel.Information, Message = "Ignored a verified {EventType} notification for a reference that is not one of our payments.")]
     private static partial void LogUnknownReference(ILogger logger, string eventType);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "The provider did not confirm the notified outcome for payment {PaymentReference}; asking for a retry.")]
-    private static partial void LogNotConfirmed(ILogger logger, string paymentReference);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The provider did not confirm the notified outcome for {Reference}; asking for a retry.")]
+    private static partial void LogNotConfirmed(ILogger logger, string reference);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Payment {PaymentReference} was received but cannot be accepted ({Reason}); kept for refund.")]
     private static partial void LogRequiresRefund(ILogger logger, string paymentReference, string reason);

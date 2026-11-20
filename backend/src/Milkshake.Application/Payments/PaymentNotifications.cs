@@ -6,6 +6,13 @@ namespace Milkshake.Application.Payments;
 /// </summary>
 public sealed record PaymentNotification(string EventType, long TransactionId, string Reference);
 
+/// <summary>
+/// A verified refund notification (refund.pending, refund.processed, refund.failed, …; M8b R4). Only identifiers are
+/// taken from it – our refund reference if Paystack echoes it, otherwise the refunded transaction's reference – and the
+/// refund's state is re-read from the provider's API.
+/// </summary>
+public sealed record RefundNotification(string EventType, string? RefundReference, string? TransactionReference);
+
 public enum NotificationOutcome
 {
     /// <summary>Verified and applied (or nothing needed changing).</summary>
@@ -24,4 +31,7 @@ public enum NotificationOutcome
 public interface IPaymentNotificationService
 {
     Task<NotificationOutcome> HandleAsync(PaymentNotification notification, CancellationToken cancellationToken);
+
+    /// <summary>Re-verifies the notified refund with the provider and stores its state. Repeats change nothing.</summary>
+    Task<NotificationOutcome> HandleRefundAsync(RefundNotification notification, CancellationToken cancellationToken);
 }

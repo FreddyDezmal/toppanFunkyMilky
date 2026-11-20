@@ -80,11 +80,13 @@ internal sealed partial class OrderCancellationService(
     {
         Guid patronId = currentUser.UserId ?? throw new InvalidOperationException("Requires a signed-in patron.");
         DateTimeOffset now = clock.GetUtcNow();
+        // Sorted before the records are built: EF Core cannot translate ordering by a property of a constructed record.
         return await db.CancellationRequests.AsNoTracking()
             .Where(r => r.Status == CancellationRequestStatus.Pending)
             .Join(db.Orders.AsNoTracking().Where(o => o.PatronId == patronId && o.Status != OrderStatus.Cancelled && o.PickupAtUtc > now),
-                r => r.OrderId, o => o.Id, (r, o) => new PendingCancellationRequest(o.Reference, r.Reason, r.CreatedAt, o.PickupAtUtc))
-            .OrderBy(r => r.CreatedAt)
+                r => r.OrderId, o => o.Id, (r, o) => new { o.Reference, r.Reason, r.CreatedAt, o.PickupAtUtc })
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => new PendingCancellationRequest(x.Reference, x.Reason, x.CreatedAt, x.PickupAtUtc))
             .ToListAsync(cancellationToken);
     }
 
