@@ -2,6 +2,8 @@ using Milkshake.Application.Ordering;
 using Milkshake.Infrastructure.Ordering;
 using Milkshake.Application.Payments;
 using Milkshake.Infrastructure.Payments;
+using Milkshake.Application.Notifications;
+using Milkshake.Infrastructure.Notifications;
 using Microsoft.Extensions.Options;
 using Milkshake.Application.Management;
 using Milkshake.Infrastructure.Management;
@@ -103,6 +105,18 @@ public static class DependencyInjection
         services.AddScoped<IManagerOrderService, ManagerOrderService>();
         services.AddHostedService<PaymentReconciliationWorker>();
         services.AddScoped<IDiscountConfigurationSource, DiscountConfigurationSource>();
+
+        // Email (M9, decision D3): Mailpit (local capture) or Resend, chosen by Email:Provider; "None" leaves emails queued.
+        services.AddOptions<EmailOptions>().Bind(configuration.GetSection(EmailOptions.SectionName));
+        services.AddHttpClient<ResendEmailSender>((provider, client) =>
+            client.Timeout = TimeSpan.FromSeconds(provider.GetRequiredService<IOptions<EmailOptions>>().Value.Resend.TimeoutSeconds));
+        services.AddSingleton<MailpitEmailSender>();
+        services.AddScoped<IEmailSender>(provider => provider.GetRequiredService<IOptions<EmailOptions>>().Value.Provider switch
+        {
+            EmailOptions.MailpitProvider => provider.GetRequiredService<MailpitEmailSender>(),
+            EmailOptions.ResendProvider => provider.GetRequiredService<ResendEmailSender>(),
+            _ => new DisabledEmailSender(),
+        });
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>(
