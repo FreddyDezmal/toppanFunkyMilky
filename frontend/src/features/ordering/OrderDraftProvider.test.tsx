@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearCsrfToken } from '../../lib/api/httpClient'
@@ -70,7 +70,8 @@ describe('OrderDraftProvider', () => {
     renderProbe()
     expect(await screen.findByText('User: Thandi')).toBeInTheDocument()
 
-    expect(sessionStorage.getItem(draftStorageKey('someone-else'))).toBeNull()
+    // The provider removes other users' drafts in an effect after this render: wait for it rather than race it.
+    await waitFor(() => expect(sessionStorage.getItem(draftStorageKey('someone-else'))).toBeNull())
   })
 
   it('clears the draft on sign-out', async () => {

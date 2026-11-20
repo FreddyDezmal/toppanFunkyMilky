@@ -152,8 +152,8 @@ settings and discount tiers. All endpoints are under `/api/manager` and require 
 ## Ordering (Milestone 5)
 
 Patrons use **Order** in the app (`/order`): choose how many milkshakes, give each one a flavour, consistency and
-topping, choose a restaurant and pickup time, and review. Nothing is ordered or paid yet: the review is a server-checked
-**draft**, and "Continue to payment" stays disabled until checkout is built.
+topping, choose a restaurant and pickup time, review the server-checked draft, and place the order (Milestone 7).
+Placed orders are stored **unpaid**; payment arrives in Milestone 8.
 
 | Endpoint | Access | Purpose |
 | --- | --- | --- |
@@ -182,6 +182,26 @@ topping, choose a restaurant and pickup time, and review. Nothing is ordered or 
 - Prices on screen are **estimates**; the final amount is calculated when the order is placed (M7).
 - Details, decisions and open questions: `docs/progress/2026-11-19_milestone-6-pricing-vat-discounts-report.md`.
   Stakeholder calculation sheet (AC-6.6): `docs/pricing/m6-calculation-sign-off.csv`.
+
+## Orders (Milestone 7)
+
+| Endpoint | Access | Purpose |
+| --- | --- | --- |
+| `POST /api/ordering/orders` | Patron + CSRF + `Idempotency-Key` header | Revalidates and reprices the draft on the server and stores the order unpaid: 201 created, 200 retry of the same submission, 400 invalid, 409 price changed (`currentTotals`), 422 key reused for different content |
+| `GET /api/ordering/orders/{reference}` | Patron | One of your own orders exactly as stored; any other reference is 404 |
+| `GET /api/ordering/orders` | Patron | Your 20 most recent orders, newest first |
+
+- **Tables:** `milkshake.orders` and `milkshake.order_items` (migration `AddOrders`). Every name, fee, VAT rate, discount and
+  total is a **snapshot** taken at placement; check constraints enforce the arithmetic; foreign keys never cascade.
+- **Atomic:** the order, its items and their audit rows are written by one `SaveChanges` call (one transaction).
+- **No duplicates:** a unique index on (patron, idempotency key) guarantees one order per submission, including for
+  simultaneous requests and retries after a lost response. The browser keeps one key per draft content in `sessionStorage`.
+- **Price confirmation:** the browser sends the total the patron confirmed; it is only compared. If the server's price
+  differs, nothing is stored and the patron confirms the new total.
+- **Status:** new orders are `PendingPayment`. Allowed changes: PendingPayment → Confirmed / PaymentFailed / Cancelled;
+  PaymentFailed → Confirmed / Cancelled. In M7 nothing changes status: payment (M8) and cancellation (Q-10) are not built.
+- Orders have a public reference such as `MS-7KQ2-X9TD`; patrons see `/orders/<reference>` after placing an order.
+- Report: `docs/progress/2026-11-20_milestone-7-order-processing-report.md`.
 
 ## Security notes
 
