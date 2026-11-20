@@ -983,6 +983,9 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
                     b.HasIndex("RestaurantId")
                         .HasDatabaseName("ix_orders_restaurant_id");
 
+                    b.HasIndex("CreatedAt", "Id")
+                        .HasDatabaseName("ix_orders_created_at_id");
+
                     b.HasIndex("PatronId", "CreatedAt")
                         .HasDatabaseName("ix_orders_patron_id_created_at");
 

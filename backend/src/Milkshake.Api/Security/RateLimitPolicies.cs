@@ -17,4 +17,7 @@ public static class RateLimitPolicies
 
     /// <summary>Management audit history (M11), per signed-in manager: bounded queries over a large table.</summary>
     public const string Audit = "audit";
+
+    /// <summary>Management reports (M12), per signed-in manager: aggregate queries over all orders.</summary>
+    public const string Reports = "reports";
 }

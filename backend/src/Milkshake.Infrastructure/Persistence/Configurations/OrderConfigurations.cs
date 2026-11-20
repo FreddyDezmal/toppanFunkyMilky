@@ -69,6 +69,9 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         // A patron's orders, newest first (order history), and by status (future discount eligibility, Q-03).
         builder.HasIndex(o => new { o.PatronId, o.CreatedAt });
         builder.HasIndex(o => new { o.PatronId, o.Status });
+
+        // Management reports (M12): every order in a period, newest first, across all patrons.
+        builder.HasIndex(o => new { o.CreatedAt, o.Id });
     }
 }
 

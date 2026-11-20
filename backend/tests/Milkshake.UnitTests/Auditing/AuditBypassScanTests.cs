@@ -19,6 +19,7 @@ public class AuditBypassScanTests
         ["DatabaseHealthCheck.cs"] = (1, "SELECT 1 (health check)"),
         ["EmailDispatcher.cs"] = (1, "SELECT … FOR UPDATE SKIP LOCKED: locks due emails; the claim itself is an audited save"),
         ["AuditQueryService.cs"] = (2, "read-only audit and security-event queries (AC-11.4): parameterised SELECTs"),
+        ["OrderReportService.cs"] = (1, "read-only order volumes by business-local day (AC-12.3): one parameterised SELECT"),
     };
 
     [Fact]

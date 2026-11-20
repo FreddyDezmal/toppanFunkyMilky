@@ -47,6 +47,7 @@ public sealed class PostgresApiFactory : WebApplicationFactory<ApiAssemblyMarker
         builder.UseSetting("RateLimiting:OrderingPermitLimit", "1000");
         builder.UseSetting("RateLimiting:EmailResendPermitLimit", "1000");
         builder.UseSetting("RateLimiting:AuditPermitLimit", "1000");
+        builder.UseSetting("RateLimiting:ReportsPermitLimit", "1000");
 
         // Tests call the payment reconciler directly; the timer-driven job would only add noise.
         builder.UseSetting("Payments:Reconciliation:Enabled", "false");
