@@ -41,7 +41,7 @@ internal sealed class OrderQueryService(MilkshakeDbContext db, ICurrentUser curr
             query = query.Where(o => o.CreatedAt < createdAt || (o.CreatedAt == createdAt && o.Id < id));
         }
 
-        // One extra row tells whether another page exists.
+        // One extra row tells whether another page exists. Refunds are read only for this patron's orders on the page.
         List<Order> orders = await query
             .OrderByDescending(o => o.CreatedAt)
             .ThenByDescending(o => o.Id)
@@ -55,29 +55,12 @@ internal sealed class OrderQueryService(MilkshakeDbContext db, ICurrentUser curr
             orders.RemoveAt(limit);
         }
 
-        ILookup<int, RefundFacts> refunds = await RefundsAsync(orders.Select(o => o.Id).ToArray(), cancellationToken);
+        ILookup<int, RefundFacts> refunds = await RefundFactsReader.ForOrdersAsync(db, orders.Select(o => o.Id).ToList(), cancellationToken);
         List<OrderHistoryEntry> items = orders
             .Select(o => new OrderHistoryEntry(o, PaymentLabels.For(o.Status, refunds[o.Id].ToList())))
             .ToList();
 
         return new OrderHistoryPage(items, more ? new OrderCursor(orders[^1].CreatedAt, orders[^1].Id) : null);
-    }
-
-    /// <summary>Refunds of these orders only (already limited to the patron's own).</summary>
-    private async Task<ILookup<int, RefundFacts>> RefundsAsync(int[] orderIds, CancellationToken cancellationToken)
-    {
-        if (orderIds.Length == 0)
-        {
-            return Array.Empty<RefundFacts>().ToLookup(r => r.Id);
-        }
-
-        var rows = await db.Refunds
-            .AsNoTracking()
-            .Where(r => orderIds.Contains(r.OrderId))
-            .Select(r => new { r.OrderId, r.Id, r.Kind, r.Status, r.FeeMinor, r.CreatedAt })
-            .ToListAsync(cancellationToken);
-
-        return rows.ToLookup(r => r.OrderId, r => new RefundFacts(r.Id, r.Kind, r.Status, r.FeeMinor, r.CreatedAt));
     }
 
     private Guid PatronId() =>
