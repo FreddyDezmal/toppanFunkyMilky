@@ -46,12 +46,23 @@ function storedDrafts(page: Page): Promise<string[]> {
   )
 }
 
+/**
+ * Picks the first real option that no test created. The manager journey (run in parallel when manager credentials are
+ * set) adds an "E2E Flavour …" and deactivates it seconds later; a draft holding it would correctly lose it.
+ */
+async function chooseFirstStableOption(select: Locator) {
+  const labels = await select.locator('option').allTextContents()
+  const index = labels.findIndex((label, i) => i > 0 && !label.trimStart().startsWith('E2E '))
+  expect(index, 'Every option in this list was created by a test.').toBeGreaterThan(0)
+  await select.selectOption({ index })
+}
+
 /** Picks an option whose fee differs from the current one (labels end in "(R 12,00)"), so the total must change. */
 async function chooseDifferentlyPricedOption(select: Locator) {
   const fee = (label: string | null) => label?.match(/\(([^)]*)\)$/)?.[1]
   const current = await select.locator('option:checked').textContent()
   const labels = await select.locator('option').allTextContents()
-  const other = labels.findIndex((label, index) => index > 0 && fee(label) !== fee(current))
+  const other = labels.findIndex((label, index) => index > 0 && !label.trimStart().startsWith('E2E ') && fee(label) !== fee(current))
   test.skip(other < 0, 'Every option in this list has the same fee in this database.')
   await select.selectOption({ index: other })
 }
@@ -74,13 +85,13 @@ test('a patron builds a draft: quantity, milkshakes, pickup and a server-checked
   await page.getByLabel('Number of milkshakes').selectOption('2')
   await page.getByRole('button', { name: 'Continue' }).click()
 
-  // Milkshakes: one flavour, consistency and topping each (the first real option in every list).
+  // Milkshakes: one flavour, consistency and topping each (the first real option in every list that no test created).
   await expect(page.getByRole('heading', { name: 'Choose your milkshakes' })).toBeVisible()
   await expectNoSeriousAccessibilityProblems(page, 'Milkshakes')
   for (const number of [1, 2]) {
     const card = page.getByRole('listitem', { name: `Milkshake ${number}`, exact: true })
     for (const label of ['Flavour', 'Consistency', 'Topping']) {
-      await card.getByLabel(label, { exact: true }).selectOption({ index: 1 })
+      await chooseFirstStableOption(card.getByLabel(label, { exact: true }))
     }
     await card.getByRole('button', { name: `Done with milkshake ${number}` }).click()
     await expect(card.getByRole('button', { name: `Edit milkshake ${number}` })).toBeFocused()
@@ -240,13 +251,13 @@ test('a patron places an order: confirmed total, stored unpaid, kept after a ref
   test.setTimeout(120_000)
   await registerPatron(page)
 
-  // A one-milkshake draft with the first real option in every list.
+  // A one-milkshake draft with the first real option in every list that no test created.
   await page.goto('/order')
   await page.getByLabel('Number of milkshakes').selectOption('1')
   await page.getByRole('button', { name: 'Continue' }).click()
   const card = page.getByRole('listitem', { name: 'Milkshake 1', exact: true })
   for (const field of ['Flavour', 'Consistency', 'Topping']) {
-    await card.getByLabel(field, { exact: true }).selectOption({ index: 1 })
+    await chooseFirstStableOption(card.getByLabel(field, { exact: true }))
   }
   await card.getByRole('button', { name: 'Done with milkshake 1' }).click()
   await page.getByRole('button', { name: 'Continue to pickup' }).click()

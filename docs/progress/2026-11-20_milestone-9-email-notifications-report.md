@@ -93,7 +93,7 @@ Decisions D1–D7 are in the M9 decision register. Made during implementation:
 | Backend unit + integration (Testcontainers PostgreSQL 17, Mailpit) | 929 (777 at M8b + 152) | Passed (929/929) |
 | Vitest | 164 (156 at M8b + 8) | Passed |
 | TypeScript, oxlint, build `-warnaserror` | – | Passed |
-| Playwright (with axe) | 9 | To be re-run after M9 |
+| Playwright (with axe) | 9 | 7 passed; the 2 manager tests skipped (they run only with `E2E_MANAGER_*` set in the terminal) |
 
 New in M9:
 
@@ -116,6 +116,7 @@ New in M9:
 | A test cancellation request named a random manager id, which the database's foreign key rejected | The test uses the test manager's account |
 | A stored payload with missing fields could have rendered an email with blanks or stopped the dispatcher | Payloads are read strictly; such emails end as Failed (E4, tests added) |
 | Filtering on a record built inside an EF Core query cannot be translated (as in M8b) | The email list filters and sorts on the joined rows, then builds the records |
+| For the Resend check, the developer's usual address was already registered as a patron (created 18 November during M4 testing; password unknown, no reset yet, D5) | A Gmail plus address was used for both the Resend account and a new patron; the old account was left unchanged |
 | The development database lacked the new table, so saves would have failed locally once the interceptor existed | Migration reviewed and applied to Supabase before running the app again |
 
 ## 8. Manual check (20 November 2026)
@@ -139,7 +140,7 @@ in Mailpit and showed as Sent under Management → Emails.
 | D1 (single receipt at payment), emails 2–5, E6 confirmation | Stakeholder | Provisional; easily changed |
 | Identity emails (D5) | Later phase | Email confirmation, password reset, change password not available |
 | Q-14 retention (POPIA) | Stakeholder | Email records kept with their orders |
-| Playwright re-run | Developer | Expected unaffected (emails are sent in the background) |
+| Playwright manager journey with M9 | Developer (manager credentials in the terminal) | Optional; the patron journeys passed with M9 |
 | Sender domain with SPF/DKIM/DMARC (R-08) | A real store's domain | Needed before emailing real patrons from a real domain |
 
 ## 10. Integration notes for Milestone 11
