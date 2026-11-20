@@ -278,11 +278,33 @@ value, new value, action and when – in the same transaction as the change. Sig
   change them (migration `AppendOnlyAuditAndActors`).
 - **Search (managers):** `GET /api/manager/audit/changes` (filters `from`, `to`, `user`, `actor`, `entity`, `action`,
   `q`, `cursor`, `limit`) and `GET /api/manager/audit/security`. Read-only, 60 requests per minute, newest first with
-  keyset paging; account details and IP addresses are masked. The screen comes in M12.
+  keyset paging; account details and IP addresses are masked. The screen is Management → Reports → Audit Lookup (M12).
 - **Coverage:** automated tests count every row written against every audit row across the real write paths, and a
   source scan rejects raw-SQL or bulk writes that would bypass the audit.
 - Docs: [`docs/audit/audit-architecture.md`](docs/audit/audit-architecture.md), decisions
   `docs/decisions/2026-11-20_m11-audit-decisions.md`, report `docs/progress/2026-11-20_milestone-11-audit-report.md`.
+
+## Reports (Milestone 12)
+
+- **Patrons:** My orders lists the full order history, 20 at a time with "Load more". Each order shows when it was
+  placed, its milkshakes, total, order status and payment status (`GET /api/ordering/orders?cursor&limit`).
+- **Managers:** Management → Reports (`/manager/reports`) has three tabs, matching URS §3.4.4. A single date or a
+  date range applies to all three, in the business time zone.
+  - **Orders:** one row per milkshake: date, time, order, flavour, topping, consistency, pickup and payment status.
+    It has a status filter, search, numbered pages, **Copy** (this page) and **Export** (CSV).
+  - **Trends:** weekly, monthly and growth charts (all orders against paid orders), each with a table of the numbers.
+    With no date chosen, it covers all orders.
+  - **Audit Lookup:** who changed which lookup value from what to what, and when; all changes with the M11 filters;
+    sign-in events. Each view has an Export.
+- **API:** `GET /api/manager/reports/orders` and `/trends` (60 per minute), plus `…/export` endpoints for orders,
+  trends and the audit history (10 per minute, at most 10,000 records). Exports are protected against spreadsheet
+  formula injection and recorded as `ReportExported` security events.
+- **Data:** figures come from the orders as they were placed (never today's prices), and payment status from stored
+  payment and refund records. Manager reports show no patron details.
+- **Database:** migration `AddOrderReportIndex` (one index on `orders (created_at, id)`).
+- Docs: [`docs/reports/reporting-architecture.md`](docs/reports/reporting-architecture.md), decisions
+  `docs/decisions/2026-11-21_m12-reporting-decisions.md`, report
+  `docs/progress/2026-11-21_milestone-12-reporting-report.md`.
 
 ## Security notes
 
