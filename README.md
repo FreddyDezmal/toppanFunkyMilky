@@ -47,9 +47,21 @@ and **Docker Desktop** (backend integration tests run against a throwaway Postgr
    `VITE_API_BASE_URL` empty. The app then calls `/api` on its own origin and Vite forwards it to the API
    (required for the `SameSite=Strict` session cookie).
 
-4. **HTTPS development certificate:** `dotnet dev-certs https --trust`
+4. **Paystack test key** (payments, Milestone 8). Use a Paystack account in Test mode; store only the secret key,
+   at a hidden prompt (details: [`docs/payments/paystack-setup-guide.md`](docs/payments/paystack-setup-guide.md)):
 
-5. **A manager account** (there is deliberately no sign-up page or endpoint for managers). With the API stopped:
+   ```powershell
+   $secure = Read-Host 'Paystack secret key' -AsSecureString
+   $key = [System.Net.NetworkCredential]::new('', $secure).Password
+   dotnet user-secrets set "Payments:Paystack:SecretKey" $key --project backend/src/Milkshake.Api | Out-Null
+   Remove-Variable secure, key
+   ```
+
+   Without it everything else works, but **Pay now** answers "Payments are temporarily unavailable".
+
+5. **HTTPS development certificate:** `dotnet dev-certs https --trust`
+
+6. **A manager account** (there is deliberately no sign-up page or endpoint for managers). With the API stopped:
 
    ```powershell
    dotnet run --project backend/src/Milkshake.Api --launch-profile https -- provision-manager --email <email> --first-name <name>
@@ -153,7 +165,7 @@ settings and discount tiers. All endpoints are under `/api/manager` and require 
 
 Patrons use **Order** in the app (`/order`): choose how many milkshakes, give each one a flavour, consistency and
 topping, choose a restaurant and pickup time, review the server-checked draft, and place the order (Milestone 7).
-Placed orders are stored **unpaid**; payment arrives in Milestone 8.
+Placed orders are stored **unpaid** until the patron pays online (Milestone 8).
 
 | Endpoint | Access | Purpose |
 | --- | --- | --- |
@@ -199,12 +211,37 @@ Placed orders are stored **unpaid**; payment arrives in Milestone 8.
 - **Price confirmation:** the browser sends the total the patron confirmed; it is only compared. If the server's price
   differs, nothing is stored and the patron confirms the new total.
 - **Status:** new orders are `PendingPayment`. Allowed changes: PendingPayment → Confirmed / PaymentFailed / Cancelled;
-  PaymentFailed → Confirmed / Cancelled. In M7 nothing changes status: payment (M8) and cancellation (Q-10) are not built.
+  PaymentFailed → Confirmed / Cancelled. Only a payment verified with Paystack changes status (M8); cancellation is
+  not built yet (M8b).
 - Orders have a public reference such as `MS-7KQ2-X9TD`; patrons see `/orders/<reference>` after placing an order.
 - Report: `docs/progress/2026-11-20_milestone-7-order-processing-report.md`.
 
+## Payments (Milestone 8)
+
+Patrons pay on the order page (`/orders/<reference>`) through **Paystack's hosted checkout** (test mode in
+development). An order becomes **Confirmed** only after the server verifies the payment with Paystack.
+
+| Endpoint | Access | Purpose |
+| --- | --- | --- |
+| `POST /api/ordering/orders/{reference}/payments` | Patron + CSRF + `Idempotency-Key` header, body `{}` | Opens (or resumes) a checkout for the stored order total: 200 `{ paymentReference, checkoutUrl }`, 404, 409 already paid / not payable / being prepared, 422 pickup passed or key used, 503 payments unavailable |
+| `POST /api/ordering/orders/{reference}/payments/refresh` | Patron + CSRF | Checks the open attempt with Paystack and returns `orderStatus`, `isPaid`, `awaitsPayment`, `checking` and the latest attempt |
+| `POST /api/payments/paystack/webhook` | Paystack only (HMAC-SHA512 signature; no session or CSRF) | Verified, deduplicated payment notifications |
+
+- **Amount:** always the stored order total, sent to Paystack in cents (ZAR). The browser sends no amount.
+- **Verification:** the webhook, the patron's return and a background job (every 5 minutes) all ask Paystack's
+  Verify Transaction API; the return address and the webhook's own JSON are never trusted.
+- **Tables:** `milkshake.payments` (one row per attempt) and `milkshake.payment_events` (verified webhook receipts),
+  migration `AddPayments`. One successful and at most one open payment per order (database-enforced).
+- **Locally** Paystack cannot reach the webhook; payments are confirmed by the return check and the background job.
+- **Tests** never call Paystack: a simulated provider and test-signed webhooks are used. A manual sandbox payment
+  with a Paystack test card is described in the setup guide.
+- Docs: [`docs/payments/payment-architecture.md`](docs/payments/payment-architecture.md),
+  [`docs/payments/paystack-setup-guide.md`](docs/payments/paystack-setup-guide.md),
+  report `docs/progress/2026-11-20_milestone-8-payments-report.md`.
+
 ## Security notes
 
+- The Paystack secret key is used only by the API; the frontend never sees it, and no card data reaches the application.
 - Secrets live in user secrets (development) or environment variables / a secrets store (production), never in Git.
 - Frontend `VITE_` variables are public by design: never put secrets in them.
 - Every data change is recorded in `milkshake.audit_logs` in the same transaction as the change; password hashes,
@@ -213,4 +250,4 @@ Placed orders are stored **unpaid**; payment arrives in Milestone 8.
 - Management changes are version-checked (optimistic concurrency) and audited field by field with the manager's identity.
 - Check that the built frontend contains no server details:
   `Select-String -CaseSensitive -Path frontend/dist/assets/*.js -Pattern 'Host=|Database=|Username=|supabase\.co|pooler'`
-  (no output expected).
+  (no output expected).
