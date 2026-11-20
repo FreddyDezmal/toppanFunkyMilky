@@ -1,5 +1,14 @@
 import { getJson, postJson } from '../../lib/api/httpClient'
-import type { DraftSummary, DrinkSelection, OrderDraft, OrderingOptions, PlacedOrder, Quote } from './types'
+import type {
+  DraftSummary,
+  DrinkSelection,
+  OrderDraft,
+  OrderingOptions,
+  PaymentCheckout,
+  PaymentStatus,
+  PlacedOrder,
+  Quote,
+} from './types'
 
 const ORDERING = '/api/ordering'
 
@@ -61,4 +70,20 @@ export function placeOrder(
 /** One of the signed-in patron's own orders, as stored. */
 export function fetchOrder(reference: string, signal?: AbortSignal): Promise<PlacedOrder> {
   return getJson<PlacedOrder>(`${ORDERING}/orders/${encodeURIComponent(reference)}`, { signal })
+}
+
+/**
+ * Starts (or resumes) paying for the order (M8). No amount is sent: the server charges the stored order total. The key
+ * identifies this click: sending it again returns the same checkout instead of creating another payment attempt.
+ */
+export function startPayment(reference: string, idempotencyKey: string, signal?: AbortSignal): Promise<PaymentCheckout> {
+  return postJson<PaymentCheckout>(`${ORDERING}/orders/${encodeURIComponent(reference)}/payments`, {}, {
+    signal,
+    headers: { [IDEMPOTENCY_HEADER]: idempotencyKey },
+  })
+}
+
+/** Asks the server to check the order's open payment with the provider, then returns what it stored. */
+export function refreshPayment(reference: string, signal?: AbortSignal): Promise<PaymentStatus> {
+  return postJson<PaymentStatus>(`${ORDERING}/orders/${encodeURIComponent(reference)}/payments/refresh`, {}, { signal })
 }

@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { fetchOrder, fetchOrderingOptions } from '../../features/ordering/api'
 import { describeOrderingError } from '../../features/ordering/errors'
 import { formatLocalTime, timeZoneLabel } from '../../features/ordering/format'
+import { RETURN_PARAM } from '../../features/ordering/payment'
+import { PaymentPanel } from '../../features/ordering/PaymentPanel'
 import { STATUS_LABELS } from '../../features/ordering/placement'
 import { PriceSummary } from '../../features/ordering/PriceSummary'
 import type { PlacedOrder } from '../../features/ordering/types'
@@ -26,6 +28,16 @@ export function OrderDetailsPage() {
   const [state, setState] = useState<PageState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
   const heading = useRef<HTMLHeadingElement>(null)
+  const [searchParams] = useSearchParams()
+  const returning = searchParams.get(RETURN_PARAM.name) === RETURN_PARAM.value
+
+  // After a payment change, show the order as now stored without leaving the page (a failure keeps what is shown).
+  const reloadOrder = useCallback(() => {
+    fetchOrder(reference).then(
+      (order) => setState((current) => (current.kind === 'loaded' ? { ...current, order } : current)),
+      () => undefined,
+    )
+  }, [reference])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -157,25 +169,19 @@ export function OrderDetailsPage() {
         <PriceSummary totals={order.totals} locale={locale} totalLabel="Total" />
       </section>
 
+      <PaymentPanel
+        key={order.reference}
+        reference={order.reference}
+        awaitsPayment={order.awaitsPayment}
+        amountLabel={money(order.totals.total)}
+        returning={returning}
+        onOrderChanged={reloadOrder}
+      />
+
       <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-6">
-        {order.awaitsPayment && (
-          <button
-            type="button"
-            disabled
-            aria-describedby="payment-coming-soon"
-            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            Pay now (coming soon)
-          </button>
-        )}
         <Link to="/order" className={LINK_CLASS}>
           Start a new order
         </Link>
-        {order.awaitsPayment && (
-          <p id="payment-coming-soon" className="w-full text-xs text-slate-500">
-            Payment is not available yet. Your order is saved and will wait, unpaid, until it is.
-          </p>
-        )}
       </div>
     </section>
   )

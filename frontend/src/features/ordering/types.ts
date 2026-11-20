@@ -184,4 +184,32 @@ export interface Quote {
   drinks: QuotedDrink[]
   totals: OrderTotals | null
   note: string
-}
+}
+/** POST /api/ordering/orders/{reference}/payments (200): where to pay. Nothing here means the order is paid. */
+export interface PaymentCheckout {
+  paymentReference: string
+  checkoutUrl: string
+}
+
+/** A payment attempt's status as stored by the server (M8). Only the server decides it. */
+export type PaymentAttemptStatus =
+  | 'Initiating'
+  | 'Pending'
+  | 'Succeeded'
+  | 'Failed'
+  | 'Abandoned'
+  | 'Superseded'
+  | 'RequiresRefund'
+
+/**
+ * POST /api/ordering/orders/{reference}/payments/refresh (200). Order status and payment status are separate:
+ * `isPaid` is true only after the server verified the payment with the provider; `checking` means an attempt is still
+ * open (the patron may still be paying, or confirmation has not arrived yet).
+ */
+export interface PaymentStatus {
+  orderStatus: OrderStatus
+  isPaid: boolean
+  awaitsPayment: boolean
+  checking: boolean
+  payment: { reference: string; status: PaymentAttemptStatus; message: string | null } | null
+}

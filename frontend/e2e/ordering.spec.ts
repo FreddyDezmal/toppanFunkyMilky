@@ -272,7 +272,8 @@ test('a patron places an order: confirmed total, stored unpaid, kept after a ref
   await expect(page.getByText('Awaiting payment', { exact: true })).toBeVisible()
   await expect(page.getByText('Not paid', { exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Price' }).locator('dd').last()).toHaveText(total)
-  await expect(page.getByRole('button', { name: 'Pay now (coming soon)' })).toBeDisabled()
+  // Payment is offered but not started here: a real checkout needs the Paystack sandbox (manual check, M8 Step 8).
+  await expect(page.getByRole('region', { name: 'Payment' }).getByRole('button', { name: 'Pay now' })).toBeEnabled()
   expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith('milkshake.')))).toEqual([])
   await expectNoSeriousAccessibilityProblems(page, 'Order')
 

@@ -476,7 +476,7 @@ describe('order page', () => {
     const price = screen.getByRole('region', { name: 'Price' })
     expect(within(price).getByText('Total')).toBeInTheDocument()
     expect(within(price).getByText(zar(52.9))).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Pay now (coming soon)' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Pay now' })).toBeEnabled()
   })
 
   it('says when the order is not the patron’s or does not exist', async () => {
