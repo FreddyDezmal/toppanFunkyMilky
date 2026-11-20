@@ -17,3 +17,7 @@ stakeholder should ratify.
 | D6 | AC-9.5: Management → Emails – delivery status list and **Resend** (same recipient and content, never a new address), ManagerOnly, CSRF, rate-limited, audited | Approved |
 | D7 | Outbox architecture: rows created by a SaveChanges interceptor in the same transaction as the business change (covers all four payment-confirmation paths); unique key per logical email; background dispatcher like the payment reconciliation job; PostgreSQL row claims with `FOR UPDATE SKIP LOCKED` and a lease; exponential backoff; a provider outage never affects payments or refunds | Approved (schema detailed in Step 3) |
 | – | Retention of email records: **open** (Q-14, POPIA); no policy invented | Open |
+
+Implementation decisions E1–E8 and the evidence for each requirement are in the M9 report
+(`docs/progress/2026-11-20_milestone-9-email-notifications-report.md`). D5: no screen promises a confirmation or
+password-reset email (checked 20 November 2026).

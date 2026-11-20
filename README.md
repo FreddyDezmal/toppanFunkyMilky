@@ -244,9 +244,32 @@ development). An order becomes **Confirmed** only after the server verifies the 
   [`docs/payments/paystack-setup-guide.md`](docs/payments/paystack-setup-guide.md),
   report `docs/progress/2026-11-20_milestone-8-payments-report.md`.
 
+## Emails (Milestone 9)
+
+Patrons get an **order confirmation with the final receipt** when their payment is verified, and emails when a
+manager asks to cancel, when an order is cancelled, and when a refund completes or fails. All go to the address on the
+patron's account.
+
+- **Reliable by design:** each email is queued in the same database transaction as the change that causes it
+  (`milkshake.email_notifications`, migration `AddEmailNotifications`) and sent by a background job every 30 seconds,
+  with retries (up to 8 attempts over about 2 hours). An email-provider outage only delays emails; it never affects a
+  payment, cancellation or refund.
+- **Locally** emails are captured by **Mailpit**: `docker run -d --name mailpit -p 8025:8025 -p 1025:1025 axllent/mailpit`,
+  then open <http://localhost:8025>. With `Email:Provider` = `None` (the default outside development) emails stay queued.
+- **Safe content:** every value is HTML-encoded, the only link is the order page, there are no tokens or one-click
+  actions, and we never ask for card or bank details.
+- **Management → Emails** (`/manager/emails`): delivery status with counts, filters, and **Send again** for sent or
+  failed emails (`GET /api/manager/emails`, `POST /api/manager/emails/{id}/resend` – ManagerOnly, CSRF, 20 per minute).
+- **Real inboxes** (Resend) only with approval and only to allow-listed addresses; the key lives in user secrets.
+- Sign-up and password emails are **not** included (deferred, decision D5).
+- Docs: [`docs/notifications/email-architecture.md`](docs/notifications/email-architecture.md),
+  [`docs/notifications/email-setup-guide.md`](docs/notifications/email-setup-guide.md),
+  report `docs/progress/2026-11-20_milestone-9-email-notifications-report.md`.
+
 ## Security notes
 
 - The Paystack secret key is used only by the API; the frontend never sees it, and no card data reaches the application.
+- The Resend API key (optional) lives only in user secrets; email addresses and content never appear in logs or the audit trail.
 - Secrets live in user secrets (development) or environment variables / a secrets store (production), never in Git.
 - Frontend `VITE_` variables are public by design: never put secrets in them.
 - Every data change is recorded in `milkshake.audit_logs` in the same transaction as the change; password hashes,
