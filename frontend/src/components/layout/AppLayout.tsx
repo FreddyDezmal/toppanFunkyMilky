@@ -40,9 +40,14 @@ export function AppLayout() {
               <>
 
                 {hasRole(user, ROLES.patron) && (
-                  <NavLink to="/order" className={navLinkClass}>
-                    Order
-                  </NavLink>
+                  <>
+                    <NavLink to="/order" className={navLinkClass}>
+                      Order
+                    </NavLink>
+                    <NavLink to="/orders" end className={navLinkClass}>
+                      My orders
+                    </NavLink>
+                  </>
                 )}              
 
                 <NavLink to="/account" className={navLinkClass}>
@@ -90,4 +95,4 @@ export function AppLayout() {
       <footer className="mx-auto max-w-4xl px-4 pb-8 text-xs text-slate-400">Development build</footer>
     </div>
   )
-}
+}

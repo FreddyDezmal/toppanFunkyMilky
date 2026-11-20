@@ -79,3 +79,14 @@ patron), and unanswered manager requests lapse at the pickup time.
 | Q2 | Payments that cannot be accepted (`RequiresRefund`) are refunded **automatically, in full, without a fee** |
 | Q3 | Managers get **Management → Orders** (find an order by reference, request cancellation, see failed refunds); patrons see requests on the order page and a Home page notice; email follows in M9 |
 | Q4 | A refund Paystack cannot complete is marked **Failed**; the patron is told to contact the restaurant; managers see it on the Orders page for manual handling (no bank details collected) |
+
+## M8b implementation decisions (20 November 2026)
+
+| ID | Decision |
+| --- | --- |
+| I1 | Cancel and accept carry no Idempotency-Key: repeating them is already harmless (cancelled stays cancelled; one refund per payment by unique index) |
+| I3 | Paystack `needs-attention` refunds stay Pending, flagged for managers (not Failed) |
+| I4 | A payment of a different amount is not refunded automatically; it is logged for a manual refund at Paystack (approved by the developer as an exception to Q2) |
+| I8 | Managers see the patron's first name and email on Management → Orders (provisional, POPIA Q-14) |
+
+Details: `docs/progress/2026-11-20_milestone-8b-cancellation-refunds-report.md`.

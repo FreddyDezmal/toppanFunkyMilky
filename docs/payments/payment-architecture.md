@@ -91,5 +91,32 @@ Both tables are audited by the existing audit interceptor in the same transactio
 ## 6. What is not here (by design)
 
 - No card data: Paystack's hosted page collects it; the API stores only references, amounts and statuses.
-- No refunds or cancellation (M8b), no manager overrides, no emails (M9), no reporting (M12).
+- No manager overrides (managers ask; patrons decide), no emails (M9), no reporting (M12).
 - No frontend secrets: the browser never sees the Paystack key; there is no Paystack JavaScript in the app.
+
+## 7. Cancellation and refunds (M8b)
+
+```
+Patron "Cancel order" ─ POST …/cancel {expectedRefund}        Manager ─ POST /api/manager/orders/{ref}/cancellation-requests {reason}
+Patron "Accept"        ─ POST …/cancellation-request/accept      └─ cancellation_requests (Pending; one per order)
+            │
+            ▼
+OrderCancellationService: own order, before pickup; unpaid → check open checkout with Paystack first;
+paid → expectedRefund must equal paid − fee (patron) or paid (accepted request)
+            │  ONE SaveChanges: order Cancelled + refunds row (Initiating, MSR-…) + request Accepted/Lapsed + audit
+            ▼
+RefundSubmitter → Paystack POST /refund {transaction: MSP-…, amount (cents), reference: MSR-…}  (409 = already exists → read it)
+            ▼
+Pending ──(refund.* webhook → GET /refund?reference=MSR-… | job every 5 min)──► Processed | Failed (→ managers, Q4)
+```
+
+| Rule | Where |
+| --- | --- |
+| Fee = `Refund.FeeRate` × order `taxable`, rounded once to cents; none for accepted requests and unaccepted payments | `Refund.CancellationFee`, `ck_refunds_fee_rate` |
+| One refund per payment | `ux_refunds_one_per_payment` |
+| One pending request per order; lapse at pickup | `ux_cancellation_requests_one_pending_per_order`; job step 5 |
+| Refund complete only when Paystack says so | `Refund.ApplyVerifiedOutcome` (amount must match) |
+| Late or duplicate payment → full refund automatically; wrong amount → manual | job step 2 (decision I4) |
+
+Reconciliation job, every run: (1) settle open payment attempts; (2) refund unaccepted payments; (3) re-send refunds
+Paystack has not accepted (over 1 minute old); (4) check pending refunds; (5) lapse requests at pickup.

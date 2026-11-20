@@ -267,3 +267,18 @@ export interface PendingCancellationRequest {
   createdAt: string
   pickupAtUtc: string
 }
+
+/** GET /api/ordering/orders: one of the patron's recent orders, from the stored snapshot. */
+export interface OrderSummary {
+  reference: string
+  status: OrderStatus
+  isPaid: boolean
+  awaitsPayment: boolean
+  restaurantName: string
+  pickup: DraftPickup
+  drinkCount: number
+  total: number
+  currencyCode: string
+  /** UTC ISO 8601. */
+  placedAtUtc: string
+}

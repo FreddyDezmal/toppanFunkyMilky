@@ -5,6 +5,7 @@ import type {
   OrderCancellation,
   OrderDraft,
   OrderingOptions,
+  OrderSummary,
   PaymentCheckout,
   PaymentStatus,
   PendingCancellationRequest,
@@ -116,4 +117,9 @@ export function declineCancellationRequest(reference: string): Promise<OrderCanc
 /** The patron's orders with a manager request waiting for an answer (Home page notice). */
 export function fetchPendingCancellationRequests(signal?: AbortSignal): Promise<PendingCancellationRequest[]> {
   return getJson<PendingCancellationRequest[]>(`${ORDERING}/cancellation-requests`, { signal })
+}
+
+/** The signed-in patron's 20 most recent orders, newest first. */
+export function fetchOrders(signal?: AbortSignal): Promise<OrderSummary[]> {
+  return getJson<OrderSummary[]>(`${ORDERING}/orders`, { signal })
 }

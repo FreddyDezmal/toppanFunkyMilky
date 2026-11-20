@@ -67,6 +67,17 @@ Applied to the development Supabase database on 20 November 2026.
 Locally the webhook cannot reach the computer; the confirmation comes from the refresh endpoint and the background
 job, which ask Paystack directly.
 
+### A6. Manual sandbox refund (M8b)
+
+1. Pay an order with the test card (A5), then press **Cancel order** on the order page and confirm the shown refund
+   (paid − 10% of the price before VAT).
+2. The order shows **Cancelled** and the refund "on its way". In the dashboard (Test mode → Refunds or the
+   transaction's page) the refund carries our `MSR-…` reference and the amount.
+3. Locally no webhook arrives: within 5 minutes the reconciliation job asks Paystack and the refund shows "completed"
+   once Paystack has processed it (test refunds may stay pending for a while).
+4. Optional: as a manager, use **Management → Orders** to ask the patron of another paid order to cancel; accept as the
+   patron and check the full amount is refunded.
+
 ## Part B – Webhook configuration
 
 ### B1. Endpoint
@@ -83,8 +94,10 @@ temporarily; this is optional because recovery works without webhooks.
 2. **Signature:** HMAC-SHA512 of the exact raw request body with the secret key, compared in constant time with the
    `x-paystack-signature` header. Missing or wrong → **401**, nothing stored.
 3. **Parse:** event type, transaction id and reference only. Malformed → **400**.
-4. **Act only on `charge.success`.** Other events and unknown references → **200**, no change (failures are found by
-   verification instead).
+4. **Act on `charge.success` and `refund.*`** (pending, processing, needs-attention, processed, failed). Other events and
+   unknown references → **200**, no change (payment failures are found by verification instead). A refund event is
+   matched by our refund reference (`MSR-…`, any letter case) or, if absent, by the payment reference, and the refund
+   is re-read with `GET /refund?reference=MSR-…`; the event's own status is never used. Repeats change nothing.
 5. **Deduplicate:** a receipt with the same (provider, event type, transaction id) already stored → **200**, no change.
 6. **Re-verify** with Paystack's Verify Transaction API; the event's own amount and status are never used.
 7. **Apply** the verified outcome; payment, order, receipt and audit rows are saved together.

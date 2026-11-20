@@ -282,6 +282,11 @@ test('a patron places an order: confirmed total, stored unpaid, kept after a ref
   await expect(page.getByRole('heading', { name: `Order ${reference}` })).toBeVisible()
   await expect(page.getByText('Not paid', { exact: true })).toBeVisible()
 
+  // Listed under My orders, linking back to it.
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'My orders' }).click()
+  await expect(page.getByRole('link', { name: `Order ${reference}` })).toBeVisible()
+  await expectNoSeriousAccessibilityProblems(page, 'My orders')
+
   // Only the patron's own order is found; any other reference is not (same 404 as a missing order).
   const lookups = await page.evaluate(async (own) => {
     const status = async (ref: string) => (await fetch(`/api/ordering/orders/${ref}`, { credentials: 'include' })).status

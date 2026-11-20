@@ -211,8 +211,8 @@ Placed orders are stored **unpaid** until the patron pays online (Milestone 8).
 - **Price confirmation:** the browser sends the total the patron confirmed; it is only compared. If the server's price
   differs, nothing is stored and the patron confirms the new total.
 - **Status:** new orders are `PendingPayment`. Allowed changes: PendingPayment → Confirmed / PaymentFailed / Cancelled;
-  PaymentFailed → Confirmed / Cancelled. Only a payment verified with Paystack changes status (M8); cancellation is
-  not built yet (M8b).
+  PaymentFailed → Confirmed / Cancelled; Confirmed → Cancelled (with a refund, M8b). Only a payment verified with
+  Paystack confirms an order; cancellation is allowed before the pickup time only.
 - Orders have a public reference such as `MS-7KQ2-X9TD`; patrons see `/orders/<reference>` after placing an order.
 - Report: `docs/progress/2026-11-20_milestone-7-order-processing-report.md`.
 
@@ -233,6 +233,11 @@ development). An order becomes **Confirmed** only after the server verifies the 
 - **Tables:** `milkshake.payments` (one row per attempt) and `milkshake.payment_events` (verified webhook receipts),
   migration `AddPayments`. One successful and at most one open payment per order (database-enforced).
 - **Locally** Paystack cannot reach the webhook; payments are confirmed by the return check and the background job.
+- **Cancellation and refunds (M8b):** patrons cancel before pickup – free if unpaid; if paid they get back what they
+  paid less `Refund.FeeRate` (10%) of the VAT-exclusive amount. Managers ask patrons to cancel (Management → Orders,
+  reason ≤ 50 characters); a patron who accepts is refunded in full. Late or duplicate payments are refunded in full
+  automatically. Refunds go through Paystack (`MSR-…` references) and are complete only when Paystack confirms them;
+  failed ones are listed for managers. Report: `docs/progress/2026-11-20_milestone-8b-cancellation-refunds-report.md`.
 - **Tests** never call Paystack: a simulated provider and test-signed webhooks are used. A manual sandbox payment
   with a Paystack test card is described in the setup guide.
 - Docs: [`docs/payments/payment-architecture.md`](docs/payments/payment-architecture.md),
