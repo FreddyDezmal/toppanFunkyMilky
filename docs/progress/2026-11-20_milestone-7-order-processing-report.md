@@ -97,9 +97,9 @@ Run by the developer on Windows 11 with Docker Desktop. Results below are from t
 | Suite | Count | Result |
 | --- | --- | --- |
 | Backend unit + integration (Testcontainers PostgreSQL 17) | 549 (470 at M6 + 79) | Passed |
-| Vitest | 110 (100 at M6 + 10) | 109 passed, 1 failed (timing race in an M5 test, fixed in this commit); re-run after the fix: **to confirm** |
+| Vitest | 110 (100 at M6 + 10) | Passed (110/110) after fixing a timing race in an M5 test; the first run had 109 passed, 1 failed |
 | Playwright without manager credentials | 7 passed + 2 skipped | Passed (includes the new placement journey and its axe scan) |
-| Playwright with manager credentials | 9 passed | **To confirm** |
+| Playwright with manager credentials | 9 passed | Passed (9/9) |
 | Build `-warnaserror`, `tsc -b`, oxlint | 0 warnings / errors | Passed |
 | `npm audit --omit=dev`, `dotnet list package --vulnerable` | No vulnerabilities | Passed |
 
