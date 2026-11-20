@@ -110,6 +110,85 @@ public sealed class PaystackGatewayTests
         Assert.Empty(handler.Requests);
     }
 
+    // ---- refunds (M8b) -------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task CreateRefund_SendsTheTransactionCentsCurrencyAndOurReference_AndIsOnlyPending()
+    {
+        var handler = new StubHandler(_ => Json(HttpStatusCode.OK,
+            """{"status":true,"message":"Refund has been queued for processing","data":{"id":555,"status":"pending","amount":2730,"currency":"ZAR","reference":"MSR-0123456789AB","transaction":{"reference":"MSP-0123456789AB"}}}"""));
+
+        GatewayRefund result = await Gateway(handler).CreateRefundAsync(
+            new RefundRequest("MSR-0123456789AB", "MSP-0123456789AB", 2730, "ZAR", "PatronCancellation"), CancellationToken.None);
+
+        Assert.Equal((true, VerifiedRefundOutcome.Pending, 2730L, (long?)555), (result.Found, result.Outcome, result.AmountMinor, result.RefundId));
+        HttpRequestMessage sent = Assert.Single(handler.Requests);
+        Assert.Equal((HttpMethod.Post, "https://api.paystack.co/refund"), (sent.Method, sent.RequestUri!.AbsoluteUri));
+        Assert.Equal(("Bearer", Key), (sent.Headers.Authorization!.Scheme, sent.Headers.Authorization.Parameter));
+        using JsonDocument body = JsonDocument.Parse(handler.Bodies.Single());
+        Assert.Equal("MSP-0123456789AB", body.RootElement.GetProperty("transaction").GetString());
+        Assert.Equal(2730, body.RootElement.GetProperty("amount").GetInt64());
+        Assert.Equal("ZAR", body.RootElement.GetProperty("currency").GetString());
+        Assert.Equal("MSR-0123456789AB", body.RootElement.GetProperty("reference").GetString());
+        Assert.Equal("PatronCancellation", body.RootElement.GetProperty("merchant_note").GetString());
+    }
+
+    [Fact]
+    public async Task CreateRefund_WithAReusedReference_ReadsTheExistingRefund_InsteadOfCreatingAnother()
+    {
+        int calls = 0;
+        var handler = new StubHandler(_ => ++calls == 1
+            ? Json(HttpStatusCode.Conflict, """{"status":false,"message":"A refund with reference MSR-0123456789AB already exists"}""")
+            : Json(HttpStatusCode.OK, """{"status":true,"data":[{"id":555,"status":"processed","amount":"2730","reference":"MSR-0123456789AB"}]}"""));
+
+        GatewayRefund result = await Gateway(handler).CreateRefundAsync(
+            new RefundRequest("MSR-0123456789AB", "MSP-0123456789AB", 2730, "ZAR", "PatronCancellation"), CancellationToken.None);
+
+        Assert.Equal((VerifiedRefundOutcome.Processed, 2730L, (long?)555), (result.Outcome, result.AmountMinor, result.RefundId));
+        Assert.Equal(
+            ["https://api.paystack.co/refund", "https://api.paystack.co/refund?reference=MSR-0123456789AB"],
+            handler.Requests.Select(r => r.RequestUri!.AbsoluteUri));
+    }
+
+    [Theory]
+    [InlineData("pending", VerifiedRefundOutcome.Pending, null)]
+    [InlineData("processing", VerifiedRefundOutcome.Pending, null)]
+    [InlineData("needs-attention", VerifiedRefundOutcome.Pending, GatewayRefund.NeedsAttentionMessage)]
+    [InlineData("processed", VerifiedRefundOutcome.Processed, null)]
+    [InlineData("failed", VerifiedRefundOutcome.Failed, "Refund failed at Paystack.")]
+    public async Task GetRefund_MapsPaystackStatuses(string status, VerifiedRefundOutcome expected, string? message)
+    {
+        var handler = new StubHandler(_ => Json(HttpStatusCode.OK,
+            """{"status":true,"data":[{"id":555,"status":"STATUS","amount":2730,"reference":"MSR-0123456789AB"}]}""".Replace("STATUS", status, StringComparison.Ordinal)));
+
+        GatewayRefund result = await Gateway(handler).GetRefundAsync("MSR-0123456789AB", CancellationToken.None);
+
+        Assert.Equal((true, expected, message), (result.Found, result.Outcome, result.Message));
+    }
+
+    [Theory]
+    [InlineData("""{"status":true,"data":[]}""")]
+    [InlineData("""{"status":true,"data":[{"id":9,"status":"processed","amount":2730,"reference":"MSR-ZZZZZZZZZZZZ"}]}""")]
+    public async Task GetRefund_OnlyOurOwnReferenceCounts(string json)
+    {
+        var handler = new StubHandler(_ => Json(HttpStatusCode.OK, json));
+
+        GatewayRefund result = await Gateway(handler).GetRefundAsync("MSR-0123456789AB", CancellationToken.None);
+
+        Assert.False(result.Found);
+    }
+
+    [Fact]
+    public async Task CreateRefund_FailuresBecomeGatewayErrors_ThatNeverContainTheKey()
+    {
+        var handler = new StubHandler(_ => Json(HttpStatusCode.BadRequest, """{"status":false,"message":"Transaction has been fully reversed"}"""));
+
+        PaymentGatewayException failure = await Assert.ThrowsAsync<PaymentGatewayException>(() => Gateway(handler).CreateRefundAsync(
+            new RefundRequest("MSR-0123456789AB", "MSP-0123456789AB", 2730, "ZAR", "PatronCancellation"), CancellationToken.None));
+
+        Assert.DoesNotContain(Key, failure.Message, StringComparison.Ordinal);
+    }
+
     private static CheckoutRequest Request() =>
         new("MSP-0123456789AB", 5980, "ZAR", "thandi@example.test", new Uri("https://localhost:5173/orders/MS-7KQ2-X9TD?payment=return"));
 

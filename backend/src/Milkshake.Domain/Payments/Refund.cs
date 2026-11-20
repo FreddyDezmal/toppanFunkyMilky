@@ -151,15 +151,30 @@ public sealed partial class Refund : IHasTimestamps, IHasRowVersion
     /// </summary>
     public bool ApplyVerifiedOutcome(VerifiedRefundOutcome outcome, long refundedAmountMinor, long? providerRefundId, string? providerMessage, DateTimeOffset verifiedAt)
     {
-        if (Status is RefundStatus.Processed or RefundStatus.Failed || outcome == VerifiedRefundOutcome.Pending)
+        if (Status is RefundStatus.Processed or RefundStatus.Failed)
         {
-            if (Status == RefundStatus.Initiating && outcome == VerifiedRefundOutcome.Pending && providerRefundId is long id)
+            return false;
+        }
+
+        if (outcome == VerifiedRefundOutcome.Pending)
+        {
+            // Still on its way: record the provider's id if we did not get it before, and any change in its message
+            // (e.g. "needs attention").
+            bool changed = false;
+            if (Status == RefundStatus.Initiating && providerRefundId is long id)
             {
                 Submitted(id);
-                return true;
+                changed = true;
             }
 
-            return false;
+            string? message = Truncate(providerMessage);
+            if (message != ProviderMessage)
+            {
+                ProviderMessage = message;
+                changed = true;
+            }
+
+            return changed;
         }
 
         if (outcome == VerifiedRefundOutcome.Processed && refundedAmountMinor != AmountMinor)

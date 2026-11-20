@@ -98,6 +98,8 @@ public static class DependencyInjection
         services.AddScoped<PaymentSettler>();
         services.AddScoped<IPaymentReconciler, PaymentReconciler>();
         services.AddScoped<IPaymentStatusService, PaymentStatusService>();
+        services.AddScoped<RefundSubmitter>();
+        services.AddScoped<IOrderCancellationService, OrderCancellationService>();
         services.AddHostedService<PaymentReconciliationWorker>();
         services.AddScoped<IDiscountConfigurationSource, DiscountConfigurationSource>();
 

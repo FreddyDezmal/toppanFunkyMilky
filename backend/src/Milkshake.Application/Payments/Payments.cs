@@ -14,6 +14,21 @@ public sealed record GatewayVerification(bool Found, VerifiedOutcome Outcome, lo
     public static GatewayVerification NotFound { get; } = new(false, VerifiedOutcome.Abandoned, 0, string.Empty, null, null);
 }
 
+/// <summary>What the gateway needs to return money. Our reference makes a repeated request harmless (no second refund).</summary>
+public sealed record RefundRequest(string Reference, string TransactionReference, long AmountMinor, string CurrencyCode, string MerchantNote);
+
+/// <summary>
+/// A refund's state as reported by the provider's own API (never by an unverified notification). <see cref="Found"/> is
+/// false when the provider has no refund with our reference.
+/// </summary>
+public sealed record GatewayRefund(bool Found, VerifiedRefundOutcome Outcome, long AmountMinor, long? RefundId, string? Message)
+{
+    /// <summary>Stored as the provider message when Paystack needs bank details we do not collect (Q4).</summary>
+    public const string NeedsAttentionMessage = "Needs attention at Paystack.";
+
+    public static GatewayRefund NotFound { get; } = new(false, VerifiedRefundOutcome.Pending, 0, null, null);
+}
+
 /// <summary>The provider could not be reached or answered unexpectedly. Never contains secrets or payloads.</summary>
 public sealed class PaymentGatewayException : Exception
 {
@@ -46,6 +61,15 @@ public interface IPaymentGateway
 
     /// <summary>Asks the provider for the transaction's current state. Throws <see cref="PaymentGatewayException"/> on failure.</summary>
     Task<GatewayVerification> VerifyAsync(string reference, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Asks the provider to return money (M8b). Repeating a request with the same reference returns the existing refund
+    /// instead of creating another. Throws <see cref="PaymentGatewayException"/> on failure.
+    /// </summary>
+    Task<GatewayRefund> CreateRefundAsync(RefundRequest request, CancellationToken cancellationToken);
+
+    /// <summary>The refund's current state by our reference. Throws <see cref="PaymentGatewayException"/> on failure.</summary>
+    Task<GatewayRefund> GetRefundAsync(string reference, CancellationToken cancellationToken);
 }
 
 public enum StartPaymentOutcome

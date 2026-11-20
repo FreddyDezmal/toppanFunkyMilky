@@ -39,6 +39,34 @@ internal sealed class FakePaymentGateway : IPaymentGateway
         return OnVerify(reference);
     }
 
+    /// <summary>Refund requests received, in order.</summary>
+    public ConcurrentQueue<RefundRequest> RefundRequests { get; } = new();
+
+    /// <summary>By default Paystack accepts the refund (pending) with a new refund id.</summary>
+    public Func<RefundRequest, GatewayRefund> OnCreateRefund { get; set; } = request =>
+        new GatewayRefund(true, VerifiedRefundOutcome.Pending, request.AmountMinor, NextRefundId(), null);
+
+    /// <summary>By default the refund is still pending.</summary>
+    public Func<string, GatewayRefund> OnGetRefund { get; set; } = _ => new GatewayRefund(true, VerifiedRefundOutcome.Pending, 0, null, null);
+
+    public async Task<GatewayRefund> CreateRefundAsync(RefundRequest request, CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+        RefundRequests.Enqueue(request);
+        return OnCreateRefund(request);
+    }
+
+    public async Task<GatewayRefund> GetRefundAsync(string reference, CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+        return OnGetRefund(reference);
+    }
+
+    private static long _nextRefundId = Random.Shared.NextInt64(1_000_000, 1_000_000_000);
+
+    /// <summary>A Paystack refund id never used before (unique index on provider refund ids).</summary>
+    public static long NextRefundId() => Interlocked.Increment(ref _nextRefundId);
+
     private static long _nextTransactionId = Random.Shared.NextInt64(1_000_000, 1_000_000_000);
 
     /// <summary>

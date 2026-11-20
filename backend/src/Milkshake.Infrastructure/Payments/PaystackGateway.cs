@@ -33,7 +33,8 @@ public sealed class PaystackOptions
 }
 
 /// <summary>
-/// Paystack Transaction API: initialize (hosted checkout) and verify. Amounts are whole minor units (cents).
+/// Paystack Transaction API (initialize, verify) and Refund API (create, fetch by our reference). Amounts are whole
+/// minor units (cents).
 /// Nothing from a response is trusted without checks: the checkout URL is validated by the domain, and verification
 /// results are compared with the stored payment by the caller. Logs never contain the key, e-mail or response bodies.
 /// </summary>
@@ -43,6 +44,7 @@ public sealed partial class PaystackGateway(HttpClient http, IOptions<PaystackOp
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        NumberHandling = JsonNumberHandling.AllowReadingFromString,
     };
 
     public string Name => Payment.PaystackProvider;
@@ -98,6 +100,54 @@ public sealed partial class PaystackGateway(HttpClient http, IOptions<PaystackOp
         return new GatewayVerification(true, outcome, data.Amount, data.Currency ?? string.Empty, data.Id, data.GatewayResponse);
     }
 
+    public async Task<GatewayRefund> CreateRefundAsync(RefundRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var body = new RefundBody(request.TransactionReference, request.AmountMinor, request.CurrencyCode, request.Reference, request.MerchantNote);
+        using HttpRequestMessage message = Authorized(HttpMethod.Post, "refund");
+        message.Content = JsonContent.Create(body, options: Json);
+
+        Envelope<RefundData> envelope;
+        try
+        {
+            envelope = await SendAsync<RefundData>(message, "refund", cancellationToken);
+        }
+        catch (RefundExistsException)
+        {
+            // Paystack's answer to a reused reference: the refund already exists, so read it instead (no second refund).
+            return await GetRefundAsync(request.Reference, cancellationToken);
+        }
+
+        RefundData data = envelope.Data ?? throw new PaymentGatewayException("Paystack returned no refund data.");
+        return ToRefund(data);
+    }
+
+    public async Task<GatewayRefund> GetRefundAsync(string reference, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reference);
+
+        using HttpRequestMessage message = Authorized(HttpMethod.Get, $"refund?reference={Uri.EscapeDataString(reference)}");
+        Envelope<List<RefundData>> envelope = await SendAsync<List<RefundData>>(message, "refund lookup", cancellationToken);
+
+        // Paystack treats references case-insensitively; only an exact match of ours is accepted.
+        RefundData? match = envelope.Data?.SingleOrDefault(r => string.Equals(r.Reference, reference, StringComparison.OrdinalIgnoreCase));
+        return match is null ? GatewayRefund.NotFound : ToRefund(match);
+    }
+
+    private static GatewayRefund ToRefund(RefundData data)
+    {
+        (VerifiedRefundOutcome outcome, string? message) = data.Status switch
+        {
+            "processed" => (VerifiedRefundOutcome.Processed, null),
+            "failed" => (VerifiedRefundOutcome.Failed, "Refund failed at Paystack."),
+            "needs-attention" => (VerifiedRefundOutcome.Pending, GatewayRefund.NeedsAttentionMessage),
+            _ => (VerifiedRefundOutcome.Pending, (string?)null), // pending, processing, …
+        };
+
+        return new GatewayRefund(true, outcome, data.Amount, data.Id, message);
+    }
+
     private HttpRequestMessage Authorized(HttpMethod method, string path)
     {
         string key = options.Value.SecretKey is { Length: > 0 } configured
@@ -130,6 +180,11 @@ public sealed partial class PaystackGateway(HttpClient http, IOptions<PaystackOp
                 throw new TransactionNotFoundException();
             }
 
+            if (operation == "refund" && response.StatusCode == HttpStatusCode.Conflict)
+            {
+                throw new RefundExistsException();
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 LogRejected(logger, operation, (int)response.StatusCode);
@@ -159,6 +214,12 @@ public sealed partial class PaystackGateway(HttpClient http, IOptions<PaystackOp
     private static partial void LogRejected(ILogger logger, string operation, int statusCode);
 
     private sealed class TransactionNotFoundException : Exception;
+
+    private sealed class RefundExistsException : Exception;
+
+    private sealed record RefundBody(string Transaction, long Amount, string Currency, string Reference, string MerchantNote);
+
+    private sealed record RefundData(long? Id, string? Status, string? Reference, long Amount);
 
     private sealed record InitializeBody(string Email, long Amount, string Currency, string Reference, string CallbackUrl);
 

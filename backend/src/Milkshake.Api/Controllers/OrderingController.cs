@@ -27,6 +27,7 @@ public sealed partial class OrderingController(
     IOrderQueryService orderQueries,
     IPaymentService payments,
     IPaymentStatusService paymentStatus,
+    IOrderCancellationService cancellations,
     ILogger<OrderingController> logger) : ControllerBase
 {
     /// <summary>
@@ -323,6 +324,78 @@ public sealed partial class OrderingController(
         return view is null
             ? Problem(statusCode: StatusCodes.Status404NotFound, title: OrderMessages.NotFoundTitle)
             : Ok(PaymentStatusResponse.From(view));
+    }
+
+    /// <summary>
+    /// Whether one of the patron's orders can be cancelled now, what they would get back (paid − fee, calculated by the
+    /// server), and the order's refunds (M8b).
+    /// </summary>
+    /// <response code="200">The cancellation quote and refunds.</response>
+    /// <response code="404">No such order for this patron.</response>
+    [HttpGet("orders/{reference}/cancellation")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ProducesResponseType<CancellationResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CancellationResponse>> GetCancellation(string reference, CancellationToken cancellationToken)
+    {
+        OrderCancellationView? view = await cancellations.GetAsync(reference, cancellationToken);
+        return view is null
+            ? Problem(statusCode: StatusCodes.Status404NotFound, title: OrderMessages.NotFoundTitle)
+            : Ok(CancellationResponse.From(view));
+    }
+
+    /// <summary>
+    /// Cancels one of the patron's orders before its pickup time (B1.1). <c>expectedRefund</c> is the refund the patron
+    /// confirmed (0 if unpaid) and is only compared. A paid order is refunded less the fee (B1.4); the refund is
+    /// complete only when Paystack confirms it. Repeating the request for a cancelled order returns its current state.
+    /// </summary>
+    /// <response code="200">Cancelled (now or already); the body shows the refund, if any.</response>
+    /// <response code="400">Missing <c>expectedRefund</c> or unknown fields.</response>
+    /// <response code="404">No such order for this patron.</response>
+    /// <response code="409">The refund changed (e.g. a payment just came through) – <c>cancellation</c> holds the new figures; or a payment is being prepared. Nothing was cancelled.</response>
+    /// <response code="422">The pickup time has passed.</response>
+    /// <response code="503">The payment provider or fee setting is unavailable; nothing was cancelled.</response>
+    [HttpPost("orders/{reference}/cancel")]
+    [RequestBodyLimit(1024)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ProducesResponseType<CancellationResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<CancellationResponse>> CancelOrder(string reference, CancelOrderRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.ExpectedRefund is not { } expectedRefund || expectedRefund < 0m)
+        {
+            ModelState.AddModelError("expectedRefund", CancellationMessages.ExpectedRefundRequired);
+            return ValidationProblem(ModelState);
+        }
+
+        CancelOrderResult result = await cancellations.CancelAsync(reference, expectedRefund, cancellationToken);
+        switch (result.Outcome)
+        {
+            case CancelOrderOutcome.Cancelled:
+            case CancelOrderOutcome.AlreadyCancelled:
+                return Ok(CancellationResponse.From(result.View!));
+            case CancelOrderOutcome.NotFound:
+                return Problem(statusCode: StatusCodes.Status404NotFound, title: OrderMessages.NotFoundTitle);
+            case CancelOrderOutcome.RefundChanged:
+                ProblemDetails changed = ProblemDetailsFactory.CreateProblemDetails(
+                    HttpContext, StatusCodes.Status409Conflict, CancellationMessages.RefundChangedTitle, detail: CancellationMessages.RefundChangedDetail);
+                changed.Extensions["cancellation"] = CancellationResponse.From(result.View!);
+                return Conflict(changed);
+            case CancelOrderOutcome.PaymentInProgress:
+                return Problem(statusCode: StatusCodes.Status409Conflict, title: CancellationMessages.PaymentInProgressTitle,
+                    detail: CancellationMessages.PaymentInProgressDetail);
+            case CancelOrderOutcome.PickupPassed:
+                return Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: CancellationMessages.PickupPassedTitle,
+                    detail: CancellationMessages.PickupPassedDetail);
+            default:
+                return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: CancellationMessages.UnavailableTitle,
+                    detail: CancellationMessages.UnavailableDetail);
+        }
     }
 
     private ActionResult FieldErrors(IReadOnlyDictionary<string, string[]> errors)

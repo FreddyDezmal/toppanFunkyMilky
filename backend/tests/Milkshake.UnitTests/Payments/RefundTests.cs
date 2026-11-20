@@ -177,6 +177,19 @@ public sealed class RefundTests
     }
 
     [Fact]
+    public void APendingResult_RecordsAChangedMessage_WithoutCompletingTheRefund()
+    {
+        Refund refund = Patron();
+        refund.Submitted(777);
+
+        Assert.True(refund.ApplyVerifiedOutcome(VerifiedRefundOutcome.Pending, 5460, 777, "Needs attention at Paystack.", Now));
+        Assert.False(refund.ApplyVerifiedOutcome(VerifiedRefundOutcome.Pending, 5460, 777, "Needs attention at Paystack.", Now));
+
+        Assert.Equal((RefundStatus.Pending, "Needs attention at Paystack."), (refund.Status, refund.ProviderMessage));
+        Assert.Null(refund.CompletedAt);
+    }
+
+    [Fact]
     public void AProcessedAmountDifferentFromOurs_IsNeverAccepted()
     {
         Refund refund = Patron();
