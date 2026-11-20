@@ -4,13 +4,14 @@ using Microsoft.AspNetCore.RateLimiting;
 using Milkshake.Api.Contracts.Ordering;
 using Milkshake.Api.Security;
 using Milkshake.Application.Ordering;
+using Milkshake.Domain.Orders;
 using Milkshake.Domain.Pricing;
 
 namespace Milkshake.Api.Controllers;
 
 /// <summary>
 /// Patron ordering: read-only options (M5), draft validation with an estimated price, live quotes (M6) and order
-/// placement (M7). Nothing here takes payment or marks an order paid. Rate-limited per patron (finding F1).
+/// placement and retrieval of the patron's own orders (M7). Nothing here takes payment or marks an order paid. Rate-limited per patron (finding F1).
 /// Prices, VAT rates and discounts always come from the server; requests carrying them are rejected.
 /// </summary>
 [ApiController]
@@ -21,6 +22,7 @@ public sealed partial class OrderingController(
     IOrderingCatalogService catalog,
     IOrderPricingService pricing,
     IOrderPlacementService orders,
+    IOrderQueryService orderQueries,
     ILogger<OrderingController> logger) : ControllerBase
 {
     /// <summary>
@@ -213,6 +215,38 @@ public sealed partial class OrderingController(
             default:
                 return Unavailable();
         }
+    }
+
+    /// <summary>
+    /// One of the signed-in patron's own orders, exactly as stored when it was placed. Another patron's order, an
+    /// unknown reference and a malformed reference all return 404, so the response never reveals that an order exists.
+    /// </summary>
+    /// <response code="200">The order.</response>
+    /// <response code="404">No order with this reference belongs to the signed-in patron.</response>
+    /// <response code="429">Too many ordering requests; try again in a minute.</response>
+    [HttpGet("orders/{reference}")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ProducesResponseType<OrderResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<OrderResponse>> GetOrder(string reference, CancellationToken cancellationToken)
+    {
+        Order? order = await orderQueries.FindOwnAsync(reference, cancellationToken);
+
+        return order is null
+            ? Problem(statusCode: StatusCodes.Status404NotFound, title: OrderMessages.NotFoundTitle)
+            : Ok(OrderResponse.From(order));
+    }
+
+    /// <summary>The signed-in patron's most recent orders, newest first (at most 20). Full history is Milestone 11.</summary>
+    /// <response code="200">The orders (possibly none).</response>
+    /// <response code="429">Too many ordering requests; try again in a minute.</response>
+    [HttpGet("orders")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ProducesResponseType<IReadOnlyList<OrderSummaryResponse>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<OrderSummaryResponse>>> ListOrders(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<Order> recent = await orderQueries.ListOwnRecentAsync(cancellationToken);
+        return Ok(recent.Select(OrderSummaryResponse.From).ToList());
     }
 
     private ActionResult FieldErrors(IReadOnlyDictionary<string, string[]> errors)

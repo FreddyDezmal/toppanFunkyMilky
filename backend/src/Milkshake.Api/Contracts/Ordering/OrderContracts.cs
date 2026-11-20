@@ -96,6 +96,30 @@ public sealed record OrderResponse(
     }
 }
 
+/// <summary>One row of the patron's basic order list, from the stored snapshot.</summary>
+public sealed record OrderSummaryResponse(
+    string Reference,
+    string Status,
+    bool IsPaid,
+    bool AwaitsPayment,
+    string RestaurantName,
+    DraftPickupResponse Pickup,
+    int DrinkCount,
+    decimal Total,
+    string CurrencyCode,
+    DateTimeOffset PlacedAtUtc)
+{
+    public static OrderSummaryResponse From(Order order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        OrderResponse full = OrderResponse.From(order);
+
+        return new OrderSummaryResponse(
+            full.Reference, full.Status, full.IsPaid, full.AwaitsPayment, full.Restaurant.Name, full.Pickup,
+            full.Drinks.Count, full.Totals.Total, full.Totals.CurrencyCode, full.PlacedAtUtc);
+    }
+}
+
 /// <summary>Messages for order placement problems.</summary>
 public static class OrderMessages
 {
@@ -112,4 +136,6 @@ public static class OrderMessages
     public const string KeyReusedTitle = "This request does not match the order it is retrying.";
 
     public const string KeyReusedDetail = "Start a new order submission.";
+
+    public const string NotFoundTitle = "Order not found.";
 }

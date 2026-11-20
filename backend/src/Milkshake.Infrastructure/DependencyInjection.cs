@@ -76,6 +76,7 @@ public static class DependencyInjection
         services.AddScoped<IDiscountTierManagementService, DiscountTierManagementService>();
         services.AddScoped<IOrderingCatalogService, OrderingCatalogService>();
         services.AddScoped<IOrderPlacementService, OrderPlacementService>();
+        services.AddScoped<IOrderQueryService, OrderQueryService>();
         services.AddScoped<IDiscountConfigurationSource, DiscountConfigurationSource>();
 
         services.AddHealthChecks()
