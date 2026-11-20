@@ -133,6 +133,22 @@ public sealed partial class Payment : IHasTimestamps, IHasRowVersion
         Status = PaymentStatus.Pending;
     }
 
+    /// <summary>
+    /// Ends an open attempt that never became a usable checkout: the provider has no such transaction (we stopped before
+    /// reaching it), or it returned an unexpected checkout address. Nothing was paid, so the order is not touched.
+    /// </summary>
+    public void MarkAbandoned(string reason, DateTimeOffset at)
+    {
+        if (!PaymentStatusTransitions.IsOpen(Status))
+        {
+            throw new BusinessRuleException($"A {Status} payment cannot be abandoned.");
+        }
+
+        Status = PaymentStatus.Abandoned;
+        ProviderMessage = Truncate(reason);
+        VerifiedAt = at;
+    }
+
     /// <summary>A newer attempt replaces this open one.</summary>
     public void Supersede()
     {

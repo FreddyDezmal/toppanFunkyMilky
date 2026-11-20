@@ -17,6 +17,13 @@ internal sealed class ValidateCsrfTokenFilter(IAntiforgery antiforgery, ProblemD
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        // Server-to-server endpoints marked [IgnoreAntiforgeryToken] (the payment webhook, M8) authenticate another way
+        // (a signature), have no browser session to protect, and could never send a token.
+        if (context.ActionDescriptor.EndpointMetadata.OfType<IgnoreAntiforgeryTokenAttribute>().Any())
+        {
+            return;
+        }
+
         string method = context.HttpContext.Request.Method;
         if (HttpMethods.IsGet(method) || HttpMethods.IsHead(method) ||
             HttpMethods.IsOptions(method) || HttpMethods.IsTrace(method))

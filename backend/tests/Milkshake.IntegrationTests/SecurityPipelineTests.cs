@@ -50,7 +50,7 @@ public sealed class SecurityPipelineTests(MilkshakeApiFactory factory) : IClassF
 
     
     [Fact]
-    public void OnlyLoginAndRegisterAcceptAnonymousStateChangingRequests()
+    public void OnlyLoginRegisterAndThePaymentWebhookAcceptAnonymousStateChangingRequests()
     {
         EndpointDataSource endpoints = factory.Services.GetRequiredService<EndpointDataSource>();
 
@@ -64,7 +64,9 @@ public sealed class SecurityPipelineTests(MilkshakeApiFactory factory) : IClassF
             .ToArray();
 
         // Anything else here would be an unauthenticated way to change data - for example a manager sign-up.
-        Assert.Equal(new[] { "api/auth/login", "api/auth/register" }, anonymousWrites);
+        // The Paystack webhook (M8) is anonymous by necessity - Paystack has no session - and is authenticated instead by
+        // an HMAC-SHA512 signature over the raw body (PaystackWebhookTests prove unsigned requests are refused).
+        Assert.Equal(new[] { "api/auth/login", "api/auth/register", "api/payments/paystack/webhook" }, anonymousWrites);
     }
 
     

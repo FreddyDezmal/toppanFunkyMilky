@@ -78,6 +78,7 @@ builder.Services.AddOptions<RateLimiterOptions>().Configure<IConfiguration>((opt
 {
     int permitLimit = configuration.GetValue("RateLimiting:AuthPermitLimit", 10);
     int orderingPermitLimit = configuration.GetValue("RateLimiting:OrderingPermitLimit", 60);
+    int webhookPermitLimit = configuration.GetValue("RateLimiting:WebhookPermitLimit", 300);
 
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.AddPolicy(RateLimitPolicies.Auth, httpContext =>
@@ -91,6 +92,18 @@ builder.Services.AddOptions<RateLimiterOptions>().Configure<IConfiguration>((opt
             }));
 
     // M5 finding F1: per patron, so patrons sharing one address (office, mobile network) do not limit each other.
+    // M8: payment notifications come from the provider's few addresses; a generous per-address limit stops floods
+    // without ever refusing Paystack's own retries.
+    options.AddPolicy(RateLimitPolicies.Webhook, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            "webhook:" + (httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = webhookPermitLimit,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+
     options.AddPolicy(RateLimitPolicies.Ordering, httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) is string userId

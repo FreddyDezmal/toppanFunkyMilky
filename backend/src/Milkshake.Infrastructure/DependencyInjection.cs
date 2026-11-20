@@ -1,5 +1,8 @@
 using Milkshake.Application.Ordering;
 using Milkshake.Infrastructure.Ordering;
+using Milkshake.Application.Payments;
+using Milkshake.Infrastructure.Payments;
+using Microsoft.Extensions.Options;
 using Milkshake.Application.Management;
 using Milkshake.Infrastructure.Management;
 using Milkshake.Application.Accounts;
@@ -77,6 +80,18 @@ public static class DependencyInjection
         services.AddScoped<IOrderingCatalogService, OrderingCatalogService>();
         services.AddScoped<IOrderPlacementService, OrderPlacementService>();
         services.AddScoped<IOrderQueryService, OrderQueryService>();
+
+        // Payments (M8): Paystack over a typed HttpClient. The secret key comes from user secrets / environment variables.
+        services.AddOptions<PaystackOptions>().Bind(configuration.GetSection(PaystackOptions.SectionName));
+        services.AddHttpClient<IPaymentGateway, PaystackGateway>((provider, client) =>
+        {
+            PaystackOptions paystack = provider.GetRequiredService<IOptions<PaystackOptions>>().Value;
+            client.BaseAddress = paystack.BaseUrl;
+            client.Timeout = TimeSpan.FromSeconds(paystack.TimeoutSeconds);
+        });
+        services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<IPaymentNotificationService, PaymentNotificationService>();
+        services.AddSingleton<PaystackWebhookAuthenticator>();
         services.AddScoped<IDiscountConfigurationSource, DiscountConfigurationSource>();
 
         services.AddHealthChecks()

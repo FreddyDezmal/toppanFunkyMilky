@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Milkshake.Api.Contracts.Ordering;
 using Milkshake.Api.Security;
 using Milkshake.Application.Ordering;
+using Milkshake.Application.Payments;
 using Milkshake.Domain.Orders;
 using Milkshake.Domain.Pricing;
 
@@ -11,7 +12,8 @@ namespace Milkshake.Api.Controllers;
 
 /// <summary>
 /// Patron ordering: read-only options (M5), draft validation with an estimated price, live quotes (M6) and order
-/// placement and retrieval of the patron's own orders (M7). Nothing here takes payment or marks an order paid. Rate-limited per patron (finding F1).
+/// placement and retrieval of the patron's own orders (M7), and starting a hosted checkout (M8). Nothing here marks an
+/// order paid: only a payment verified with the provider does. Rate-limited per patron (finding F1).
 /// Prices, VAT rates and discounts always come from the server; requests carrying them are rejected.
 /// </summary>
 [ApiController]
@@ -23,6 +25,7 @@ public sealed partial class OrderingController(
     IOrderPricingService pricing,
     IOrderPlacementService orders,
     IOrderQueryService orderQueries,
+    IPaymentService payments,
     ILogger<OrderingController> logger) : ControllerBase
 {
     /// <summary>
@@ -247,6 +250,54 @@ public sealed partial class OrderingController(
     {
         IReadOnlyList<Order> recent = await orderQueries.ListOwnRecentAsync(cancellationToken);
         return Ok(recent.Select(OrderSummaryResponse.From).ToList());
+    }
+
+    /// <summary>
+    /// Starts paying one of the patron's own unpaid orders: returns the provider's hosted checkout address for the order's
+    /// stored total. Retrying with the same Idempotency-Key returns the same checkout; an open checkout is resumed rather
+    /// than duplicated. The response never means the order is paid.
+    /// </summary>
+    /// <response code="200">Send the patron to <c>checkoutUrl</c>.</response>
+    /// <response code="400">Missing or invalid Idempotency-Key, or a request body with any field.</response>
+    /// <response code="404">No such order for this patron.</response>
+    /// <response code="409">Already paid, no longer payable, or a payment is already being prepared.</response>
+    /// <response code="422">The pickup time has passed, or this Idempotency-Key was used for an attempt that has ended.</response>
+    /// <response code="429">Too many ordering requests; try again in a minute.</response>
+    /// <response code="503">The payment provider is unavailable or not configured; nothing was charged.</response>
+    [HttpPost("orders/{reference}/payments")]
+    [RequestBodyLimit(1024)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ProducesResponseType<PaymentCheckoutResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<PaymentCheckoutResponse>> StartPayment(
+        string reference,
+        [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] StartPaymentRequest? request,
+        [FromHeader(Name = OrderMessages.IdempotencyKeyHeader)] string? idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        _ = request;
+        if (!Guid.TryParseExact(idempotencyKey, "D", out Guid key) || key == Guid.Empty)
+        {
+            ModelState.AddModelError(OrderMessages.IdempotencyKeyHeader, OrderMessages.IdempotencyKeyRequired);
+            return ValidationProblem(ModelState);
+        }
+
+        StartPaymentResult result = await payments.StartAsync(reference, key, cancellationToken);
+        return result.Outcome switch
+        {
+            StartPaymentOutcome.Checkout => Ok(new PaymentCheckoutResponse(result.PaymentReference!, result.CheckoutUrl!)),
+            StartPaymentOutcome.NotFound => Problem(statusCode: StatusCodes.Status404NotFound, title: OrderMessages.NotFoundTitle),
+            StartPaymentOutcome.AlreadyPaid => Problem(statusCode: StatusCodes.Status409Conflict, title: PaymentMessages.AlreadyPaidTitle),
+            StartPaymentOutcome.NotPayable => Problem(statusCode: StatusCodes.Status409Conflict, title: PaymentMessages.NotPayableTitle),
+            StartPaymentOutcome.InProgress => Problem(statusCode: StatusCodes.Status409Conflict, title: PaymentMessages.InProgressTitle, detail: PaymentMessages.InProgressDetail),
+            StartPaymentOutcome.PickupPassed => Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: PaymentMessages.PickupPassedTitle, detail: PaymentMessages.PickupPassedDetail),
+            StartPaymentOutcome.KeyUsed => Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: PaymentMessages.KeyUsedTitle, detail: PaymentMessages.KeyUsedDetail),
+            _ => Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: PaymentMessages.UnavailableTitle, detail: PaymentMessages.UnavailableDetail),
+        };
     }
 
     private ActionResult FieldErrors(IReadOnlyDictionary<string, string[]> errors)
