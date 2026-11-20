@@ -15,7 +15,10 @@ public enum OrderStatus
     /// <summary>A payment attempt failed or was abandoned (M8); the patron may retry (AC-8.3).</summary>
     PaymentFailed,
 
-    /// <summary>Cancelled before payment. Who may cancel is open (Q-10).</summary>
+    /// <summary>
+    /// Cancelled before the pickup time, by the patron or by the patron accepting the restaurant's request (B1.1, B1.2).
+    /// A paid order's refund is tracked separately (M8b). Final.
+    /// </summary>
     Cancelled,
 }
 
@@ -26,7 +29,7 @@ public static class OrderStatusTransitions
     {
         [OrderStatus.PendingPayment] = [OrderStatus.Confirmed, OrderStatus.PaymentFailed, OrderStatus.Cancelled],
         [OrderStatus.PaymentFailed] = [OrderStatus.Confirmed, OrderStatus.Cancelled],
-        [OrderStatus.Confirmed] = [],
+        [OrderStatus.Confirmed] = [OrderStatus.Cancelled],
         [OrderStatus.Cancelled] = [],
     };
 

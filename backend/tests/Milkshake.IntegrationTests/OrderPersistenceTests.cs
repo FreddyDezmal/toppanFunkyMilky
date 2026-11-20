@@ -215,7 +215,7 @@ public sealed class OrderPersistenceTests(PostgresApiFactory factory)
         {
             MilkshakeDbContext db = Db(scope);
             Order tracked = await db.Orders.SingleAsync(o => o.Id == order.Id);
-            tracked.Cancel();
+            tracked.Cancel(tracked.PickupAtUtc.AddMinutes(-1));
             await db.SaveChangesAsync();
         }
 

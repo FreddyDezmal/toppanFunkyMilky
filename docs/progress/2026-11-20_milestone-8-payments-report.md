@@ -48,7 +48,7 @@ during implementation:
 | I8 | Return page polls every 3 s up to 10 times, then shows "still waiting" with **Check again** | Approved | Within the 60/min limit; the job continues server-side |
 | I9 | One idempotency key per click, reused only after an uncertain failure (network, timeout, 5xx other than 503) | Approved | Same rule as M7 placement |
 | I10 | Webhook limits: 64 KB body, 300 requests per minute per IP | Approved | Generous enough for Paystack's retries |
-| DV-2 | The Playwright sandbox journey (prompt §14, end-to-end steps 4–10) is checked manually, not automated | **Proposed deviation – needs acceptance** | Third-party hosted checkout; webhooks cannot reach localhost. The same flow is automated with a simulated provider (integration and Vitest tests) |
+| DV-2 | The Playwright sandbox journey (prompt §14, end-to-end steps 4–10) is checked manually, not automated | **Accepted deviation** (developer, 20 November 2026) | Third-party hosted checkout; webhooks cannot reach localhost. The same flow is automated with a simulated provider (integration and Vitest tests) |
 
 ## 3. Architecture
 
@@ -100,7 +100,7 @@ on an identical lockfile and the repository history).
 | Playwright (with axe scans) | 9 | Passed |
 | Build `-warnaserror`, `tsc -b`, oxlint | – | Passed |
 | `npm audit`, `dotnet list package --vulnerable --include-transitive` | – | No vulnerabilities |
-| Manual Paystack sandbox payment (test card) | 1 journey | Passed: verified, Confirmed/Paid, dashboard reference and amount matched. The optional decline and cancel checks were reported as working without issues |
+| Manual Paystack sandbox payment (test card) | 1 journey | Passed: verified, Confirmed/Paid, dashboard reference and amount matched. Decline-card and cancelled-checkout checks also passed (confirmed by the developer) |
 
 New in M8: domain 23 (`PaymentTests`), gateway client 14, webhook signature 3, persistence 13, initiation API 20,
 webhook API 14, recovery 12, hardening 7; Vitest 21 (pay, duplicate clicks, redirect guard, retries, return states,
@@ -132,14 +132,13 @@ outcome mapping).
 | Accurate pending/success/failure UI; access control; existing protections | Done |
 | Existing and new tests pass; accessibility checks | Done |
 | No secrets or card details exposed; documentation | Done |
-| Automated sandbox end-to-end journey | **Pending – proposed deviation DV-2** |
+| Automated sandbox end-to-end journey | Not automated – **accepted deviation DV-2** (manual sandbox journey passed) |
 | Production activation | **Pending stakeholder** (business Paystack account; checklist in the setup guide) |
 
 ## 10. Open questions and deferred items
 
 | Item | Needed from | Effect |
 | --- | --- | --- |
-| DV-2 acceptance (manual sandbox journey) | Stakeholder / assessor | Otherwise an automated sandbox test would need a public test deployment |
 | Production Paystack account and live keys | Stakeholder | Payments stay in test mode |
 | Cancellation and refunds (B1.1–B1.4) | – | M8b, next; `RequiresRefund` payments wait for it |
 | A2, I4 (no payment after pickup; 30-minute abandon grace) | Stakeholder | Provisional; both configurable in code |

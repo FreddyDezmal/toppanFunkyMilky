@@ -22,6 +22,9 @@ public static class MinorUnits
         return checked((long)minor);
     }
 
+    /// <summary>Like <see cref="ToMinor"/>, but zero is allowed (e.g. no fee).</summary>
+    public static long ToMinorOrZero(decimal amount, string currencyCode) => amount == 0m && IsSupported(currencyCode) ? 0 : ToMinor(amount, currencyCode);
+
     public static decimal FromMinor(long minor, string currencyCode) => minor / Pow10(ScaleOf(currencyCode));
 
     private static int ScaleOf(string currencyCode) =>

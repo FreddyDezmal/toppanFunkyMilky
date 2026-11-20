@@ -175,8 +175,23 @@ public sealed class Order : IHasTimestamps, IHasRowVersion
     /// <summary>A payment attempt failed (M8 only).</summary>
     public void MarkPaymentFailed() => MoveTo(OrderStatus.PaymentFailed);
 
-    /// <summary>Cancels an unpaid order. Who may do this is open (Q-10); no endpoint calls it yet.</summary>
-    public void Cancel() => MoveTo(OrderStatus.Cancelled);
+    /// <summary>Whether the order may still be cancelled at this moment: not cancelled, and before the pickup time (B1.1).</summary>
+    public bool CanBeCancelledAt(DateTimeOffset now) =>
+        OrderStatusTransitions.IsAllowed(Status, OrderStatus.Cancelled) && now < PickupAtUtc;
+
+    /// <summary>
+    /// Cancels the order before its pickup time (B1.1). A paid order's refund is created by the caller in the same
+    /// transaction (M8b).
+    /// </summary>
+    public void Cancel(DateTimeOffset now)
+    {
+        if (Status != OrderStatus.Cancelled && now >= PickupAtUtc)
+        {
+            throw new BusinessRuleException("An order cannot be cancelled once its pickup time has passed.");
+        }
+
+        MoveTo(OrderStatus.Cancelled);
+    }
 
     private void MoveTo(OrderStatus next)
     {

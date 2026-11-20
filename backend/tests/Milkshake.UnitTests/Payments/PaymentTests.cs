@@ -44,7 +44,7 @@ public sealed class PaymentTests
     public void Start_RefusesOrdersThatDoNotAwaitPayment(OrderStatus status)
     {
         Order order = UnpaidOrder();
-        if (status == OrderStatus.Confirmed) { order.MarkConfirmed(); } else { order.Cancel(); }
+        if (status == OrderStatus.Confirmed) { order.MarkConfirmed(); } else { order.Cancel(Now); }
 
         Assert.Throws<BusinessRuleException>(() => Start(order));
     }
@@ -127,7 +127,7 @@ public sealed class PaymentTests
     {
         Order order = UnpaidOrder();
         Payment payment = Start(order);
-        order.Cancel();
+        order.Cancel(Now);
 
         Apply(payment, order, VerifiedOutcome.Paid);
 

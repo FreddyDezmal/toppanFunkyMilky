@@ -60,3 +60,22 @@ they are built as configurable or easily changed where practical.
 
 None. Both points were decided on 20 November 2026: the fee is 10% of the VAT-exclusive amount (better for the
 patron), and unanswered manager requests lapse at the pickup time.
+
+## M8b cancellation and refund design (approved 20 November 2026)
+
+| ID | Decision |
+| --- | --- |
+| R1 | Lifecycle gains Confirmed → Cancelled; Cancelled is final; refund progress is shown separately from order status |
+| R2 | Table `cancellation_requests`: order, manager, reason (required, ≤ 50 characters), status Pending / Accepted / Declined / Lapsed, timestamps; at most one Pending per order (database-enforced) |
+| R3 | Table `refunds`: one per payment; amount paid, fee, fee rate used, refund amount (cents), reference `MSR-…`, Paystack refund id, status Initiating / Pending / Processed / Failed; audited; restrict-only foreign keys |
+| R4 | Paid cancellation: order Cancelled + refund row committed together before Paystack is called; Processed only after Paystack confirms (signed, re-verified `refund.processed` / `refund.failed` webhook, or the reconciliation job) |
+| R5 | Fee = `Refund.FeeRate` (setting, default 0.10, 0–0.5) × order `taxable`, rounded once to cents half away from zero; refund = amount paid − fee; rate stored on the refund |
+| R6 | Unpaid cancellation first verifies any open payment attempt; if it was paid, the patron is shown the refund and confirms again |
+| R7 | Cancellation only before the pickup time; pending manager requests lapse at the pickup time |
+| R8 | Patron confirms a server-calculated fee and refund (`expectedRefund` compared only, `Idempotency-Key`); pending manager requests are accepted or declined on the order page |
+| R9 | Ownership, Manager role, CSRF, rate limits, strict JSON; the reason is plain text; everything audited |
+| R10 | Simulated Paystack refund client and test-signed refund webhooks in automated tests; one manual sandbox refund |
+| Q1 | A cancellation requested by a manager and accepted by the patron is refunded **in full, without a fee** |
+| Q2 | Payments that cannot be accepted (`RequiresRefund`) are refunded **automatically, in full, without a fee** |
+| Q3 | Managers get **Management → Orders** (find an order by reference, request cancellation, see failed refunds); patrons see requests on the order page and a Home page notice; email follows in M9 |
+| Q4 | A refund Paystack cannot complete is marked **Failed**; the patron is told to contact the restaurant; managers see it on the Orders page for manual handling (no bank details collected) |

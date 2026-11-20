@@ -150,6 +150,7 @@ public sealed class OrderTests
         { OrderStatus.PendingPayment, OrderStatus.Cancelled },
         { OrderStatus.PaymentFailed, OrderStatus.Confirmed },
         { OrderStatus.PaymentFailed, OrderStatus.Cancelled },
+        { OrderStatus.Confirmed, OrderStatus.Cancelled },
     };
 
     [Theory]
@@ -185,9 +186,28 @@ public sealed class OrderTests
             }
         }
 
-        // 4 statuses × 3 targets = 12 moves; 5 allowed, 7 rejected (including Confirmed and Cancelled being final).
-        Assert.Equal(7, rejected);
+        // 4 statuses × 3 targets = 12 moves; 6 allowed (M8b adds Confirmed → Cancelled), 6 rejected (Cancelled is final).
+        Assert.Equal(6, rejected);
         Assert.False(OrderStatusTransitions.IsAllowed(OrderStatus.Confirmed, OrderStatus.PendingPayment));
+    }
+
+    [Theory]
+    [InlineData(OrderStatus.PendingPayment)]
+    [InlineData(OrderStatus.PaymentFailed)]
+    [InlineData(OrderStatus.Confirmed)]
+    public void Cancel_IsAllowedUntilThePickupTime_ButNotFromThenOn(OrderStatus status)
+    {
+        Order early = InStatus(status);
+        Order late = InStatus(status);
+
+        Assert.True(early.CanBeCancelledAt(Pickup.AddTicks(-1)));
+        Assert.False(late.CanBeCancelledAt(Pickup));
+        early.Cancel(Pickup.AddTicks(-1));
+        Assert.Throws<BusinessRuleException>(() => late.Cancel(Pickup));
+
+        Assert.Equal((OrderStatus.Cancelled, status), (early.Status, late.Status));
+        Assert.False(early.CanBeCancelledAt(PricedAt));
+        Assert.Throws<BusinessRuleException>(() => early.Cancel(PricedAt));
     }
 
     [Fact]
@@ -216,7 +236,7 @@ public sealed class OrderTests
         {
             case OrderStatus.Confirmed: order.MarkConfirmed(); break;
             case OrderStatus.PaymentFailed: order.MarkPaymentFailed(); break;
-            case OrderStatus.Cancelled: order.Cancel(); break;
+            case OrderStatus.Cancelled: order.Cancel(PricedAt); break;
         }
 
         return order;
@@ -228,7 +248,7 @@ public sealed class OrderTests
         {
             case OrderStatus.Confirmed: order.MarkConfirmed(); break;
             case OrderStatus.PaymentFailed: order.MarkPaymentFailed(); break;
-            case OrderStatus.Cancelled: order.Cancel(); break;
+            case OrderStatus.Cancelled: order.Cancel(PricedAt); break;
             default: throw new ArgumentOutOfRangeException(nameof(to));
         }
     }
