@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.TryAddScoped<ICurrentUser, SystemCurrentUser>();
 
         services.AddScoped<AuditingSaveChangesInterceptor>();
+        services.AddScoped<NotificationSaveChangesInterceptor>();
         services.AddOptions<SeedDataOptions>().Bind(configuration.GetSection(SeedDataOptions.SectionName));
         services.AddScoped<DatabaseSeeder>();
 
@@ -66,7 +67,10 @@ public static class DependencyInjection
                     npgsql.EnableRetryOnFailure(maxRetryCount: 3);
                 })
                 .UseSnakeCaseNamingConvention()
-                .AddInterceptors(serviceProvider.GetRequiredService<AuditingSaveChangesInterceptor>())
+                // Order matters: the email outbox rows (M9) are added first, so the audit interceptor stamps and audits them.
+                .AddInterceptors(
+                    serviceProvider.GetRequiredService<NotificationSaveChangesInterceptor>(),
+                    serviceProvider.GetRequiredService<AuditingSaveChangesInterceptor>())
                 .UseSeeding((context, _) =>
                     serviceProvider.GetRequiredService<DatabaseSeeder>().Seed((MilkshakeDbContext)context))
                 .UseAsyncSeeding((context, _, cancellationToken) =>
