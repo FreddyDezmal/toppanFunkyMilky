@@ -92,6 +92,13 @@ public static class DependencyInjection
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IPaymentNotificationService, PaymentNotificationService>();
         services.AddSingleton<PaystackWebhookAuthenticator>();
+
+        // Recovery without webhooks (P7): patron refresh, plus a background job checking open attempts every few minutes.
+        services.AddOptions<PaymentReconciliationOptions>().Bind(configuration.GetSection(PaymentReconciliationOptions.SectionName));
+        services.AddScoped<PaymentSettler>();
+        services.AddScoped<IPaymentReconciler, PaymentReconciler>();
+        services.AddScoped<IPaymentStatusService, PaymentStatusService>();
+        services.AddHostedService<PaymentReconciliationWorker>();
         services.AddScoped<IDiscountConfigurationSource, DiscountConfigurationSource>();
 
         services.AddHealthChecks()

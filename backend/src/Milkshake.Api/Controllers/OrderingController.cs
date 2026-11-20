@@ -26,6 +26,7 @@ public sealed partial class OrderingController(
     IOrderPlacementService orders,
     IOrderQueryService orderQueries,
     IPaymentService payments,
+    IPaymentStatusService paymentStatus,
     ILogger<OrderingController> logger) : ControllerBase
 {
     /// <summary>
@@ -298,6 +299,30 @@ public sealed partial class OrderingController(
             StartPaymentOutcome.KeyUsed => Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: PaymentMessages.KeyUsedTitle, detail: PaymentMessages.KeyUsedDetail),
             _ => Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: PaymentMessages.UnavailableTitle, detail: PaymentMessages.UnavailableDetail),
         };
+    }
+
+    /// <summary>
+    /// Checks the order's open payment attempt with the provider and returns the stored result. Called when the patron
+    /// returns from checkout (the return address itself proves nothing) and while an attempt is open.
+    /// </summary>
+    /// <response code="200">Order and latest payment attempt status. <c>isPaid</c> is true only after verification.</response>
+    /// <response code="404">No such order for this patron.</response>
+    /// <response code="429">Too many ordering requests; try again in a minute.</response>
+    [HttpPost("orders/{reference}/payments/refresh")]
+    [RequestBodyLimit(1024)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ProducesResponseType<PaymentStatusResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PaymentStatusResponse>> RefreshPayment(
+        string reference,
+        [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] StartPaymentRequest? request,
+        CancellationToken cancellationToken)
+    {
+        _ = request;
+        PaymentStatusView? view = await paymentStatus.RefreshAsync(reference, cancellationToken);
+        return view is null
+            ? Problem(statusCode: StatusCodes.Status404NotFound, title: OrderMessages.NotFoundTitle)
+            : Ok(PaymentStatusResponse.From(view));
     }
 
     private ActionResult FieldErrors(IReadOnlyDictionary<string, string[]> errors)
