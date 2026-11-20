@@ -55,6 +55,9 @@ export function ManagementLayout() {
         <NavLink to="/manager/orders" className={sectionLinkClass}>
           Orders
         </NavLink>
+        <NavLink to="/manager/emails" className={sectionLinkClass}>
+          Emails
+        </NavLink>
         <NavLink to="/manager/settings" className={sectionLinkClass}>
           Settings
         </NavLink>

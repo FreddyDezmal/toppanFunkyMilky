@@ -163,3 +163,32 @@ export interface RefundNeedingAttention {
 
 /** Longest cancellation reason a manager may give (B1.2). */
 export const REASON_MAX_LENGTH = 50
+
+/** Delivery state of a transactional email (M9). */
+export const EMAIL_STATUSES = ['Pending', 'Sending', 'Sent', 'Failed', 'Suppressed'] as const
+export type EmailStatus = (typeof EMAIL_STATUSES)[number]
+
+/** GET /api/manager/emails: one email's delivery state (never its content), AC-9.5. */
+export interface EmailDelivery {
+  id: number
+  kind: 'OrderConfirmed' | 'CancellationRequested' | 'OrderCancelled' | 'RefundProcessed' | 'RefundFailed'
+  status: EmailStatus
+  orderReference: string
+  recipientEmail: string
+  attemptCount: number
+  lastError: 'Timeout' | 'ProviderUnavailable' | 'RateLimited' | 'Rejected' | 'InvalidRecipient' | null
+  createdAt: string
+  lastAttemptAt: string | null
+  /** Only while waiting to be sent. */
+  nextAttemptAt: string | null
+  sentAt: string | null
+  provider: string | null
+  resendCount: number
+  canResend: boolean
+}
+
+export interface EmailDeliveryList {
+  items: EmailDelivery[]
+  /** Emails in each status overall. */
+  counts: Record<EmailStatus, number>
+}

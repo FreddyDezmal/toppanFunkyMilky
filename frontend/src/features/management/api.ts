@@ -3,6 +3,9 @@ import type {
   CatalogItem,
   CatalogKind,
   DiscountTier,
+  EmailDelivery,
+  EmailDeliveryList,
+  EmailStatus,
   ManagerOrder,
   PriceHistory,
   RefundNeedingAttention,
@@ -104,4 +107,23 @@ export function requestCancellation(reference: string, reason: string): Promise<
 /** Refunds that failed at Paystack or need the patron's bank details (Q4). */
 export function listRefundsNeedingAttention(signal?: AbortSignal): Promise<RefundNeedingAttention[]> {
   return getJson<RefundNeedingAttention[]>(`${MANAGER}/refunds/attention`, { signal })
+}
+
+/** The newest emails (up to 100), optionally of one status and/or one order, with counts per status (M9). */
+export function listEmails(filter: { status?: EmailStatus; order?: string }, signal?: AbortSignal): Promise<EmailDeliveryList> {
+  const query = new URLSearchParams()
+  if (filter.status) {
+    query.set('status', filter.status)
+  }
+  if (filter.order?.trim()) {
+    query.set('order', filter.order.trim())
+  }
+  const search = query.toString()
+  const suffix = search ? `?${search}` : ''
+  return getJson<EmailDeliveryList>(`${MANAGER}/emails${suffix}`, { signal })
+}
+
+/** Queues a sent or failed email to be sent again (same content and recipient); the server sends it shortly. */
+export function resendEmail(id: number): Promise<EmailDelivery> {
+  return postJson<EmailDelivery>(`${MANAGER}/emails/${id}/resend`)
 }
