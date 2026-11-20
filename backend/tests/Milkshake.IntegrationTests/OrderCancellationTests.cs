@@ -110,6 +110,38 @@ public sealed class OrderCancellationTests(PostgresApiFactory factory) : IDispos
     // ---- paid orders -----------------------------------------------------------------------------------------------
 
     [Fact]
+    public async Task TheOrderHistory_FollowsAPaidOrderThroughCancellationAndItsRefund()
+    {
+        (HttpClient patron, string order, _) = await PaidOrderAsync();
+        using (patron)
+        {
+            Assert.Equal(("Paid", (string?)null), await HistoryStatusAsync(patron, order));
+
+            using HttpResponseMessage cancelled = await CancelAsync(patron, order, 27.30m);
+            Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
+            Assert.Equal(("Cancelled", (string?)"RefundInProgress"), await HistoryStatusAsync(patron, order));
+
+            // Paystack confirms the refund (simulated directly; the confirmation path itself is covered by the M8b tests).
+            await using (AsyncServiceScope scope = factory.Services.CreateAsyncScope())
+            {
+                MilkshakeDbContext db = Db(scope);
+                await db.Database.ExecuteSqlAsync(
+                    $"UPDATE milkshake.refunds SET status = 'Processed', completed_at = now() WHERE order_id = (SELECT id FROM milkshake.orders WHERE reference = {order})");
+            }
+
+            Assert.Equal(("Cancelled", (string?)"RefundedLessFee"), await HistoryStatusAsync(patron, order));
+        }
+    }
+
+    private static async Task<(string Payment, string? Refund)> HistoryStatusAsync(HttpClient patron, string order)
+    {
+        using HttpResponseMessage response = await patron.GetAsync(new Uri("/api/ordering/orders", UriKind.Relative));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        OrderSummaryResponse row = Assert.Single((await response.ReadJsonAsync<OrderHistoryResponse>()).Items, o => o.Reference == order);
+        return (row.PaymentStatus, row.RefundStatus);
+    }
+
+    [Fact]
     public async Task APaidOrder_ShowsTheFee_ThenIsCancelledWithItsRefundSentToPaystack()
     {
         (HttpClient patron, string order, string payment) = await PaidOrderAsync();

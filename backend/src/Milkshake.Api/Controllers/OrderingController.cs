@@ -242,16 +242,35 @@ public sealed partial class OrderingController(
             : Ok(OrderResponse.From(order));
     }
 
-    /// <summary>The signed-in patron's most recent orders, newest first (at most 20). Full history is Milestone 11.</summary>
-    /// <response code="200">The orders (possibly none).</response>
+    /// <summary>
+    /// The signed-in patron's order history, newest first, one page at a time (AC-12.1): each order with its drinks, total
+    /// and payment status. Only the patron's own orders; there is no patron parameter.
+    /// </summary>
+    /// <response code="200">A page of orders (possibly empty) and the cursor for the next page, if any.</response>
+    /// <response code="400">An unknown parameter, an invalid cursor, or a limit outside 1–50.</response>
     /// <response code="429">Too many ordering requests; try again in a minute.</response>
     [HttpGet("orders")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    [ProducesResponseType<IReadOnlyList<OrderSummaryResponse>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<OrderSummaryResponse>>> ListOrders(CancellationToken cancellationToken)
+    [ProducesResponseType<OrderHistoryResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<OrderHistoryResponse>> ListOrders(CancellationToken cancellationToken)
     {
-        IReadOnlyList<Order> recent = await orderQueries.ListOwnRecentAsync(cancellationToken);
-        return Ok(recent.Select(OrderSummaryResponse.From).ToList());
+        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
+        OrderHistoryQuery? query = OrderHistoryQueryParser.Parse(
+            Request.Query.ToDictionary(pair => pair.Key, pair => pair.Value.Select(value => value ?? string.Empty).ToArray(), StringComparer.Ordinal),
+            errors);
+        if (query is null)
+        {
+            foreach ((string key, string message) in errors)
+            {
+                ModelState.AddModelError(key, message);
+            }
+
+            return ValidationProblem(ModelState);
+        }
+
+        OrderHistoryPage page = await orderQueries.ListOwnAsync(query.After, query.Limit, cancellationToken);
+        return Ok(new OrderHistoryResponse(page.Items.Select(OrderSummaryResponse.From).ToList(), page.Next?.Encode()));
     }
 
     /// <summary>

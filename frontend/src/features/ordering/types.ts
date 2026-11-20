@@ -269,16 +269,39 @@ export interface PendingCancellationRequest {
 }
 
 /** GET /api/ordering/orders: one of the patron's recent orders, from the stored snapshot. */
+/** Payment label shared with the manager reports (URS §3.4.4). */
+export type PaymentLabel = 'Paid' | 'Unpaid' | 'Cancelled'
+
+/** What happened to the money of a cancelled order; null for other orders. */
+export type RefundLabel = 'NotPaid' | 'RefundInProgress' | 'Refunded' | 'RefundedLessFee' | 'RefundFailed'
+
+/** One milkshake in an order-history row, named as it was when ordered. */
+export interface OrderedDrinkSummary {
+  number: number
+  flavour: string
+  consistency: string
+  topping: string
+}
+
 export interface OrderSummary {
   reference: string
   status: OrderStatus
   isPaid: boolean
   awaitsPayment: boolean
+  paymentStatus: PaymentLabel
+  refundStatus: RefundLabel | null
   restaurantName: string
   pickup: DraftPickup
   drinkCount: number
+  drinks: OrderedDrinkSummary[]
   total: number
   currencyCode: string
   /** UTC ISO 8601. */
   placedAtUtc: string
+}
+
+/** A page of the patron's order history, newest first; nextCursor is null on the last page. */
+export interface OrderHistoryPage {
+  items: OrderSummary[]
+  nextCursor: string | null
 }

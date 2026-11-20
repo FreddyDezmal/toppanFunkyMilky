@@ -111,7 +111,7 @@ public sealed class HistoricalAccuracyTests(PostgresApiFactory factory) : IDispo
         string page = await patron.GetStringAsync(new Uri($"/api/ordering/orders/{order}", UriKind.Relative));
         string cancellation = await patron.GetStringAsync(new Uri($"/api/ordering/orders/{order}/cancellation", UriKind.Relative));
         using JsonDocument list = JsonDocument.Parse(await patron.GetStringAsync(new Uri("/api/ordering/orders", UriKind.Relative)));
-        string entry = list.RootElement.EnumerateArray().Single(o => o.GetProperty("reference").GetString() == order).GetRawText();
+        string entry = list.RootElement.GetProperty("items").EnumerateArray().Single(o => o.GetProperty("reference").GetString() == order).GetRawText();
 
         await using AsyncServiceScope scope = factory.Services.CreateAsyncScope();
         MilkshakeDbContext db = scope.ServiceProvider.GetRequiredService<MilkshakeDbContext>();

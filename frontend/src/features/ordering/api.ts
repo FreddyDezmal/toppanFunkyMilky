@@ -4,8 +4,8 @@ import type {
   DrinkSelection,
   OrderCancellation,
   OrderDraft,
+  OrderHistoryPage,
   OrderingOptions,
-  OrderSummary,
   PaymentCheckout,
   PaymentStatus,
   PendingCancellationRequest,
@@ -119,7 +119,8 @@ export function fetchPendingCancellationRequests(signal?: AbortSignal): Promise<
   return getJson<PendingCancellationRequest[]>(`${ORDERING}/cancellation-requests`, { signal })
 }
 
-/** The signed-in patron's 20 most recent orders, newest first. */
-export function fetchOrders(signal?: AbortSignal): Promise<OrderSummary[]> {
-  return getJson<OrderSummary[]>(`${ORDERING}/orders`, { signal })
+/** One page of the signed-in patron's order history, newest first; pass the previous page's nextCursor for more. */
+export function fetchOrders(cursor?: string | null, signal?: AbortSignal): Promise<OrderHistoryPage> {
+  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''
+  return getJson<OrderHistoryPage>(`${ORDERING}/orders${query}`, { signal })
 }

@@ -9,7 +9,10 @@ using Milkshake.Infrastructure.Persistence;
 
 namespace Milkshake.IntegrationTests;
 
-/// <summary>M7 order retrieval: own orders only (AC-7.6), stored snapshots after catalogue changes (AC-7.2).</summary>
+/// <summary>
+/// M7 order retrieval: own orders only (AC-7.6), stored snapshots after catalogue changes (AC-7.2); M12 order history
+/// with cursor paging, drinks and payment status (AC-12.1).
+/// </summary>
 [Collection(PostgresTestGroup.Name)]
 public sealed class OrderRetrievalTests(PostgresApiFactory factory)
 {
@@ -83,7 +86,7 @@ public sealed class OrderRetrievalTests(PostgresApiFactory factory)
     }
 
     [Fact]
-    public async Task TheList_ShowsOnlyThePatronsOwnOrders_NewestFirst()
+    public async Task TheHistory_ShowsOnlyThePatronsOwnOrders_NewestFirst_WithDrinksAndPaymentStatus()
     {
         (HttpClient patron, TestMenu menu, OrderResponse first) = await PlaceOrderAsync();
         (HttpClient other, _, OrderResponse othersOrder) = await PlaceOrderAsync();
@@ -92,15 +95,95 @@ public sealed class OrderRetrievalTests(PostgresApiFactory factory)
         {
             OrderResponse second = await PlaceAsync(patron, menu);
 
-            List<OrderSummaryResponse> mine = await patron.GetFromJsonAsync<List<OrderSummaryResponse>>(new Uri(OrdersPath, UriKind.Relative))
-                ?? throw new InvalidOperationException("No list returned.");
-            List<OrderSummaryResponse> theirs = await other.GetFromJsonAsync<List<OrderSummaryResponse>>(new Uri(OrdersPath, UriKind.Relative))
-                ?? throw new InvalidOperationException("No list returned.");
+            OrderHistoryResponse mine = await HistoryAsync(patron, OrdersPath);
+            OrderHistoryResponse theirs = await HistoryAsync(other, OrdersPath);
 
-            Assert.Equal(new[] { second.Reference, first.Reference }, mine.Select(o => o.Reference));
-            Assert.Equal(new[] { othersOrder.Reference }, theirs.Select(o => o.Reference));
-            Assert.All(mine, o => Assert.Equal(("PendingPayment", false, 1, 29.90m, "ZAR"), (o.Status, o.IsPaid, o.DrinkCount, o.Total, o.CurrencyCode)));
+            Assert.Equal(new[] { second.Reference, first.Reference }, mine.Items.Select(o => o.Reference));
+            Assert.Null(mine.NextCursor);
+            Assert.Equal(new[] { othersOrder.Reference }, theirs.Items.Select(o => o.Reference));
+            Assert.All(mine.Items, o =>
+            {
+                Assert.Equal(("PendingPayment", false, "Unpaid", (string?)null, 1, 29.90m, "ZAR"),
+                    (o.Status, o.IsPaid, o.PaymentStatus, o.RefundStatus, o.DrinkCount, o.Total, o.CurrencyCode));
+                OrderedDrinkSummaryResponse drink = Assert.Single(o.Drinks);
+                Assert.Equal((1, menu.Flavour.Name, menu.Consistency.Name, menu.Topping.Name), (drink.Number, drink.Flavour, drink.Consistency, drink.Topping));
+            });
         }
+    }
+
+    [Fact]
+    public async Task TheHistory_PagesWithACursor_WithoutGapsOrRepeats()
+    {
+        (HttpClient patron, TestMenu menu, OrderResponse first) = await PlaceOrderAsync();
+        using (patron)
+        {
+            OrderResponse second = await PlaceAsync(patron, menu);
+            OrderResponse third = await PlaceAsync(patron, menu);
+
+            OrderHistoryResponse page1 = await HistoryAsync(patron, $"{OrdersPath}?limit=2");
+            Assert.Equal(new[] { third.Reference, second.Reference }, page1.Items.Select(o => o.Reference));
+            Assert.NotNull(page1.NextCursor);
+
+            OrderHistoryResponse page2 = await HistoryAsync(patron, $"{OrdersPath}?limit=2&cursor={page1.NextCursor}");
+            Assert.Equal(new[] { first.Reference }, page2.Items.Select(o => o.Reference));
+            Assert.Null(page2.NextCursor);
+
+            // Exactly a full last page: no cursor to an empty page.
+            OrderHistoryResponse all = await HistoryAsync(patron, $"{OrdersPath}?limit=3");
+            Assert.Equal(3, all.Items.Count);
+            Assert.Null(all.NextCursor);
+        }
+    }
+
+    [Fact]
+    public async Task AnotherPatronsCursor_OnlyEverReadsTheCallersOwnOrders()
+    {
+        (HttpClient owner, TestMenu menu, _) = await PlaceOrderAsync();
+        using HttpClient other = await factory.CreatePatronClientAsync();
+        using (owner)
+        {
+            await PlaceAsync(owner, menu);
+            OrderHistoryResponse ownersPage = await HistoryAsync(owner, $"{OrdersPath}?limit=1");
+            Assert.NotNull(ownersPage.NextCursor);
+
+            OrderHistoryResponse othersView = await HistoryAsync(other, $"{OrdersPath}?cursor={ownersPage.NextCursor}");
+
+            Assert.Empty(othersView.Items);
+            Assert.Null(othersView.NextCursor);
+        }
+    }
+
+    [Fact]
+    public async Task ACancelledUnpaidOrder_IsListedAsCancelledAndNotPaid()
+    {
+        (HttpClient patron, _, OrderResponse placed) = await PlaceOrderAsync();
+        using (patron)
+        {
+            using HttpResponseMessage cancelled = await patron.SendWithCsrfAsync(
+                HttpMethod.Post, $"{OrdersPath}/{placed.Reference}/cancel", new { expectedRefund = 0m });
+            Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
+
+            OrderSummaryResponse row = Assert.Single((await HistoryAsync(patron, OrdersPath)).Items);
+
+            Assert.Equal(("Cancelled", false, "Cancelled", "NotPaid"), (row.Status, row.IsPaid, row.PaymentStatus, row.RefundStatus));
+        }
+    }
+
+    [Theory]
+    [InlineData("?limit=0", "limit")]
+    [InlineData("?limit=51", "limit")]
+    [InlineData("?cursor=nope!", "cursor")]
+    [InlineData("?limit=5&limit=6", "limit")]
+    [InlineData("?patronId=00000000-0000-0000-0000-000000000001", "patronId")]
+    public async Task InvalidHistoryParameters_AreRejected(string query, string field)
+    {
+        using HttpClient patron = await factory.CreatePatronClientAsync();
+
+        using HttpResponseMessage response = await patron.GetAsync(new Uri(OrdersPath + query, UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using JsonDocument problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.True(problem.RootElement.GetProperty("errors").TryGetProperty(field, out _));
     }
 
     [Fact]
@@ -127,6 +210,14 @@ public sealed class OrderRetrievalTests(PostgresApiFactory factory)
         TestMenu menu = await manager.CreateTestMenuAsync(12.00m, 6.00m, 8.00m);
         HttpClient patron = await factory.CreatePatronClientAsync();
         return (patron, menu, await PlaceAsync(patron, menu));
+    }
+
+    private static async Task<OrderHistoryResponse> HistoryAsync(HttpClient patron, string path)
+    {
+        using HttpResponseMessage response = await patron.GetAsync(new Uri(path, UriKind.Relative));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("no-store", response.Headers.CacheControl?.ToString() ?? string.Empty, StringComparison.Ordinal);
+        return await response.ReadJsonAsync<OrderHistoryResponse>();
     }
 
     /// <summary>Places one milkshake (12.00 + 6.00 + 8.00 = 26.00; VAT 3.90; total 29.90).</summary>

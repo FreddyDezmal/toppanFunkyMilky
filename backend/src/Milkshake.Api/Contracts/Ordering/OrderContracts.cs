@@ -96,29 +96,46 @@ public sealed record OrderResponse(
     }
 }
 
-/// <summary>One row of the patron's basic order list, from the stored snapshot.</summary>
+/// <summary>One milkshake in an order-history row: the names as they were when the order was placed.</summary>
+public sealed record OrderedDrinkSummaryResponse(int Number, string Flavour, string Consistency, string Topping);
+
+/// <summary>
+/// One row of the patron's order history (AC-12.1), from the stored snapshot. <see cref="PaymentStatus"/> is Paid, Unpaid
+/// or Cancelled (URS §3.4.4); for a cancelled order <see cref="RefundStatus"/> says what happened to the money (NotPaid,
+/// RefundInProgress, Refunded, RefundedLessFee or RefundFailed), otherwise it is null.
+/// </summary>
 public sealed record OrderSummaryResponse(
     string Reference,
     string Status,
     bool IsPaid,
     bool AwaitsPayment,
+    string PaymentStatus,
+    string? RefundStatus,
     string RestaurantName,
     DraftPickupResponse Pickup,
     int DrinkCount,
+    IReadOnlyList<OrderedDrinkSummaryResponse> Drinks,
     decimal Total,
     string CurrencyCode,
     DateTimeOffset PlacedAtUtc)
 {
-    public static OrderSummaryResponse From(Order order)
+    public static OrderSummaryResponse From(OrderHistoryEntry entry)
     {
-        ArgumentNullException.ThrowIfNull(order);
-        OrderResponse full = OrderResponse.From(order);
+        ArgumentNullException.ThrowIfNull(entry);
+        OrderResponse full = OrderResponse.From(entry.Order);
 
         return new OrderSummaryResponse(
-            full.Reference, full.Status, full.IsPaid, full.AwaitsPayment, full.Restaurant.Name, full.Pickup,
-            full.Drinks.Count, full.Totals.Total, full.Totals.CurrencyCode, full.PlacedAtUtc);
+            full.Reference, full.Status, full.IsPaid, full.AwaitsPayment,
+            entry.Payment.Label.ToString(),
+            entry.Payment.Refund == RefundLabel.None ? null : entry.Payment.Refund.ToString(),
+            full.Restaurant.Name, full.Pickup, full.Drinks.Count,
+            full.Drinks.Select(d => new OrderedDrinkSummaryResponse(d.Number, d.Flavour.Name, d.Consistency.Name, d.Topping.Name)).ToList(),
+            full.Totals.Total, full.Totals.CurrencyCode, full.PlacedAtUtc);
     }
 }
+
+/// <summary>A page of the patron's order history, newest first. Pass <see cref="NextCursor"/> as <c>cursor</c> for the next page; null on the last.</summary>
+public sealed record OrderHistoryResponse(IReadOnlyList<OrderSummaryResponse> Items, string? NextCursor);
 
 /// <summary>Messages for order placement problems.</summary>
 public static class OrderMessages
