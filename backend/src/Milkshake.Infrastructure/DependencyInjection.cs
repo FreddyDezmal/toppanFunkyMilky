@@ -121,6 +121,8 @@ public static class DependencyInjection
             EmailOptions.ResendProvider => provider.GetRequiredService<ResendEmailSender>(),
             _ => new DisabledEmailSender(),
         });
+        services.AddScoped<IEmailDispatcher, EmailDispatcher>();
+        services.AddHostedService<EmailDispatchWorker>();
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>(

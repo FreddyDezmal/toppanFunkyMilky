@@ -301,6 +301,17 @@ public class EmailTemplateTests
         Assert.Throws<EmailRenderException>(() => EmailTemplates.Render(notification, Site));
     }
 
+    [Theory]
+    [InlineData(NotificationKind.OrderCancelled, "{}")]
+    [InlineData(NotificationKind.OrderConfirmed, "{\"orderReference\":\"MS-1\",\"total\":29.90}")]
+    [InlineData(NotificationKind.CancellationRequested, "{\"orderReference\":\"MS-1\",\"reason\":null,\"pickupAtUtc\":\"2026-11-21T10:30:00Z\",\"pickupTimeZone\":\"UTC\",\"isPaid\":true,\"refundAmount\":1,\"currencyCode\":\"ZAR\",\"locale\":\"en-ZA\"}")]
+    public void A_payload_with_missing_or_null_fields_cannot_be_rendered(NotificationKind kind, string payload)
+    {
+        EmailNotification notification = Notification(kind, payload);
+
+        Assert.Throws<EmailRenderException>(() => EmailTemplates.Render(notification, Site));
+    }
+
     [Fact]
     public void A_null_payload_cannot_be_rendered()
     {

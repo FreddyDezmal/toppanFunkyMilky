@@ -48,6 +48,7 @@ public sealed class PostgresApiFactory : WebApplicationFactory<ApiAssemblyMarker
 
         // Tests call the payment reconciler directly; the timer-driven job would only add noise.
         builder.UseSetting("Payments:Reconciliation:Enabled", "false");
+        builder.UseSetting("Email:Dispatch:Enabled", "false");
     }
 }
 

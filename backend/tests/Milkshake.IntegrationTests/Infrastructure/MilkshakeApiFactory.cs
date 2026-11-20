@@ -19,6 +19,7 @@ public sealed class MilkshakeApiFactory : WebApplicationFactory<ApiAssemblyMarke
 
         builder.UseEnvironment("Testing");
         builder.UseSetting("Payments:Reconciliation:Enabled", "false");
+        builder.UseSetting("Email:Dispatch:Enabled", "false");
 
         builder.ConfigureTestServices(services =>
             services.PostConfigure<HealthCheckServiceOptions>(options =>

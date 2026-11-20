@@ -12,7 +12,13 @@ public static class EmailPayloads
 {
     public const int CurrentTemplateVersion = 1;
 
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    // Missing fields or nulls where the record does not allow them fail as unreadable (EmailRenderException), so a
+    // damaged payload ends as a failed email instead of an email with blanks or a crashed dispatcher.
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        RespectRequiredConstructorParameters = true,
+        RespectNullableAnnotations = true,
+    };
 
     public static string Serialize<T>(T payload) where T : class => JsonSerializer.Serialize(payload, Json);
 

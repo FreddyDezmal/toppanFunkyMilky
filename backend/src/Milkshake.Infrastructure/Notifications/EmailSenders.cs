@@ -38,6 +38,14 @@ public sealed class EmailOptions
 
     public ResendSettings Resend { get; set; } = new();
 
+    /// <summary>
+    /// The site address used for the one link in every email (its order page), e.g. https://shop.example/. Required to
+    /// send: without it emails stay queued.
+    /// </summary>
+    public Uri? PublicBaseUrl { get; set; }
+
+    public DispatchSettings Dispatch { get; set; } = new();
+
     /// <summary>Exact address match, ignoring letter case.</summary>
     public bool IsAllowed(string recipient) =>
         AllowedRecipients.Any(allowed => string.Equals(allowed.Trim(), recipient, StringComparison.OrdinalIgnoreCase));
@@ -49,6 +57,21 @@ public sealed class EmailOptions
         public int Port { get; set; } = 1025;
 
         public int TimeoutSeconds { get; set; } = 15;
+    }
+
+    /// <summary>The background dispatcher (section "Email:Dispatch").</summary>
+    public sealed class DispatchSettings
+    {
+        /// <summary>Switched off in automated tests, which call the dispatcher directly.</summary>
+        public bool Enabled { get; set; } = true;
+
+        public int IntervalSeconds { get; set; } = 30;
+
+        /// <summary>Emails claimed per run. With the sender timeout this must fit inside the lease.</summary>
+        public int BatchSize { get; set; } = 10;
+
+        /// <summary>How long a claimed email is held before another run may take it back.</summary>
+        public int LeaseMinutes { get; set; } = 5;
     }
 
     public sealed class ResendSettings
