@@ -91,6 +91,7 @@ internal sealed partial class DatabaseSeeder(
             new(SettingKeys.MaxDiscountAmount, Invariant(values.MaxDiscountAmount), SettingValueType.DecimalNumber, "Maximum frequent-customer discount per order, in the pricing currency."),
             new(SettingKeys.MinPickupLeadTimeMinutes, Invariant(values.MinPickupLeadTimeMinutes), SettingValueType.WholeNumber, "Minimum minutes between ordering and pickup."),
             new(SettingKeys.PickupMaxAdvanceDays, Invariant(values.PickupMaxAdvanceDays), SettingValueType.WholeNumber, "How many days ahead a pickup may be booked (0 = same day only). Provisional (Q-18)."),
+            new(SettingKeys.RefundFeeRate, Invariant(values.RefundFeeRate), SettingValueType.DecimalNumber, "Fee kept when a patron cancels a paid order, as a fraction of the VAT-exclusive amount. Provisional (B1.4)."),
             new(SettingKeys.PickupTimeZone, values.PickupTimeZone, SettingValueType.Text, "IANA time zone in which pickup times are chosen and shown. Provisional (Q-17)."),
             new(SettingKeys.CurrencyCode, currency, SettingValueType.Text, "ISO 4217 currency used for new prices and orders."),
             new(SettingKeys.DisplayLocale, locale, SettingValueType.Text, "Locale used to format amounts for display."),

@@ -30,4 +30,7 @@ public static class SettingKeys
 
     /// <summary>How many days ahead a pickup may be booked; 0 = same day only [provisional, Q-18].</summary>
     public const string PickupMaxAdvanceDays = "Pickup.MaxAdvanceDays";
+
+    /// <summary>Fee kept when a patron cancels a paid order, as a fraction of the VAT-exclusive amount [provisional, B1.4].</summary>
+    public const string RefundFeeRate = "Refund.FeeRate";
 }

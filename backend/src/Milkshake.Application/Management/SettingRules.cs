@@ -1,4 +1,5 @@
 using System.Globalization;
+using Milkshake.Domain.Payments;
 using Milkshake.Domain.Settings;
 
 namespace Milkshake.Application.Management;
@@ -36,6 +37,7 @@ public static class SettingRules
         SettingKeys.MaxDrinksPerOrder,
         SettingKeys.VatRate,
         SettingKeys.MaxDiscountAmount,
+        SettingKeys.RefundFeeRate,
         SettingKeys.MinPickupLeadTimeMinutes,
         SettingKeys.PickupMaxAdvanceDays,
         SettingKeys.PickupTimeZone,
@@ -68,6 +70,7 @@ public static class SettingRules
         SettingKeys.MaxDrinksPerOrder => $"Whole number from the minimum drinks per order up to {MaxDrinksUpperLimit}. URS value: 10.",
         SettingKeys.VatRate => "Fraction from 0 to 1, e.g. 0.15 for 15%. URS value: 15%.",
         SettingKeys.MaxDiscountAmount => "Amount in the pricing currency, 0 or more, at most two decimal places. Meaning pending confirmation (open question Q-02).",
+        SettingKeys.RefundFeeRate => $"Fraction from 0 to {Refund.MaxFeeRate.ToString(CultureInfo.InvariantCulture)} of the VAT-exclusive amount kept when a patron cancels a paid order, e.g. 0.10 for 10%. Provisional (B1.4).",
         SettingKeys.MinPickupLeadTimeMinutes => $"Whole number of minutes from 0 to {MaxLeadTimeMinutes}. Pickup rules pending confirmation (open question Q-06).",
         SettingKeys.PickupMaxAdvanceDays => $"Whole number of days from 0 (same day only) to {MaxAdvanceDaysLimit}. Provisional, pending confirmation (open question Q-18).",
         SettingKeys.PickupTimeZone => "IANA time zone name, e.g. Africa/Johannesburg. Pickup times are chosen and shown in this zone. Provisional (open question Q-17).",
@@ -161,6 +164,21 @@ public static class SettingRules
                 return errors.Count > 0
                     ? Fail(errors[ManagementFields.Value][0].Replace("Price", "Amount", StringComparison.Ordinal))
                     : Ok(amount.ToString(CultureInfo.InvariantCulture));
+            }
+
+            case SettingKeys.RefundFeeRate:
+            {
+                if (!TryDecimal(trimmed, out decimal rate))
+                {
+                    return Fail("Enter a number such as 0.10.");
+                }
+
+                if (rate < 0m || rate > Refund.MaxFeeRate || decimal.Round(rate, 4) != rate)
+                {
+                    return Fail($"The cancellation fee rate must be between 0 and {Refund.MaxFeeRate.ToString(CultureInfo.InvariantCulture)} (0% to 50%), with at most four decimal places, e.g. 0.10 for 10%.");
+                }
+
+                return Ok(rate.ToString(CultureInfo.InvariantCulture));
             }
 
             case SettingKeys.MinPickupLeadTimeMinutes:

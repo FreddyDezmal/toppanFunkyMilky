@@ -100,4 +100,7 @@ public sealed class SettingsSeed
 
     /// <summary>Days ahead a pickup may be booked; 0 = same day only [provisional, Q-18].</summary>
     public int PickupMaxAdvanceDays { get; set; }
+
+    /// <summary>Fee kept when a patron cancels a paid order, as a fraction of the VAT-exclusive amount [provisional, B1.4].</summary>
+    public decimal RefundFeeRate { get; set; } = 0.10m;
 }

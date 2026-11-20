@@ -107,6 +107,7 @@ internal static class ManagementTestHelpers
             new(SettingKeys.MinPickupLeadTimeMinutes, "15", SettingValueType.WholeNumber, "Minimum pickup lead time."),
             new(SettingKeys.PickupMaxAdvanceDays, "7", SettingValueType.WholeNumber, "Days ahead a pickup may be booked."),
             new(SettingKeys.PickupTimeZone, "Africa/Johannesburg", SettingValueType.Text, "Pickup time zone."),
+            new(SettingKeys.RefundFeeRate, "0.10", SettingValueType.DecimalNumber, "Cancellation fee rate."),
             new(SettingKeys.CurrencyCode, "ZAR", SettingValueType.Text, "Pricing currency."),
             new(SettingKeys.DisplayLocale, "en-ZA", SettingValueType.Text, "Display locale."),
         ];

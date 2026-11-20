@@ -599,6 +599,80 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Milkshake.Domain.Orders.CancellationRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseHiLo(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("integer")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("RequestedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cancellation_requests");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_cancellation_requests_order_id");
+
+                    b.HasIndex("RequestedBy")
+                        .HasDatabaseName("ix_cancellation_requests_requested_by");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_cancellation_requests_status");
+
+                    b.HasIndex(new[] { "OrderId" }, "ux_cancellation_requests_one_pending_per_order")
+                        .IsUnique()
+                        .HasDatabaseName("ux_cancellation_requests_one_pending_per_order")
+                        .HasFilter("status = 'Pending'");
+
+                    b.ToTable("cancellation_requests", "milkshake", t =>
+                        {
+                            t.HasCheckConstraint("ck_cancellation_requests_closed", "(status = 'Pending') = (closed_at IS NULL)");
+
+                            t.HasCheckConstraint("ck_cancellation_requests_reason", "char_length(reason) BETWEEN 1 AND 50 AND reason = btrim(reason) AND reason !~ '[[:cntrl:]]'");
+
+                            t.HasCheckConstraint("ck_cancellation_requests_status", "status IN ('Pending', 'Accepted', 'Declined', 'Lapsed')");
+                        });
+                });
+
             modelBuilder.Entity("Milkshake.Domain.Orders.Order", b =>
                 {
                     b.Property<int>("Id")
@@ -1041,6 +1115,141 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
                     b.ToTable("payment_events", "milkshake");
                 });
 
+            modelBuilder.Entity("Milkshake.Domain.Payments.Refund", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseHiLo(b.Property<int>("Id"));
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_minor");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .HasColumnName("currency_code")
+                        .IsFixedLength();
+
+                    b.Property<long>("FeeMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("fee_minor");
+
+                    b.Property<decimal>("FeeRate")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)")
+                        .HasColumnName("fee_rate");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("integer")
+                        .HasColumnName("order_id");
+
+                    b.Property<long>("PaidAmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("paid_amount_minor");
+
+                    b.Property<int>("PaymentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("payment_id");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("ProviderMessage")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_message");
+
+                    b.Property<long?>("ProviderRefundId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("provider_refund_id");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character(16)")
+                        .HasColumnName("reference")
+                        .IsFixedLength();
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_refunds");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_refunds_order_id");
+
+                    b.HasIndex("Reference")
+                        .IsUnique()
+                        .HasDatabaseName("ix_refunds_reference");
+
+                    b.HasIndex("Provider", "ProviderRefundId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_refunds_provider_provider_refund_id")
+                        .HasFilter("provider_refund_id IS NOT NULL");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("ix_refunds_status_created_at");
+
+                    b.HasIndex(new[] { "PaymentId" }, "ux_refunds_one_per_payment")
+                        .IsUnique()
+                        .HasDatabaseName("ux_refunds_one_per_payment");
+
+                    b.ToTable("refunds", "milkshake", t =>
+                        {
+                            t.HasCheckConstraint("ck_refunds_amounts", "paid_amount_minor > 0 AND fee_minor >= 0 AND amount_minor > 0 AND amount_minor = paid_amount_minor - fee_minor");
+
+                            t.HasCheckConstraint("ck_refunds_completed", "(status IN ('Processed', 'Failed')) = (completed_at IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_refunds_currency", "currency_code ~ '^[A-Z]{3}$'");
+
+                            t.HasCheckConstraint("ck_refunds_fee_rate", "fee_rate >= 0 AND fee_rate <= 0.5 AND (kind = 'PatronCancellation' OR (fee_rate = 0 AND fee_minor = 0))");
+
+                            t.HasCheckConstraint("ck_refunds_kind", "kind IN ('PatronCancellation', 'RestaurantCancellation', 'UnacceptedPayment')");
+
+                            t.HasCheckConstraint("ck_refunds_provider_id", "status <> 'Pending' OR provider_refund_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_refunds_reference", "reference ~ '^MSR-[0-9A-HJKMNP-TV-Z]{12}$'");
+
+                            t.HasCheckConstraint("ck_refunds_status", "status IN ('Initiating', 'Pending', 'Processed', 'Failed')");
+                        });
+                });
+
             modelBuilder.Entity("Milkshake.Domain.Restaurants.Restaurant", b =>
                 {
                     b.Property<int>("Id")
@@ -1415,6 +1624,23 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
                     b.Navigation("Topping");
                 });
 
+            modelBuilder.Entity("Milkshake.Domain.Orders.CancellationRequest", b =>
+                {
+                    b.HasOne("Milkshake.Domain.Orders.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cancellation_requests_orders_order_id");
+
+                    b.HasOne("Milkshake.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cancellation_requests_users_requested_by");
+                });
+
             modelBuilder.Entity("Milkshake.Domain.Orders.Order", b =>
                 {
                     b.HasOne("Milkshake.Infrastructure.Identity.ApplicationUser", null)
@@ -1471,6 +1697,23 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_payments_orders_order_id");
+                });
+
+            modelBuilder.Entity("Milkshake.Domain.Payments.Refund", b =>
+                {
+                    b.HasOne("Milkshake.Domain.Orders.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_refunds_orders_order_id");
+
+                    b.HasOne("Milkshake.Domain.Payments.Payment", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_refunds_payments_payment_id");
                 });
 
             modelBuilder.Entity("Milkshake.Domain.Catalog.Consistency", b =>

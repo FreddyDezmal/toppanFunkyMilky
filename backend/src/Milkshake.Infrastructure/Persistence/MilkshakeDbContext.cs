@@ -62,6 +62,10 @@ public sealed class MilkshakeDbContext(DbContextOptions<MilkshakeDbContext> opti
 
     public DbSet<PaymentEvent> PaymentEvents => Set<PaymentEvent>();
 
+    public DbSet<Refund> Refunds => Set<Refund>();
+
+    public DbSet<CancellationRequest> CancellationRequests => Set<CancellationRequest>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder builder)
     {
