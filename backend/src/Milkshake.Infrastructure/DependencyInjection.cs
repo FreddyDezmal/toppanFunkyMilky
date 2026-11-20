@@ -122,6 +122,7 @@ public static class DependencyInjection
             _ => new DisabledEmailSender(),
         });
         services.AddScoped<IEmailDispatcher, EmailDispatcher>();
+        services.AddScoped<IManagerEmailService, ManagerEmailService>();
         services.AddHostedService<EmailDispatchWorker>();
 
         services.AddHealthChecks()

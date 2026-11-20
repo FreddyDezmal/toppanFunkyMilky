@@ -11,4 +11,7 @@ public static class RateLimitPolicies
 
     /// <summary>Payment provider notifications, per source address (M8). Generous so legitimate retries are never refused.</summary>
     public const string Webhook = "webhook";
+
+    /// <summary>Management → Emails resend (M9), per signed-in manager: a resend reaches a patron's inbox.</summary>
+    public const string EmailResend = "email-resend";
 }
