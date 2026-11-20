@@ -599,6 +599,160 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Milkshake.Domain.Notifications.EmailNotification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseHiLo(b.Property<int>("Id"));
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<int?>("CancellationRequestId")
+                        .HasColumnType("integer")
+                        .HasColumnName("cancellation_request_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_attempt_at");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("LockedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("locked_until");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<string>("NotificationKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("notification_key");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("integer")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_message_id");
+
+                    b.Property<string>("RecipientEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("recipient_email");
+
+                    b.Property<string>("RecipientName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("recipient_name");
+
+                    b.Property<int?>("RefundId")
+                        .HasColumnType("integer")
+                        .HasColumnName("refund_id");
+
+                    b.Property<int>("ResendCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("resend_count");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("TemplateVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("template_version");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_email_notifications");
+
+                    b.HasIndex("CancellationRequestId")
+                        .HasDatabaseName("ix_email_notifications_cancellation_request_id");
+
+                    b.HasIndex("NotificationKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_email_notifications_notification_key");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_email_notifications_order_id");
+
+                    b.HasIndex("RefundId")
+                        .HasDatabaseName("ix_email_notifications_refund_id");
+
+                    b.HasIndex("Status", "NextAttemptAt")
+                        .HasDatabaseName("ix_email_notifications_status_next_attempt_at");
+
+                    b.ToTable("email_notifications", "milkshake", t =>
+                        {
+                            t.HasCheckConstraint("ck_email_notifications_counts", "attempt_count >= 0 AND resend_count >= 0 AND template_version >= 1");
+
+                            t.HasCheckConstraint("ck_email_notifications_kind", "kind IN ('OrderConfirmed', 'CancellationRequested', 'OrderCancelled', 'RefundProcessed', 'RefundFailed')");
+
+                            t.HasCheckConstraint("ck_email_notifications_last_error", "last_error IS NULL OR last_error IN ('Timeout', 'ProviderUnavailable', 'RateLimited', 'Rejected', 'InvalidRecipient')");
+
+                            t.HasCheckConstraint("ck_email_notifications_lease", "(status = 'Sending') = (locked_until IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_email_notifications_recipient", "recipient_email LIKE '%_@_%' AND recipient_email !~ '[[:cntrl:][:space:],<>]' AND recipient_name !~ '[[:cntrl:]]'");
+
+                            t.HasCheckConstraint("ck_email_notifications_refund", "(kind IN ('RefundProcessed', 'RefundFailed')) = (refund_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_email_notifications_request", "(kind = 'CancellationRequested') = (cancellation_request_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_email_notifications_sent", "(status = 'Sent') = (sent_at IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_email_notifications_status", "status IN ('Pending', 'Sending', 'Sent', 'Failed', 'Suppressed')");
+                        });
+                });
+
             modelBuilder.Entity("Milkshake.Domain.Orders.CancellationRequest", b =>
                 {
                     b.Property<int>("Id")
@@ -1622,6 +1776,28 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_topping_prices_toppings_topping_id");
 
                     b.Navigation("Topping");
+                });
+
+            modelBuilder.Entity("Milkshake.Domain.Notifications.EmailNotification", b =>
+                {
+                    b.HasOne("Milkshake.Domain.Orders.CancellationRequest", null)
+                        .WithMany()
+                        .HasForeignKey("CancellationRequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_email_notifications_cancellation_requests_cancellation_requ");
+
+                    b.HasOne("Milkshake.Domain.Orders.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_email_notifications_orders_order_id");
+
+                    b.HasOne("Milkshake.Domain.Payments.Refund", null)
+                        .WithMany()
+                        .HasForeignKey("RefundId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_email_notifications_refunds_refund_id");
                 });
 
             modelBuilder.Entity("Milkshake.Domain.Orders.CancellationRequest", b =>

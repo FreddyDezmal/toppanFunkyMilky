@@ -26,12 +26,16 @@ internal sealed class AuditingSaveChangesInterceptor(TimeProvider timeProvider, 
     // PostgreSQL row version (optimistic concurrency): changes on every write and is not business data.
     private const string RowVersionColumn = "xmin";
 
-    // Secrets that must never be written to the audit trail in clear text.
+    // Secrets that must never be written to the audit trail in clear text, and the email outbox's personal data and
+    // content (M9: the delivery log itself is the record; the audit trail shows only that it changed).
     private static readonly HashSet<string> SensitiveColumns = new(StringComparer.Ordinal)
     {
         "password_hash",
         "security_stamp",
         "concurrency_stamp",
+        "recipient_email",
+        "recipient_name",
+        "payload",
     };
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)

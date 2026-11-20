@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Milkshake.Domain.Auditing;
 using Milkshake.Domain.Catalog;
+using Milkshake.Domain.Notifications;
 using Milkshake.Domain.Orders;
 using Milkshake.Domain.Payments;
 using Milkshake.Domain.Restaurants;
@@ -65,6 +66,8 @@ public sealed class MilkshakeDbContext(DbContextOptions<MilkshakeDbContext> opti
     public DbSet<Refund> Refunds => Set<Refund>();
 
     public DbSet<CancellationRequest> CancellationRequests => Set<CancellationRequest>();
+
+    public DbSet<EmailNotification> EmailNotifications => Set<EmailNotification>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder builder)
