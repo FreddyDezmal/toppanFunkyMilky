@@ -130,6 +130,44 @@ export interface DraftSummary {
   note: string
 }
 
+/** A choice as it was when the order was placed (name and fee are snapshots). */
+export interface OrderedChoice {
+  id: number
+  name: string
+  fee: number
+}
+
+/** One milkshake of a placed order, from the stored snapshot. */
+export interface OrderDrink {
+  number: number
+  flavour: OrderedChoice
+  consistency: OrderedChoice
+  topping: OrderedChoice
+  price: number
+}
+
+export type OrderStatus = 'PendingPayment' | 'Confirmed' | 'PaymentFailed' | 'Cancelled'
+
+/**
+ * POST /api/ordering/orders (201, or 200 for a retry) and GET /api/ordering/orders/{reference}: an order exactly as
+ * stored when it was placed. `status` is the order state; `isPaid` is true only after the server verified payment (M8).
+ */
+export interface PlacedOrder {
+  reference: string
+  status: OrderStatus
+  isPaid: boolean
+  awaitsPayment: boolean
+  restaurant: OrderingRestaurant
+  pickup: DraftPickup
+  drinks: OrderDrink[]
+  totals: OrderTotals
+  /** UTC ISO 8601. */
+  pricedAtUtc: string
+  /** UTC ISO 8601. */
+  placedAtUtc: string
+  note: string
+}
+
 /** One milkshake in a live quote: its price, or null until all three choices are made. */
 export interface QuotedDrink {
   number: number

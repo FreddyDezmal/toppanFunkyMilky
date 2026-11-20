@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EMPTY_DRAFT } from './draft'
-import { clearOrderDrafts, draftStorageKey, loadDraft, saveDraft } from './draftStorage'
+import { clearOrderDrafts, draftStorageKey, forgetOrderSubmissionKey, loadDraft, orderSubmissionKey, saveDraft } from './draftStorage'
 import type { OrderDraft } from './types'
 
 const thandi = 'user-thandi'
@@ -103,5 +103,32 @@ describe('draft storage', () => {
 
     expect(() => saveDraft(thandi, draft)).not.toThrow()
     expect(loadDraft(thandi)).toEqual(EMPTY_DRAFT)
+  })
+})
+describe('order submission key', () => {
+  it('stays the same for the same draft content, so retries reuse it', () => {
+    const first = orderSubmissionKey(thandi, draft)
+
+    expect(first).toMatch(/^[0-9a-f-]{36}$/)
+    expect(orderSubmissionKey(thandi, { ...draft })).toBe(first)
+  })
+
+  it('changes when the content changes, so a different order never reuses an old key', () => {
+    const first = orderSubmissionKey(thandi, draft)
+    const changed = orderSubmissionKey(thandi, { ...draft, pickupLocal: '2026-11-20T10:15' })
+
+    expect(changed).not.toBe(first)
+    expect(orderSubmissionKey(thandi, draft)).not.toBe(first)
+  })
+
+  it('is forgotten after placement, and cleared with other users’ drafts', () => {
+    const first = orderSubmissionKey(thandi, draft)
+    forgetOrderSubmissionKey(thandi)
+    expect(orderSubmissionKey(thandi, draft)).not.toBe(first)
+
+    orderSubmissionKey(sipho, draft)
+    clearOrderDrafts(thandi)
+    expect(Object.keys(sessionStorage).some((key) => key.endsWith(sipho))).toBe(false)
+    expect(Object.keys(sessionStorage).some((key) => key.endsWith(thandi))).toBe(true)
   })
 })

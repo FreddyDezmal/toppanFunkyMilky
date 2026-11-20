@@ -9,6 +9,8 @@ export interface ProblemDetails {
   title?: string
   detail?: string
   errors?: FieldErrors
+  /** RFC 9457 extension members, e.g. currentTotals on a price-changed conflict. */
+  [extension: string]: unknown
 }
 
 /** An API call that failed: unreachable server or an unexpected HTTP status. */
@@ -31,6 +33,8 @@ export class ApiError extends Error {
 
 interface RequestOptions {
   signal?: AbortSignal
+  /** Extra request headers, e.g. Idempotency-Key. */
+  headers?: Record<string, string>
   /** Non-2xx statuses whose JSON body is still meaningful (e.g. 503 from the health check). */
   acceptStatuses?: readonly number[]
 }
@@ -68,7 +72,7 @@ async function request<T>(
   isRetry = false,
 ): Promise<T> {
   const url = `${getApiBaseUrl()}${path}`
-  const headers: Record<string, string> = { Accept: 'application/json' }
+  const headers: Record<string, string> = { ...options.headers, Accept: 'application/json' }
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json'
   }
@@ -139,4 +143,4 @@ async function readProblem(response: Response): Promise<ProblemDetails | undefin
   } catch {
     return undefined
   }
-}
+}

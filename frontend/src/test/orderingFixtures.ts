@@ -1,5 +1,5 @@
 import type { CurrentUser } from '../features/auth/types'
-import type { DraftSummary, DrinkSelection, OrderingOptions, Quote } from '../features/ordering/types'
+import type { DraftSummary, DrinkSelection, OrderingOptions, PlacedOrder, Quote } from '../features/ordering/types'
 
 export const patronUser: CurrentUser = {
   id: '01a1ea38-0000-7000-8000-000000000011',
@@ -107,5 +107,34 @@ export function quoteFor(drinks: DrinkSelection[]): Quote {
         }
       : null,
     note: 'Estimated prices based on current fees and VAT. The final amount is calculated when you place your order.',
+  }
+}
+
+/**
+ * A placed order as GET/POST /api/ordering/orders return it: one milkshake at Branch A, unpaid. Its names and fees are
+ * the stored snapshot ("Vanilla (old recipe)" at 30.00), deliberately different from today's options.
+ */
+export function placedOrder(reference = 'MS-7KQ2-X9TD'): PlacedOrder {
+  const options = orderingOptions()
+  return {
+    reference,
+    status: 'PendingPayment',
+    isPaid: false,
+    awaitsPayment: true,
+    restaurant: options.restaurants[0]!,
+    pickup: { local: '2026-11-20T10:00', utc: '2026-11-20T08:00:00+00:00', timeZone: 'Africa/Johannesburg' },
+    drinks: [
+      {
+        number: 1,
+        flavour: { id: 3, name: 'Vanilla (old recipe)', fee: 30 },
+        consistency: { id: 29, name: 'Thick', fee: 6 },
+        topping: { id: 19, name: 'Oreo crumbs', fee: 10 },
+        price: 46,
+      },
+    ],
+    totals: draftSummary().totals,
+    pricedAtUtc: '2026-11-19T10:00:00+00:00',
+    placedAtUtc: '2026-11-19T10:00:01+00:00',
+    note: 'Your order has been placed and is awaiting payment. It has not been paid.',
   }
 }

@@ -5,7 +5,16 @@ import type { OrderTotals } from './types'
  * Server-calculated totals (M6): subtotal, frequent-customer discount (0 when none, as the URS requires), VAT with
  * its rate, and the estimated total. Formatting only – every amount comes from the API.
  */
-export function PriceSummary({ totals, locale }: { totals: OrderTotals; locale: string }) {
+export function PriceSummary({
+  totals,
+  locale,
+  totalLabel = 'Estimated total',
+}: {
+  totals: OrderTotals
+  locale: string | undefined
+  /** "Estimated total" for drafts; "Total" for a placed order, whose amount is fixed. */
+  totalLabel?: string
+}) {
   const money = (amount: number) => formatMoney(amount, totals.currencyCode, locale)
   const { discount } = totals
 
@@ -20,7 +29,7 @@ export function PriceSummary({ totals, locale }: { totals: OrderTotals; locale: 
       <dt className="text-slate-600">VAT ({formatPercent(totals.vatRate, locale)})</dt>
       <dd className="text-right">{money(totals.vat)}</dd>
 
-      <dt className="border-t border-slate-200 pt-1 font-semibold text-slate-900">Estimated total</dt>
+      <dt className="border-t border-slate-200 pt-1 font-semibold text-slate-900">{totalLabel}</dt>
       <dd className="border-t border-slate-200 pt-1 text-right font-semibold text-slate-900">{money(totals.total)}</dd>
     </dl>
   )

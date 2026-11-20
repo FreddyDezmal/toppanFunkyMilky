@@ -17,6 +17,7 @@ import { NotFoundPage } from '../pages/NotFoundPage'
 import { OrderDrinksPage } from '../pages/ordering/OrderDrinksPage'
 import { OrderPickupPage } from '../pages/ordering/OrderPickupPage'
 import { OrderQuantityPage } from '../pages/ordering/OrderQuantityPage'
+import { OrderDetailsPage } from '../pages/orders/OrderDetailsPage'
 import { OrderReviewPage } from '../pages/ordering/OrderReviewPage'
 import { RegisterPage } from '../pages/RegisterPage'
 
@@ -40,6 +41,7 @@ export function AppRoutes() {
             <Route path="pickup" element={<OrderPickupPage />} />
             <Route path="review" element={<OrderReviewPage />} />
           </Route>
+          <Route path="orders/:reference" element={<OrderDetailsPage />} />
         </Route>
 
         <Route element={<RequireAuth role={ROLES.manager} />}>
@@ -57,4 +59,4 @@ export function AppRoutes() {
       </Route>
     </Routes>
   )
-}
+}

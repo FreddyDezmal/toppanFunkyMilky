@@ -7,6 +7,7 @@ import type { DrinkSelection, OrderDraft } from './types'
  * Everything read back is treated as untrusted and rebuilt field by field.
  */
 const KEY_PREFIX = 'milkshake.orderDraft.v1:'
+const SUBMISSION_PREFIX = 'milkshake.orderSubmission.v1:'
 const LOCAL_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/
 
 export function draftStorageKey(userId: string): string {
@@ -37,18 +38,57 @@ export function saveDraft(userId: string, draft: OrderDraft): void {
   })
 }
 
-/** Removes every stored draft in this tab, optionally keeping one user's. */
+/** Removes every stored draft and submission key in this tab, optionally keeping one user's. */
 export function clearOrderDrafts(exceptUserId?: string): void {
   safely(() => {
-    const keep = exceptUserId === undefined ? undefined : draftStorageKey(exceptUserId)
+    const keep =
+      exceptUserId === undefined ? [] : [draftStorageKey(exceptUserId), `${SUBMISSION_PREFIX}${exceptUserId}`]
     const keys = Array.from({ length: sessionStorage.length }, (_, index) => sessionStorage.key(index))
     for (const key of keys) {
-      if (key?.startsWith(KEY_PREFIX) && key !== keep) {
+      if (key && (key.startsWith(KEY_PREFIX) || key.startsWith(SUBMISSION_PREFIX)) && !keep.includes(key)) {
         sessionStorage.removeItem(key)
       }
     }
   })
 }
+
+/** The content that identifies a submission: restaurant, pickup time and each milkshake's choices, in order. */
+function submissionContent(draft: OrderDraft): string {
+  return JSON.stringify([
+    draft.restaurantId,
+    draft.pickupLocal,
+    draft.drinks.map((drink) => [drink.flavourId, drink.consistencyId, drink.toppingId]),
+  ])
+}
+
+/**
+ * The Idempotency-Key for placing this draft (M7, decision O5). The same draft content always gets the same key, also
+ * after a timeout or a page refresh, so a retry can never create a second order; any change to the content gets a new
+ * key, so a different order is never sent under an old key.
+ */
+export function orderSubmissionKey(userId: string, draft: OrderDraft): string {
+  const storageKey = `${SUBMISSION_PREFIX}${userId}`
+  const content = submissionContent(draft)
+  const stored = safely(() => sessionStorage.getItem(storageKey))
+  try {
+    const parsed = stored ? (JSON.parse(stored) as unknown) : null
+    if (isRecord(parsed) && parsed.content === content && typeof parsed.key === 'string' && UUID.test(parsed.key)) {
+      return parsed.key
+    }
+  } catch {
+    // Unreadable: start a new submission below.
+  }
+  const key = crypto.randomUUID()
+  safely(() => sessionStorage.setItem(storageKey, JSON.stringify({ content, key })))
+  return key
+}
+
+/** Forgets the submission key: after the order was placed, or when the server refused the key. */
+export function forgetOrderSubmissionKey(userId: string): void {
+  safely(() => sessionStorage.removeItem(`${SUBMISSION_PREFIX}${userId}`))
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Rebuilds a draft from untrusted data, keeping only well-formed identifiers and pickup time. */
 export function sanitizeDraft(value: unknown): OrderDraft {
@@ -85,4 +125,4 @@ function safely<T>(action: () => T): T | undefined {
   } catch {
     return undefined
   }
-}
+}

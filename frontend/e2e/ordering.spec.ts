@@ -5,7 +5,8 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
  * Patron ordering journey (M5) against the real stack (React → ASP.NET Core → Supabase).
  * Needs at least one active, priced flavour, consistency and topping and one active restaurant in the development
  * database (the seed data provides them). Each test registers a new patron, so no credentials are stored.
- * Nothing is ordered or paid: M5 only builds and validates a draft, and the draft never reaches the database.
+ * The draft journey orders nothing. The placement journey (M7) places ONE real, unpaid order per run for its own new
+ * patron (decision O12); nothing is ever paid.
  */
 const PASSWORD = 'Milkshake1Test'
 const DRAFT_KEY_PREFIX = 'milkshake.orderDraft.v1:'
@@ -117,7 +118,7 @@ test('a patron builds a draft: quantity, milkshakes, pickup and a server-checked
   await expect(page.getByRole('heading', { name: 'Review your order' })).toBeVisible()
   await expect(page.getByText(/^Draft – not yet ordered or paid/)).toBeVisible()
   await expect(page.getByRole('heading', { name: '2 milkshakes' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Continue to payment (coming soon)' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Place order' })).toBeEnabled()
   // Server-calculated estimate: discount shown as none (deferred), VAT with its rate, and the same total as before.
   const reviewPrice = page.getByRole('region', { name: 'Estimated price' })
   await expect(reviewPrice.getByText('Estimated total', { exact: true })).toBeVisible()
@@ -234,4 +235,59 @@ test.describe('manager', () => {
     await page.goto('/order')
     await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
   })
-})
+})
+test('a patron places an order: confirmed total, stored unpaid, kept after a refresh, draft cleared', async ({ page }) => {
+  test.setTimeout(120_000)
+  await registerPatron(page)
+
+  // A one-milkshake draft with the first real option in every list.
+  await page.goto('/order')
+  await page.getByLabel('Number of milkshakes').selectOption('1')
+  await page.getByRole('button', { name: 'Continue' }).click()
+  const card = page.getByRole('listitem', { name: 'Milkshake 1', exact: true })
+  for (const field of ['Flavour', 'Consistency', 'Topping']) {
+    await card.getByLabel(field, { exact: true }).selectOption({ index: 1 })
+  }
+  await card.getByRole('button', { name: 'Done with milkshake 1' }).click()
+  await page.getByRole('button', { name: 'Continue to pickup' }).click()
+  await page.getByLabel('Pickup restaurant').selectOption({ index: 1 })
+  const time = page.getByLabel('Pickup date and time')
+  await time.fill((await time.getAttribute('max')) ?? '')
+  await page.getByRole('button', { name: 'Review order' }).click()
+
+  // Review, then confirm the server's total.
+  const reviewPrice = page.getByRole('region', { name: 'Estimated price' })
+  await expect(reviewPrice.getByText('Estimated total', { exact: true })).toBeVisible()
+  const total = (await reviewPrice.locator('dd').last().textContent()) ?? ''
+  await page.getByRole('button', { name: 'Place order' }).click()
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog).toContainText(total)
+  await dialog.getByRole('button', { name: 'Place order' }).click()
+
+  // The stored order: reference, unpaid, the same total; the draft and its submission key are gone.
+  await expect(page).toHaveURL(/\/orders\/MS-[0-9A-Z]{4}-[0-9A-Z]{4}$/)
+  const heading = page.getByRole('heading', { name: /^Order MS-/ })
+  await expect(heading).toBeVisible()
+  const reference = ((await heading.textContent()) ?? '').replace(/^Order /, '')
+  await expect(page.getByText('Awaiting payment', { exact: true })).toBeVisible()
+  await expect(page.getByText('Not paid', { exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Price' }).locator('dd').last()).toHaveText(total)
+  await expect(page.getByRole('button', { name: 'Pay now (coming soon)' })).toBeDisabled()
+  expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith('milkshake.')))).toEqual([])
+  await expectNoSeriousAccessibilityProblems(page, 'Order')
+
+  // Still there after a refresh, read back from the server.
+  await page.reload()
+  await expect(page.getByRole('heading', { name: `Order ${reference}` })).toBeVisible()
+  await expect(page.getByText('Not paid', { exact: true })).toBeVisible()
+
+  // Only the patron's own order is found; any other reference is not (same 404 as a missing order).
+  const lookups = await page.evaluate(async (own) => {
+    const status = async (ref: string) => (await fetch(`/api/ordering/orders/${ref}`, { credentials: 'include' })).status
+    return { own: await status(own), other: await status('MS-0000-0000') }
+  }, reference)
+  expect(lookups).toEqual({ own: 200, other: 404 })
+
+  await page.goto('/order/review')
+  await expect(page.getByRole('heading', { name: 'Your order is empty' })).toBeVisible()
+})

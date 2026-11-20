@@ -1,20 +1,32 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { formatMoney } from '../../lib/format/money'
-import { validateDraft } from '../../features/ordering/api'
+import { useAuth } from '../../features/auth/authContext'
+import { placeOrder, validateDraft } from '../../features/ordering/api'
+import { forgetOrderSubmissionKey, orderSubmissionKey } from '../../features/ordering/draftStorage'
 import { EmptyDraft } from '../../features/ordering/EmptyDraft'
 import { draftErrorsFrom, type DraftErrors } from '../../features/ordering/errors'
 import { formatLocalTime, timeZoneLabel } from '../../features/ordering/format'
 import { useOrderDraft } from '../../features/ordering/orderDraftContext'
+import { placementFailureMessage, isOrderTotals, PLACE_ORDER_TIMEOUT_MS } from '../../features/ordering/placement'
 import { PriceSummary } from '../../features/ordering/PriceSummary'
-import type { DraftSummary, OrderingOption } from '../../features/ordering/types'
+import type { DraftSummary, OrderingOption, OrderTotals } from '../../features/ordering/types'
+import { ApiError } from '../../lib/api/httpClient'
 import { useOrdering } from '../../features/ordering/useOrdering'
 
 type ReviewState =
   | { kind: 'checking' }
   | { kind: 'valid'; summary: DraftSummary }
   | { kind: 'invalid'; errors: DraftErrors }
+
+/** Placing an order: never more than one request at a time; the draft is kept until the order is stored. */
+type Placement =
+  | { kind: 'idle' }
+  | { kind: 'confirming'; totals: OrderTotals }
+  | { kind: 'placing' }
+  | { kind: 'priceChanged'; totals: OrderTotals }
+  | { kind: 'failed'; message: string }
 
 const LINK_CLASS = 'rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50'
 
@@ -31,12 +43,18 @@ function stepFor(field: string): { to: string; label: string } {
 
 /**
  * /order/review — the server checks the draft against the options in force now and returns the summary shown here,
- * with its estimated price (M6). Every amount comes from that response; nothing is ordered or paid.
+ * with its estimated price (M6). Place order (M7) asks for confirmation of that total, then the server revalidates,
+ * reprices and stores the order unpaid. Every amount comes from the server; the draft is cleared only once the order
+ * is stored.
  */
 export function OrderReviewPage() {
   const { options, reloadOptions } = useOrdering()
   const { draft, dispatch } = useOrderDraft()
+  const { user } = useAuth()
   const navigate = useNavigate()
+  const [placement, setPlacement] = useState<Placement>({ kind: 'idle' })
+  const placing = useRef(false)
+  const placeController = useRef<AbortController | null>(null)
   const [state, setState] = useState<ReviewState>({ kind: 'checking' })
   const [attempt, setAttempt] = useState(0)
   const [confirmStartOver, setConfirmStartOver] = useState(false)
@@ -67,8 +85,56 @@ export function OrderReviewPage() {
     return () => controller.abort()
   }, [draft, attempt, reloadOptions])
 
+  // Leaving the page cancels a request in flight; the stored key makes a later retry safe.
+  useEffect(() => () => placeController.current?.abort(), [])
+
   if (draft.drinks.length === 0) {
     return <EmptyDraft />
+  }
+
+  async function place(expected: OrderTotals) {
+    if (placing.current || !user) {
+      return
+    }
+    placing.current = true
+    setPlacement({ kind: 'placing' })
+    const controller = new AbortController()
+    placeController.current = controller
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, PLACE_ORDER_TIMEOUT_MS)
+
+    try {
+      const key = orderSubmissionKey(user.id, draft)
+      const order = await placeOrder(draft, { total: expected.total, currencyCode: expected.currencyCode }, key, controller.signal)
+      // Stored on the server: only now is the draft cleared.
+      forgetOrderSubmissionKey(user.id)
+      dispatch({ type: 'reset' })
+      void navigate(`/orders/${encodeURIComponent(order.reference)}`, { replace: true })
+    } catch (error: unknown) {
+      if (controller.signal.aborted && !timedOut) {
+        return
+      }
+      if (error instanceof ApiError && error.status === 409 && isOrderTotals(error.problem?.currentTotals)) {
+        setPlacement({ kind: 'priceChanged', totals: error.problem.currentTotals })
+        return
+      }
+      if (error instanceof ApiError && error.status === 422) {
+        forgetOrderSubmissionKey(user.id)
+      }
+      if (error instanceof ApiError && error.status === 400 && Object.keys(error.fieldErrors).length > 0) {
+        setPlacement({ kind: 'idle' })
+        setState({ kind: 'invalid', errors: draftErrorsFrom(error) })
+        reloadOptions()
+        return
+      }
+      setPlacement({ kind: 'failed', message: placementFailureMessage(error, timedOut) })
+    } finally {
+      clearTimeout(timer)
+      placing.current = false
+    }
   }
 
   function fee(option: OrderingOption) {
@@ -181,26 +247,83 @@ export function OrderReviewPage() {
         </>
       )}
 
+      {placement.kind === 'priceChanged' && (
+        <section role="alert" aria-labelledby="price-changed-heading" className="mt-6 rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
+          <h2 id="price-changed-heading" className="font-semibold">
+            The price has changed
+          </h2>
+          <p className="mt-1">
+            Prices changed since you reviewed your order. The new total is{' '}
+            {formatMoney(placement.totals.total, placement.totals.currencyCode, locale)}. Nothing has been ordered yet.
+          </p>
+          <div className="mt-3 max-w-sm rounded-lg bg-white p-3">
+            <PriceSummary totals={placement.totals} locale={locale} totalLabel="New total" />
+          </div>
+        </section>
+      )}
+
+      {placement.kind === 'failed' && (
+        <p role="alert" className="mt-6 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">
+          {placement.message}
+        </p>
+      )}
+
       <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-6">
+        {state.kind === 'valid' && placement.kind === 'priceChanged' ? (
+          <button
+            type="button"
+            onClick={() => void place(placement.totals)}
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          >
+            Place order at {formatMoney(placement.totals.total, placement.totals.currencyCode, locale)}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={state.kind !== 'valid' || placement.kind === 'placing'}
+            aria-describedby="place-order-note"
+            onClick={() => {
+              if (state.kind === 'valid') {
+                setPlacement({ kind: 'confirming', totals: state.summary.totals })
+              }
+            }}
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          >
+            {placement.kind === 'placing' ? 'Placing your order…' : placement.kind === 'failed' ? 'Try again' : 'Place order'}
+          </button>
+        )}
         <button
           type="button"
-          disabled
-          aria-describedby="payment-coming-soon"
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          Continue to payment (coming soon)
-        </button>
-        <button
-          type="button"
+          disabled={placement.kind === 'placing'}
           onClick={() => setConfirmStartOver(true)}
-          className="rounded-lg px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50"
+          className="rounded-lg px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
         >
           Start over
         </button>
-        <p id="payment-coming-soon" className="w-full text-xs text-slate-500">
-          Payment is not available yet. Your draft stays in this browser tab until you sign out or close it.
+        <p role="status" className="w-full text-xs text-slate-500" id="place-order-note">
+          {placement.kind === 'placing'
+            ? 'Placing your order…'
+            : 'Placing your order saves it as awaiting payment. You will not be charged now: payment is not available yet.'}
         </p>
       </div>
+
+      <ConfirmDialog
+        open={placement.kind === 'confirming'}
+        title="Place your order?"
+        message={
+          placement.kind === 'confirming'
+            ? `Your order will be placed for ${formatMoney(placement.totals.total, placement.totals.currencyCode, locale)} and saved as awaiting payment. You will not be charged now.`
+            : ''
+        }
+        confirmLabel="Place order"
+        cancelLabel="Not yet"
+        onConfirm={() => {
+          if (placement.kind === 'confirming') {
+            void place(placement.totals)
+          }
+        }}
+        onCancel={() => setPlacement({ kind: 'idle' })}
+      />
 
       <ConfirmDialog
         open={confirmStartOver}

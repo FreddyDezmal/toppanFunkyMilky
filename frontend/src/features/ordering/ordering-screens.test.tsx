@@ -4,10 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearCsrfToken } from '../../lib/api/httpClient'
 import { formatMoney, formatPercent } from '../../lib/format/money'
 import { jsonResponse } from '../../test/mockApi'
-import { draftSummary, patronUser, quoteFor } from '../../test/orderingFixtures'
+import { draftSummary, patronUser, placedOrder, quoteFor } from '../../test/orderingFixtures'
 import { callsTo, renderOrderingAt } from '../../test/renderOrdering'
 import type { CurrentUser } from '../auth/types'
-import { saveDraft } from './draftStorage'
+import { draftStorageKey, saveDraft } from './draftStorage'
+import { PLACEMENT_MESSAGES } from './placement'
 import { RECONCILE_MESSAGES } from './reconcileDraft'
 import type { DrinkSelection, OrderDraft } from './types'
 
@@ -196,7 +197,7 @@ describe('review', () => {
   const ready: Partial<OrderDraft> = { restaurantId: 35, pickupLocal: '2026-11-20T10:00', drinks: [vanillaThickOreo] }
   const VALIDATE = 'POST /api/ordering/draft/validate'
 
-  it('shows the server-checked draft with per-drink prices and estimated totals, and payment is not offered yet', async () => {
+  it('shows the server-checked draft with per-drink prices and estimated totals, and offers to place it', async () => {
     storeDraft(ready)
     const fetchMock = renderOrderingAt('/order/review', { [VALIDATE]: () => jsonResponse(draftSummary()) })
 
@@ -210,7 +211,8 @@ describe('review', () => {
     expect(within(price).getByText(`VAT (${formatPercent(0.15, 'en-ZA')})`)).toBeInTheDocument()
     expect(within(price).getByText(zar(6.9))).toBeInTheDocument()
     expect(within(price).getByText(zar(52.9))).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Continue to payment (coming soon)' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Place order' })).toBeEnabled()
+    expect(screen.getByText(/You will not be charged now/)).toBeInTheDocument()
 
     const [call] = callsTo(fetchMock, 'POST', '/api/ordering/draft/validate')
     expect(JSON.parse(String(call?.[1]?.body))).toEqual({
@@ -327,5 +329,161 @@ describe('live prices', () => {
 
     expect(await screen.findByText('Ordering is temporarily unavailable. Please try again later.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue to pickup' })).toBeEnabled()
+  })
+})
+
+describe('placing an order', () => {
+  const ready: Partial<OrderDraft> = { restaurantId: 35, pickupLocal: '2026-11-20T10:00', drinks: [vanillaThickOreo] }
+  const VALIDATE = 'POST /api/ordering/draft/validate'
+  const PLACE = 'POST /api/ordering/orders'
+  const ORDER = 'GET /api/ordering/orders/MS-7KQ2-X9TD'
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const keyOf = (init: RequestInit | undefined) => new Headers(init?.headers).get('Idempotency-Key')
+  const bodyOf = (init: RequestInit | undefined) => JSON.parse(String(init?.body)) as Record<string, unknown>
+
+  async function confirmPlacement() {
+    await userEvent.click(await screen.findByRole('button', { name: /^(Place order|Try again)$/ }))
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Place order' }))
+  }
+
+  it('asks to confirm the total, places the order with an idempotency key, clears the draft and shows the order', async () => {
+    storeDraft(ready)
+    const fetchMock = renderOrderingAt('/order/review', {
+      [VALIDATE]: () => jsonResponse(draftSummary()),
+      [PLACE]: () => jsonResponse(placedOrder(), 201),
+      [ORDER]: () => jsonResponse(placedOrder()),
+    })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Place order' }))
+    expect(within(screen.getByRole('alertdialog')).getByText(new RegExp(zar(52.9)))).toBeInTheDocument()
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Place order' }))
+
+    expect(await screen.findByRole('heading', { name: 'Order MS-7KQ2-X9TD' })).toBeInTheDocument()
+    expect(screen.getByText('Awaiting payment')).toBeInTheDocument()
+    expect(screen.getByText('Not paid')).toBeInTheDocument()
+    const [call] = callsTo(fetchMock, 'POST', '/api/ordering/orders')
+    expect(bodyOf(call?.[1])).toEqual({ ...ready, expectedTotal: 52.9, expectedCurrencyCode: 'ZAR' })
+    expect(keyOf(call?.[1])).toMatch(UUID)
+    expect(sessionStorage.getItem(draftStorageKey(patronUser.id))).toBeNull()
+    expect(Object.keys(sessionStorage).filter((key) => key.startsWith('milkshake.'))).toEqual([])
+  })
+
+  it('sends one request however often the patron confirms', async () => {
+    storeDraft(ready)
+    let release: (() => void) | undefined
+    const fetchMock = renderOrderingAt('/order/review', {
+      [VALIDATE]: () => jsonResponse(draftSummary()),
+      [PLACE]: () => new Promise<Response>((resolve) => (release = () => resolve(jsonResponse(placedOrder(), 201)))),
+      [ORDER]: () => jsonResponse(placedOrder()),
+    })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Place order' }))
+    const confirm = within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Place order' })
+    fireEvent.click(confirm)
+    fireEvent.click(confirm)
+    fireEvent.click(confirm)
+
+    expect(await screen.findByRole('button', { name: 'Placing your order…' })).toBeDisabled()
+    await waitFor(() => expect(callsTo(fetchMock, 'POST', '/api/ordering/orders')).toHaveLength(1))
+    await act(async () => release?.())
+    expect(await screen.findByRole('heading', { name: 'Order MS-7KQ2-X9TD' })).toBeInTheDocument()
+    expect(callsTo(fetchMock, 'POST', '/api/ordering/orders')).toHaveLength(1)
+  })
+
+  it('keeps the draft and the same key after a network failure, so trying again cannot create a second order', async () => {
+    storeDraft(ready)
+    let attempts = 0
+    const fetchMock = renderOrderingAt('/order/review', {
+      [VALIDATE]: () => jsonResponse(draftSummary()),
+      [PLACE]: () => {
+        attempts += 1
+        return attempts === 1 ? Promise.reject(new TypeError('Failed to fetch')) : jsonResponse(placedOrder())
+      },
+      [ORDER]: () => jsonResponse(placedOrder()),
+    })
+
+    await confirmPlacement()
+    expect(await screen.findByText(PLACEMENT_MESSAGES.uncertain)).toBeInTheDocument()
+    expect(sessionStorage.getItem(draftStorageKey(patronUser.id))).not.toBeNull()
+
+    await confirmPlacement()
+    expect(await screen.findByRole('heading', { name: 'Order MS-7KQ2-X9TD' })).toBeInTheDocument()
+    const keys = callsTo(fetchMock, 'POST', '/api/ordering/orders').map(([, init]) => keyOf(init))
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toMatch(UUID)
+    expect(keys[1]).toBe(keys[0])
+  })
+
+  it('shows a changed price and places the order only once the patron accepts the new total', async () => {
+    storeDraft(ready)
+    const newTotals = { ...draftSummary().totals, subtotal: 48, taxable: 48, vat: 7.2, total: 55.2 }
+    let attempts = 0
+    const fetchMock = renderOrderingAt('/order/review', {
+      [VALIDATE]: () => jsonResponse(draftSummary()),
+      [PLACE]: () => {
+        attempts += 1
+        return attempts === 1
+          ? jsonResponse({ status: 409, title: 'The price has changed.', currentTotals: newTotals }, 409)
+          : jsonResponse(placedOrder(), 201)
+      },
+      [ORDER]: () => jsonResponse(placedOrder()),
+    })
+
+    await confirmPlacement()
+    const notice = await screen.findByRole('alert')
+    expect(notice).toHaveTextContent('The price has changed')
+    expect(notice).toHaveTextContent(`The new total is ${zar(55.2)}`)
+    expect(callsTo(fetchMock, 'POST', '/api/ordering/orders')).toHaveLength(1)
+
+    // The accessible name keeps Intl's non-breaking space, so compare it with spaces normalised.
+    await userEvent.click(screen.getByRole('button', { name: (name) => name.replace(/\s/g, ' ') === `Place order at ${zar(55.2)}` }))
+
+    expect(await screen.findByRole('heading', { name: 'Order MS-7KQ2-X9TD' })).toBeInTheDocument()
+    const [first, second] = callsTo(fetchMock, 'POST', '/api/ordering/orders')
+    expect(bodyOf(second?.[1])).toMatchObject({ expectedTotal: 55.2, expectedCurrencyCode: 'ZAR' })
+    expect(keyOf(second?.[1])).toBe(keyOf(first?.[1]))
+  })
+
+  it('shows what the server rejected at placement and keeps the draft', async () => {
+    storeDraft(ready)
+    renderOrderingAt('/order/review', {
+      [VALIDATE]: () => jsonResponse(draftSummary()),
+      [PLACE]: () =>
+        jsonResponse(
+          { status: 400, title: 'One or more validation errors occurred.', errors: { pickupLocal: ['That pickup time has already passed.'] } },
+          400,
+        ),
+    })
+
+    await confirmPlacement()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('That pickup time has already passed.')
+    expect(within(alert).getByRole('link', { name: 'Change pickup' })).toBeInTheDocument()
+    expect(sessionStorage.getItem(draftStorageKey(patronUser.id))).not.toBeNull()
+  })
+})
+
+describe('order page', () => {
+  it('shows the order as stored, with its own names and prices, and makes clear it is not paid', async () => {
+    renderOrderingAt('/orders/MS-7KQ2-X9TD', { 'GET /api/ordering/orders/MS-7KQ2-X9TD': () => jsonResponse(placedOrder()) })
+
+    expect(await screen.findByRole('heading', { name: 'Order MS-7KQ2-X9TD' })).toHaveFocus()
+    expect(screen.getByText(/^Vanilla \(old recipe\) ·/)).toBeInTheDocument()
+    expect(screen.getByText('Awaiting payment')).toBeInTheDocument()
+    expect(screen.getByText('Not paid')).toBeInTheDocument()
+    expect(screen.getByText(/has not been paid/)).toBeInTheDocument()
+    const price = screen.getByRole('region', { name: 'Price' })
+    expect(within(price).getByText('Total')).toBeInTheDocument()
+    expect(within(price).getByText(zar(52.9))).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pay now (coming soon)' })).toBeDisabled()
+  })
+
+  it('says when the order is not the patron’s or does not exist', async () => {
+    renderOrderingAt('/orders/MS-0000-0000', {
+      'GET /api/ordering/orders/MS-0000-0000': () => jsonResponse({ status: 404, title: 'Order not found.' }, 404),
+    })
+
+    expect(await screen.findByRole('heading', { name: 'Order not found' })).toBeInTheDocument()
   })
 })
