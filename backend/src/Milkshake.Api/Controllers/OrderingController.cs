@@ -9,8 +9,8 @@ using Milkshake.Domain.Pricing;
 namespace Milkshake.Api.Controllers;
 
 /// <summary>
-/// Patron ordering: read-only options (M5), draft validation with an estimated price, and live quotes (M6).
-/// Nothing here creates an order, stores a draft or takes payment. Rate-limited per patron (finding F1).
+/// Patron ordering: read-only options (M5), draft validation with an estimated price, live quotes (M6) and order
+/// placement (M7). Nothing here takes payment or marks an order paid. Rate-limited per patron (finding F1).
 /// Prices, VAT rates and discounts always come from the server; requests carrying them are rejected.
 /// </summary>
 [ApiController]
@@ -20,6 +20,7 @@ namespace Milkshake.Api.Controllers;
 public sealed partial class OrderingController(
     IOrderingCatalogService catalog,
     IOrderPricingService pricing,
+    IOrderPlacementService orders,
     ILogger<OrderingController> logger) : ControllerBase
 {
     /// <summary>
@@ -132,6 +133,88 @@ public sealed partial class OrderingController(
             : Ok(DraftSummaryResponse.From(result.Draft, result.Price));
     }
 
+    /// <summary>
+    /// Places an order: the draft is revalidated and repriced on the server and stored with its price snapshot, unpaid
+    /// (status PendingPayment). The Idempotency-Key header (a UUID) makes retries safe: the same key with the same
+    /// content returns the original order instead of creating another one.
+    /// </summary>
+    /// <response code="201">The order was placed. Location points to it.</response>
+    /// <response code="200">A retry of an order already placed with this key: the original order, unchanged.</response>
+    /// <response code="400">Invalid selections, pickup time, request shape or Idempotency-Key header.</response>
+    /// <response code="409">The price changed since the patron reviewed it; <c>currentTotals</c> holds the new price. Nothing was stored.</response>
+    /// <response code="413">The request body is larger than any real order.</response>
+    /// <response code="422">The key was already used for a different order. Nothing was stored.</response>
+    /// <response code="429">Too many ordering requests; try again in a minute.</response>
+    /// <response code="503">Ordering or pricing configuration is invalid.</response>
+    [HttpPost("orders")]
+    [RequestBodyLimit(MaxDraftBodyBytes)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ProducesResponseType<OrderResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<OrderResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status413PayloadTooLarge)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<OrderResponse>> PlaceOrder(
+        PlaceOrderRequest request,
+        [FromHeader(Name = OrderMessages.IdempotencyKeyHeader)] string? idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!Guid.TryParseExact(idempotencyKey, "D", out Guid key) || key == Guid.Empty)
+        {
+            ModelState.AddModelError(OrderMessages.IdempotencyKeyHeader, OrderMessages.IdempotencyKeyRequired);
+        }
+
+        if (request.ExpectedTotal is null || string.IsNullOrWhiteSpace(request.ExpectedCurrencyCode))
+        {
+            ModelState.AddModelError("expectedTotal", OrderMessages.ExpectedTotalRequired);
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        PlaceOrderResult result;
+        try
+        {
+            result = await orders.PlaceAsync(
+                new PlaceOrderCommand(request.ToDraft(), request.ExpectedTotal!.Value, request.ExpectedCurrencyCode!.Trim(), key),
+                cancellationToken);
+        }
+        catch (PricingConfigurationException exception)
+        {
+            LogPricingConfiguration(logger, exception);
+            return Unavailable();
+        }
+
+        switch (result.Outcome)
+        {
+            case PlaceOrderOutcome.Created:
+                OrderResponse created = OrderResponse.From(result.Order!);
+                return Created($"/api/ordering/orders/{created.Reference}", created);
+            case PlaceOrderOutcome.Replayed:
+                return Ok(OrderResponse.From(result.Order!));
+            case PlaceOrderOutcome.Invalid:
+                return FieldErrors(result.Errors);
+            case PlaceOrderOutcome.PriceChanged:
+                ProblemDetails changed = ProblemDetailsFactory.CreateProblemDetails(
+                    HttpContext, StatusCodes.Status409Conflict, OrderMessages.PriceChangedTitle, detail: OrderMessages.PriceChangedDetail);
+                changed.Extensions["currentTotals"] = OrderTotalsResponse.From(result.CurrentPrice!);
+                return Conflict(changed);
+            case PlaceOrderOutcome.KeyReused:
+                return Problem(
+                    statusCode: StatusCodes.Status422UnprocessableEntity,
+                    title: OrderMessages.KeyReusedTitle,
+                    detail: OrderMessages.KeyReusedDetail);
+            default:
+                return Unavailable();
+        }
+    }
+
     private ActionResult FieldErrors(IReadOnlyDictionary<string, string[]> errors)
     {
         foreach ((string field, string[] messages) in errors)
@@ -153,4 +236,4 @@ public sealed partial class OrderingController(
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Ordering is unavailable because prices or settings cannot produce a correct price.")]
     private static partial void LogPricingConfiguration(ILogger logger, Exception exception);
-}
+}
