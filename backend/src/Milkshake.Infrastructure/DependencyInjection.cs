@@ -125,6 +125,7 @@ public static class DependencyInjection
         services.AddScoped<IManagerEmailService, ManagerEmailService>();
         services.AddScoped<IAuditQueryService, AuditQueryService>();
         services.AddScoped<IOrderReportService, OrderReportService>();
+        services.AddScoped<IReportExportService, ReportExportService>();
         services.AddHostedService<EmailDispatchWorker>();
 
         services.AddHealthChecks()

@@ -1,4 +1,4 @@
-import { getJson, postJson, putJson } from '../../lib/api/httpClient'
+import { getFile, getJson, postJson, putJson, type DownloadedFile } from '../../lib/api/httpClient'
 import type {
   AuditChange,
   AuditPage,
@@ -144,8 +144,7 @@ export interface OrderReportFilter {
   page?: number
 }
 
-/** One page of the orders report: one row per milkshake, newest order first (AC-12.2). */
-export function getOrderReport(filter: OrderReportFilter, signal?: AbortSignal): Promise<OrderReport> {
+function orderReportQuery(filter: OrderReportFilter): URLSearchParams {
   const query = new URLSearchParams({ from: filter.from })
   if (filter.to && filter.to !== filter.from) {
     query.set('to', filter.to)
@@ -159,11 +158,20 @@ export function getOrderReport(filter: OrderReportFilter, signal?: AbortSignal):
   if (filter.page && filter.page > 1) {
     query.set('page', String(filter.page))
   }
-  return getJson<OrderReport>(`${MANAGER}/reports/orders?${query.toString()}`, { signal })
+  return query
 }
 
-/** Order volumes by weekday, month and year (AC-12.3); without from, all orders. */
-export function getOrderTrends(filter: { from?: string; to?: string }, signal?: AbortSignal): Promise<OrderTrends> {
+/** One page of the orders report: one row per milkshake, newest order first (AC-12.2). */
+export function getOrderReport(filter: OrderReportFilter, signal?: AbortSignal): Promise<OrderReport> {
+  return getJson<OrderReport>(`${MANAGER}/reports/orders?${orderReportQuery(filter).toString()}`, { signal })
+}
+
+/** Every row of the orders report with these filters, as CSV (at most 10,000; AC-12.6). */
+export function exportOrderReport(filter: OrderReportFilter): Promise<DownloadedFile> {
+  return getFile(`${MANAGER}/reports/orders/export?${orderReportQuery({ ...filter, page: undefined }).toString()}`)
+}
+
+function trendsQuery(filter: { from?: string; to?: string }): string {
   const query = new URLSearchParams()
   if (filter.from) {
     query.set('from', filter.from)
@@ -172,7 +180,17 @@ export function getOrderTrends(filter: { from?: string; to?: string }, signal?: 
     }
   }
   const search = query.toString()
-  return getJson<OrderTrends>(`${MANAGER}/reports/trends${search ? `?${search}` : ''}`, { signal })
+  return search ? `?${search}` : ''
+}
+
+/** Order volumes by weekday, month and year (AC-12.3); without from, all orders. */
+export function getOrderTrends(filter: { from?: string; to?: string }, signal?: AbortSignal): Promise<OrderTrends> {
+  return getJson<OrderTrends>(`${MANAGER}/reports/trends${trendsQuery(filter)}`, { signal })
+}
+
+/** The trends for this period as CSV: one line per weekday, month and year. */
+export function exportOrderTrends(filter: { from?: string; to?: string }): Promise<DownloadedFile> {
+  return getFile(`${MANAGER}/reports/trends/export${trendsQuery(filter)}`)
 }
 
 /** Filters of the audit history (AC-11.4); from and to are UTC instants (ISO 8601), to exclusive. */
@@ -212,4 +230,14 @@ export function listSecurityEvents(
   signal?: AbortSignal,
 ): Promise<AuditPage<SecurityEvent>> {
   return getJson<AuditPage<SecurityEvent>>(`${MANAGER}/audit/security${auditQuery({ ...filter }, cursor)}`, { signal })
+}
+
+/** The change history with these filters as CSV, one line per changed field (at most 10,000 records; masked). */
+export function exportAuditChanges(filter: AuditFilter): Promise<DownloadedFile> {
+  return getFile(`${MANAGER}/reports/audit/changes/export${auditQuery({ ...filter })}`)
+}
+
+/** Sign-in events with these filters as CSV (at most 10,000; masked). */
+export function exportSecurityEvents(filter: { from?: string; to?: string; user?: string; eventType?: SecurityEventType }): Promise<DownloadedFile> {
+  return getFile(`${MANAGER}/reports/audit/security/export${auditQuery({ ...filter })}`)
 }

@@ -126,6 +126,42 @@ async function getCsrfToken(signal?: AbortSignal): Promise<string> {
   return csrfToken
 }
 
+/** A downloaded file and the name the server gave it (null when the server named none). */
+export interface DownloadedFile {
+  blob: Blob
+  fileName: string | null
+}
+
+/** GETs a file (e.g. a CSV export) with the session cookie. Errors arrive as ApiError, like getJson. */
+export async function getFile(path: string, options: RequestOptions = {}): Promise<DownloadedFile> {
+  const response = await send(`${getApiBaseUrl()}${path}`, {
+    headers: { ...options.headers, Accept: 'text/csv, application/problem+json' },
+    credentials: 'include',
+    signal: options.signal,
+  })
+  if (!response.ok) {
+    const problem = await readProblem(response)
+    throw new ApiError(problem?.detail ?? problem?.title ?? `The API returned HTTP ${response.status}.`, response.status, problem)
+  }
+  return { blob: await response.blob(), fileName: fileNameFrom(response.headers.get('Content-Disposition')) }
+}
+
+/** The file name in a Content-Disposition header, preferring the UTF-8 form (filename*=UTF-8''…). */
+export function fileNameFrom(disposition: string | null): string | null {
+  if (!disposition) {
+    return null
+  }
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1]
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded.trim())
+    } catch {
+      // Fall back to the plain name below.
+    }
+  }
+  return /filename="?([^";]+)"?/i.exec(disposition)?.[1]?.trim() ?? null
+}
+
 async function send(url: string, init: RequestInit): Promise<Response> {
   try {
     return await fetch(url, init)

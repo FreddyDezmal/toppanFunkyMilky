@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { listAuditChanges, listSecurityEvents, type AuditFilter } from './api'
+import { exportAuditChanges, exportSecurityEvents, listAuditChanges, listSecurityEvents, type AuditFilter } from './api'
 import { useDisplayFormat } from './displayFormat'
+import { ExportButton } from './ExportButton'
 import { ACTION_LABELS, ACTORS, describeActor, describeRecord, describeValue, EVENT_LABELS, LOOKUP_TABLES, OTHER_TABLES } from './audit'
 import { describeReportError, nextDay, startOfDayUtc } from './reports'
 import type { AuditChange, AuditPage, SecurityEvent, SecurityEventType } from './types'
@@ -215,6 +216,13 @@ function Changes({ lookupsOnly, from, to }: { lookupsOnly: boolean; from: string
           Show
         </button>
       </form>
+      <div className="mt-3">
+        <ExportButton
+          label={lookupsOnly ? 'Export these lookup changes as CSV' : 'Export these changes as CSV'}
+          fallbackName="milkshake-audit-changes.csv"
+          run={() => exportAuditChanges(query)}
+        />
+      </div>
 
       {error && (
         <p role="alert" className="mt-4 text-sm text-rose-700">
@@ -324,6 +332,9 @@ function SecurityEvents({ from, to }: { from: string; to: string }) {
           Show
         </button>
       </form>
+      <div className="mt-3">
+        <ExportButton label="Export these sign-in events as CSV" fallbackName="milkshake-sign-in-events.csv" run={() => exportSecurityEvents(query)} />
+      </div>
 
       {error && (
         <p role="alert" className="mt-4 text-sm text-rose-700">

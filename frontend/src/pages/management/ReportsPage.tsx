@@ -1,12 +1,14 @@
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { getOrderReport, getOrderTrends } from '../../features/management/api'
+import { exportOrderReport, exportOrderTrends, getOrderReport, getOrderTrends } from '../../features/management/api'
 import { AuditPanel } from '../../features/management/AuditPanel'
+import { ExportButton } from '../../features/management/ExportButton'
 import { useDisplayFormat } from '../../features/management/displayFormat'
 import { describeReportError, pageNumbers, shortMonth, shortWeekday, slashed, todayIn } from '../../features/management/reports'
 import { TrendChart } from '../../features/management/TrendChart'
 import type { OrderReport, OrderReportRow, OrderTrends, ReportStatusFilter, TrendPoint } from '../../features/management/types'
 import { paymentText } from '../../features/ordering/history'
+import { toTabSeparated } from '../../lib/download'
 
 type Tab = 'orders' | 'trends' | 'audit'
 
@@ -24,6 +26,8 @@ const BADGE_CLASS: Record<OrderReportRow['paymentStatus'], string> = {
   Unpaid: 'bg-amber-50 text-amber-800 ring-amber-200',
   Cancelled: 'bg-rose-50 text-rose-800 ring-rose-200',
 }
+
+const COPY_HEADINGS = ['Date', 'Time', 'Order', 'Milkshake', 'Flavour', 'Topping', 'Consistency', 'Pickup', 'Payment status']
 
 const INPUT_CLASS = 'mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none'
 const BUTTON_CLASS = 'rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50'
@@ -216,6 +220,7 @@ function OrdersPanel({ from, to, q, status, page, update }: OrdersPanelProps) {
   const [report, setReport] = useState<OrderReport | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState(q)
+  const [copied, setCopied] = useState<{ text: string; isError: boolean } | null>(null)
   const [shownQ, setShownQ] = useState(q)
   if (q !== shownQ) {
     // The address changed (e.g. Clear): show the new search text.
@@ -249,6 +254,33 @@ function OrdersPanel({ from, to, q, status, page, update }: OrdersPanelProps) {
 
   const period = to && to !== from ? `${slashed(from)} to ${slashed(to)}` : slashed(from)
 
+  /** Copy (URS §3.4.4): the rows on screen as tab-separated text, which pastes into a spreadsheet as cells. */
+  async function copyPage(rows: OrderReportRow[]) {
+    const text = toTabSeparated([
+      COPY_HEADINGS,
+      ...rows.map((row) => [
+        slashed(row.date),
+        row.time,
+        row.reference,
+        String(row.drinkNumber),
+        row.flavour,
+        row.topping,
+        row.consistency,
+        slashed(row.pickupLocal.replace('T', ' ')),
+        row.paymentStatus === 'Cancelled' ? `Cancelled (${paymentText({ paymentStatus: 'Cancelled', refundStatus: row.refundStatus })})` : row.paymentStatus,
+      ]),
+    ])
+    try {
+      if (!navigator.clipboard) {
+        throw new Error('No clipboard.')
+      }
+      await navigator.clipboard.writeText(text)
+      setCopied({ text: `Copied ${rows.length === 1 ? '1 row' : `${rows.length} rows`} (this page).`, isError: false })
+    } catch {
+      setCopied({ text: 'This browser did not allow copying. Use Export instead.', isError: true })
+    }
+  }
+
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -277,6 +309,28 @@ function OrdersPanel({ from, to, q, status, page, update }: OrdersPanelProps) {
             Search
           </button>
         </form>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          aria-label="Copy the rows on this page"
+          disabled={!report || report.rows.length === 0}
+          onClick={() => report && void copyPage(report.rows)}
+          className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:opacity-50"
+        >
+          Copy
+        </button>
+        <ExportButton
+          label="Export all matching orders as CSV"
+          fallbackName="milkshake-orders.csv"
+          run={() => exportOrderReport({ from, to, status, q })}
+        />
+        {copied && (
+          <span role={copied.isError ? 'alert' : 'status'} className={`text-sm ${copied.isError ? 'text-rose-700' : 'text-emerald-800'}`}>
+            {copied.text}
+          </span>
+        )}
       </div>
 
       <div role="group" aria-label="Show orders by payment status" className="mt-4 flex flex-wrap gap-2">
@@ -424,7 +478,14 @@ function TrendsPanel({ from, to }: { from: string; to: string }) {
 
   return (
     <>
-      <h2 className="text-lg font-semibold">Trends for {period}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">Trends for {period}</h2>
+        <ExportButton
+          label="Export the trends as CSV"
+          fallbackName="milkshake-trends.csv"
+          run={() => exportOrderTrends({ from: from || undefined, to: to || undefined })}
+        />
+      </div>
       {error && (
         <p role="alert" className="mt-4 text-sm text-rose-700">
           {error}

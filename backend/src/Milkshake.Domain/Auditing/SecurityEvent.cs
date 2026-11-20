@@ -17,6 +17,9 @@ public enum SecurityEventType
 
     /// <summary>A manager account was created by the provisioning process (Step 6).</summary>
     ManagerProvisioned,
+
+    /// <summary>A manager downloaded a report or audit export (M12); which one is in the server log under the same trace id.</summary>
+    ReportExported,
 }
 
 /// <summary>

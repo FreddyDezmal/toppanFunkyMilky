@@ -269,7 +269,7 @@ export interface AuditChange {
   traceId: string | null
 }
 
-export type SecurityEventType = 'LoginSucceeded' | 'LoginFailed' | 'LoginLockedOut' | 'Logout'
+export type SecurityEventType = 'LoginSucceeded' | 'LoginFailed' | 'LoginLockedOut' | 'Logout' | 'ManagerProvisioned' | 'ReportExported'
 
 /** One sign-in, sign-out or lockout (T11.3); addresses and IPs masked except managers' addresses. */
 export interface SecurityEvent {

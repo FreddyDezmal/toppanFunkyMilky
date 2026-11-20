@@ -119,4 +119,8 @@ public static class ReportMessages
     public const string UnavailableTitle = "Reports are unavailable.";
 
     public const string UnavailableDetail = "The business time zone setting is missing or invalid. Check Management → Settings.";
+
+    public const string TooLargeTitle = "Too many records to export.";
+
+    public const string TooLargeDetail = "An export holds at most 10,000 records. Choose a shorter period or add filters, then export again.";
 }

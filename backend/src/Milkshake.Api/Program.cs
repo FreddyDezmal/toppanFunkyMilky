@@ -82,6 +82,7 @@ builder.Services.AddOptions<RateLimiterOptions>().Configure<IConfiguration>((opt
     int emailResendPermitLimit = configuration.GetValue("RateLimiting:EmailResendPermitLimit", 20);
     int auditPermitLimit = configuration.GetValue("RateLimiting:AuditPermitLimit", 60);
     int reportsPermitLimit = configuration.GetValue("RateLimiting:ReportsPermitLimit", 60);
+    int exportPermitLimit = configuration.GetValue("RateLimiting:ExportPermitLimit", 10);
 
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.AddPolicy(RateLimitPolicies.Auth, httpContext =>
@@ -154,6 +155,18 @@ builder.Services.AddOptions<RateLimiterOptions>().Configure<IConfiguration>((opt
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
             }));
+
+    options.AddPolicy(RateLimitPolicies.ReportExports, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            "exports:" + (httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) is string userId
+                ? "user:" + userId
+                : "ip:" + (httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown")),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = exportPermitLimit,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
 });
 
 // Only origins listed in configuration (Cors:AllowedOrigins) may call the API from a browser.
@@ -166,7 +179,8 @@ builder.Services.AddOptions<CorsOptions>().Configure<IConfiguration>((options, c
     {
         if (allowedOrigins.Length > 0)
         {
-            policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+            // Content-Disposition carries the file name of report exports (M12).
+            policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials().WithExposedHeaders("Content-Disposition");
         }
     });
 });

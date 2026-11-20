@@ -20,4 +20,7 @@ public static class RateLimitPolicies
 
     /// <summary>Management reports (M12), per signed-in manager: aggregate queries over all orders.</summary>
     public const string Reports = "reports";
+
+    /// <summary>Report and audit exports (M12), per signed-in manager: each builds a file of up to 10,000 records.</summary>
+    public const string ReportExports = "report-exports";
 }

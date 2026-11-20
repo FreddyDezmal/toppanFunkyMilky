@@ -46,6 +46,8 @@ export const EVENT_LABELS: Record<SecurityEventType, string> = {
   LoginFailed: 'Sign-in failed',
   LoginLockedOut: 'Locked out',
   Logout: 'Signed out',
+  ManagerProvisioned: 'Manager account created',
+  ReportExported: 'Report exported',
 }
 
 /** Who made a change: the account for a signed-in user, otherwise the kind of actor; "Not recorded" for old records. */

@@ -204,6 +204,123 @@ public sealed class ManagerReportsTests(PostgresApiFactory factory)
         Assert.Equal(new[] { HttpStatusCode.OK, HttpStatusCode.OK, HttpStatusCode.TooManyRequests }, statuses);
     }
 
+    // ---- exports (AC-12.6) --------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task TheOrdersExport_HasEveryRowOfTheFilter_AsCsvForSpreadsheets_AndIsRecorded()
+    {
+        Seeded s = await SeedAsync();
+        using ManagerSession manager = await factory.CreateManagerSessionAsync();
+
+        using HttpResponseMessage response = await manager.Client.GetAsync(new Uri(
+            $"{OrdersReport}/export?from=2041-03-04&to=2041-03-06&pageSize=1&q={Uri.EscapeDataString(s.Menu.Flavour.Name)}", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/csv", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("milkshake-orders_2041-03-04_2041-03-06.csv", response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+        Assert.Contains("no-store", response.Headers.CacheControl?.ToString() ?? string.Empty, StringComparison.Ordinal);
+        byte[] bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.Equal(System.Text.Encoding.UTF8.GetPreamble(), bytes[..3]);
+        string[] lines = System.Text.Encoding.UTF8.GetString(bytes[3..]).Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Equal("Date,Time,Order,Milkshake,Flavour,Topping,Consistency,Restaurant,Pickup,Payment status,Refund", lines[0]);
+        Assert.Equal(6, lines.Length);   // all five milkshakes, although the screen's page size was 1
+        Assert.StartsWith($"2041-03-05,00:30,{s.C},1,{s.Menu.Flavour.Name},", lines[2], StringComparison.Ordinal);
+        Assert.EndsWith(",Cancelled,Not paid", lines[2], StringComparison.Ordinal);
+        Assert.EndsWith(",Paid,", lines[4], StringComparison.Ordinal);
+        Assert.DoesNotContain("@", string.Join('\n', lines), StringComparison.Ordinal);
+
+        AuditPageResponse<SecurityEventResponse> recorded = await GetAsync<AuditPageResponse<SecurityEventResponse>>(manager.Client,
+            $"/api/manager/audit/security?eventType=ReportExported&user={Uri.EscapeDataString(manager.Email)}");
+        Assert.NotEmpty(recorded.Items);
+    }
+
+    [Fact]
+    public async Task TheTrendsExport_ListsEachWeekdayMonthAndYear()
+    {
+        await SeedAsync(year: 2043);
+        using ManagerSession manager = await factory.CreateManagerSessionAsync();
+
+        string csv = await ExportTextAsync(manager.Client, $"{TrendsReport}/export?from=2043-03-01&to=2043-04-30");
+
+        string[] lines = csv.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("Series,Period,Orders,Paid orders", lines[0]);
+        Assert.Equal(7 + 2 + 1, lines.Length - 1);
+        Assert.Contains("Month,2043-03,5,1", lines);
+        Assert.Contains("Year,2043,6,2", lines);
+    }
+
+    [Fact]
+    public async Task TheAuditExports_HaveOneLinePerChangedField_AndMaskPersonalData()
+    {
+        using ManagerSession manager = await factory.CreateManagerSessionAsync();
+        TestMenu menu = await manager.CreateTestMenuAsync(12.00m, 6.00m, 8.00m);
+        using HttpClient patron = await factory.CreatePatronClientAsync();
+
+        string changes = await ExportTextAsync(manager.Client, $"/api/manager/reports/audit/changes/export?entity=flavours&q={Uri.EscapeDataString(menu.Flavour.Name)}");
+        string[] lines = changes.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("Occurred at (UTC),Action,Table,Record,Made by,User,Field,From,To", lines[0]);
+        Assert.Contains(lines, l => l.Contains($",Insert,flavours,{menu.Flavour.Id},user,{manager.Email},name,,{menu.Flavour.Name}", StringComparison.Ordinal));
+
+        string users = await ExportTextAsync(manager.Client, "/api/manager/reports/audit/changes/export?entity=users&action=Insert");
+        Assert.Contains(",email,,***", users, StringComparison.Ordinal);
+
+        string signIns = await ExportTextAsync(manager.Client, $"/api/manager/reports/audit/security/export?user={Uri.EscapeDataString(manager.Email)}&eventType=LoginSucceeded");
+        Assert.StartsWith("Occurred at (UTC),Event,User,Address\r\n", signIns, StringComparison.Ordinal);
+        Assert.Contains($",LoginSucceeded,{manager.Email},", signIns, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("/api/manager/reports/orders/export", "?to=2041-03-04", HttpStatusCode.BadRequest)]
+    [InlineData("/api/manager/reports/trends/export", "?status=paid", HttpStatusCode.BadRequest)]
+    [InlineData("/api/manager/reports/audit/changes/export", "?entity=no_such_table", HttpStatusCode.BadRequest)]
+    [InlineData("/api/manager/reports/audit/security/export", "?eventType=Hacked", HttpStatusCode.BadRequest)]
+    public async Task InvalidExportFilters_AreRejected(string path, string query, HttpStatusCode expected)
+    {
+        using ManagerSession manager = await factory.CreateManagerSessionAsync();
+
+        using HttpResponseMessage response = await manager.Client.GetAsync(new Uri(path + query, UriKind.Relative));
+
+        Assert.Equal(expected, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task OnlyManagers_CanExport()
+    {
+        using HttpClient patron = await factory.CreatePatronClientAsync();
+        using HttpClient anonymous = factory.CreateHttpsClient();
+
+        foreach (string path in new[] { $"{OrdersReport}/export?from=2041-03-04", $"{TrendsReport}/export", "/api/manager/reports/audit/changes/export", "/api/manager/reports/audit/security/export" })
+        {
+            using HttpResponseMessage asPatron = await patron.GetAsync(new Uri(path, UriKind.Relative));
+            using HttpResponseMessage asAnonymous = await anonymous.GetAsync(new Uri(path, UriKind.Relative));
+            Assert.Equal((HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized), (asPatron.StatusCode, asAnonymous.StatusCode));
+        }
+    }
+
+    [Fact]
+    public async Task Exports_HaveTheirOwnStricterRateLimit()
+    {
+        using ManagerSession manager = await factory.CreateManagerSessionAsync();
+        using WebApplicationFactory<ApiAssemblyMarker> app = factory.WithWebHostBuilder(builder => builder.UseSetting("RateLimiting:ExportPermitLimit", "1"));
+        using HttpClient client = app.CreateSecureClient();
+        using (HttpResponseMessage login = await client.PostWithCsrfAsync("/api/auth/login", new LoginBody(manager.Email, RegisterBody.ValidPassword)))
+        {
+            Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        }
+
+        var statuses = new List<HttpStatusCode>();
+        foreach (string path in new[] { $"{TrendsReport}/export?from=2041-03-04", $"{TrendsReport}/export?from=2041-03-04", $"{TrendsReport}?from=2041-03-04" })
+        {
+            using HttpResponseMessage response = await client.GetAsync(new Uri(path, UriKind.Relative));
+            statuses.Add(response.StatusCode);
+        }
+
+        // The second export is refused; the report itself still answers (its own limit).
+        Assert.Equal(new[] { HttpStatusCode.OK, HttpStatusCode.TooManyRequests, HttpStatusCode.OK }, statuses);
+    }
+
     // ---- performance (decision R8) ------------------------------------------------------------------------------
 
     [Fact]
@@ -280,6 +397,16 @@ public sealed class ManagerReportsTests(PostgresApiFactory factory)
         Assert.Equal((12_500, 25_000), (year.TotalOrders, year.TotalDrinks));
         OrderReportResponse found = await GetAsync<OrderReportResponse>(manager.Client, $"{OrdersReport}?from=2045-01-01&to=2045-12-31&q=ZZ00-C350");
         Assert.Equal(new[] { "MS-ZZ00-C350", "MS-ZZ00-C350" }, found.Rows.Select(r => r.Reference));
+
+        // Exports stop at 10,000 records: a year of 100,000 milkshakes is refused; one week (about 2,000) is not.
+        using HttpResponseMessage tooLarge = await manager.Client.GetAsync(new Uri($"{OrdersReport}/export?from=2045-01-01&to=2045-12-31", UriKind.Relative));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, tooLarge.StatusCode);
+        Assert.Contains("10,000", await tooLarge.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        var exportTimer = Stopwatch.StartNew();
+        using HttpResponseMessage week = await manager.Client.GetAsync(new Uri($"{OrdersReport}/export?from=2045-03-02&to=2045-03-08", UriKind.Relative));
+        exportTimer.Stop();
+        Assert.Equal(HttpStatusCode.OK, week.StatusCode);
+        Assert.True(exportTimer.Elapsed < TimeSpan.FromSeconds(3), $"week export: {exportTimer.ElapsedMilliseconds} ms");
     }
 
     // ---- helpers -------------------------------------------------------------------------------------------------
@@ -378,6 +505,14 @@ public sealed class ManagerReportsTests(PostgresApiFactory factory)
     }
 
     private static (int Orders, int Drinks) Totals(OrderReportResponse report) => (report.TotalOrders, report.TotalDrinks);
+
+    private static async Task<string> ExportTextAsync(HttpClient client, string path)
+    {
+        using HttpResponseMessage response = await client.GetAsync(new Uri(path, UriKind.Relative));
+        Assert.True(response.StatusCode == HttpStatusCode.OK, $"GET {path}: {(int)response.StatusCode} {await response.Content.ReadAsStringAsync()}");
+        byte[] bytes = await response.Content.ReadAsByteArrayAsync();
+        return System.Text.Encoding.UTF8.GetString(bytes[3..]);
+    }
 
     private sealed record Seeded(TestMenu Menu, string A, string B, string C, string D, string E, string F);
 
