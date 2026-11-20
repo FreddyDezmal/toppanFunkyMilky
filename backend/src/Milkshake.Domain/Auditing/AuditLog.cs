@@ -32,11 +32,16 @@ public sealed class AuditLog
         string changes,
         Guid? userId,
         string? userEmail,
-        string? traceId)
+        string? traceId,
+        string? actor)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tableName);
         ArgumentException.ThrowIfNullOrWhiteSpace(recordId);
         ArgumentException.ThrowIfNullOrWhiteSpace(changes);
+        if (actor is not null && !AuditActors.IsValid(actor))
+        {
+            throw new ArgumentException("Unknown audit actor.", nameof(actor));
+        }
 
         OccurredAt = occurredAt;
         Action = action;
@@ -46,6 +51,7 @@ public sealed class AuditLog
         UserId = userId;
         UserEmail = userEmail;
         TraceId = traceId;
+        Actor = actor;
     }
 
     /// <summary>Database identifier.</summary>
@@ -74,4 +80,10 @@ public sealed class AuditLog
 
     /// <summary>Request trace id, to correlate with API logs.</summary>
     public string? TraceId { get; private set; }
-}
+
+    /// <summary>
+    /// Who made the change (M11): <c>user</c> (see <see cref="UserId"/>), <c>anonymous</c>, or a named system process
+    /// such as <c>system:payment-reconciliation</c>. Null only for records written before M11.
+    /// </summary>
+    public string? Actor { get; private set; }
+}

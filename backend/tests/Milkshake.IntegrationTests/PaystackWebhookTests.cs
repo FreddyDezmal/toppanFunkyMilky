@@ -53,6 +53,7 @@ public sealed class PaystackWebhookTests(PostgresApiFactory factory) : IDisposab
         Assert.Equal(string.Empty, await response.Content.ReadAsStringAsync());
         Assert.Equal((PaymentStatus.Succeeded, OrderStatus.Confirmed), await StateAsync(order, payment));
         Assert.Equal(1, await ReceiptsAsync(501));
+        Assert.Equal([AuditActors.PaystackWebhook], await PaymentSuccessActorsAsync(payment));   // M11: never the browser user
     }
 
     [Fact]
@@ -290,6 +291,19 @@ public sealed class PaystackWebhookTests(PostgresApiFactory factory) : IDisposab
     {
         await using AsyncServiceScope scope = factory.Services.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<MilkshakeDbContext>().PaymentEvents.CountAsync(e => e.ProviderTransactionId == transactionId);
+    }
+
+    /// <summary>M11: who the payment's change to Succeeded is attributed to in the audit trail.</summary>
+    private async Task<List<string?>> PaymentSuccessActorsAsync(string paymentReference)
+    {
+        await using AsyncServiceScope scope = factory.Services.CreateAsyncScope();
+        MilkshakeDbContext db = scope.ServiceProvider.GetRequiredService<MilkshakeDbContext>();
+        string id = (await db.Payments.Where(p => p.Reference == paymentReference).Select(p => p.Id).SingleAsync())
+            .ToString(CultureInfo.InvariantCulture);
+        List<AuditLog> updates = await db.AuditLogs
+            .Where(a => a.TableName == "payments" && a.RecordId == id && a.Action == AuditAction.Update)
+            .ToListAsync();
+        return updates.Where(a => a.Changes.Contains("Succeeded", StringComparison.Ordinal)).Select(a => a.Actor).ToList();
     }
 
     private async Task<int> PaymentUpdateAuditsAsync(string paymentReference)

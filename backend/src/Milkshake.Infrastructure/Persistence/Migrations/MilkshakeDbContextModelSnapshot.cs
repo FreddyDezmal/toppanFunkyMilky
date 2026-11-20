@@ -172,6 +172,11 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(10)")
                         .HasColumnName("action");
 
+                    b.Property<string>("Actor")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("actor");
+
                     b.Property<string>("Changes")
                         .IsRequired()
                         .HasColumnType("jsonb")
@@ -216,10 +221,17 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_audit_logs_user_id");
 
+                    b.HasIndex("OccurredAt", "Id")
+                        .IsDescending()
+                        .HasDatabaseName("ix_audit_logs_occurred_at_id");
+
                     b.HasIndex("TableName", "RecordId")
                         .HasDatabaseName("ix_audit_logs_table_name_record_id");
 
-                    b.ToTable("audit_logs", "milkshake");
+                    b.ToTable("audit_logs", "milkshake", t =>
+                        {
+                            t.HasCheckConstraint("ck_audit_logs_actor", "actor IS NULL OR actor ~ '^(user|anonymous|system:[a-z][a-z-]{0,40})$'");
+                        });
                 });
 
             modelBuilder.Entity("Milkshake.Domain.Auditing.SecurityEvent", b =>
@@ -268,6 +280,10 @@ namespace Milkshake.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_security_events_user_id");
+
+                    b.HasIndex("OccurredAt", "Id")
+                        .IsDescending()
+                        .HasDatabaseName("ix_security_events_occurred_at_id");
 
                     b.ToTable("security_events", "milkshake");
                 });

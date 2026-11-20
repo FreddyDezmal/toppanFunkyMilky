@@ -6,6 +6,8 @@ using Microsoft.Extensions.Options;
 using Milkshake.Application.Notifications;
 using Milkshake.Domain.Notifications;
 using Milkshake.Infrastructure.Persistence;
+using Milkshake.Application.Abstractions;
+using Milkshake.Domain.Auditing;
 
 namespace Milkshake.Infrastructure.Notifications;
 
@@ -28,6 +30,7 @@ internal sealed partial class EmailDispatcher(
 {
     public async Task<int> DispatchAsync(CancellationToken cancellationToken)
     {
+        using IDisposable actor = AuditActorScope.Begin(AuditActors.EmailDispatcher);   // M11 audit attribution
         EmailOptions settings = options.Value;
         if (!sender.IsConfigured)
         {

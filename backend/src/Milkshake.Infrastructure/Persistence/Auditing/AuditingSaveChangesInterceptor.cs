@@ -16,6 +16,9 @@ namespace Milkshake.Infrastructure.Persistence.Auditing;
 /// Runs before every SaveChanges: maintains created_at/updated_at and adds one AuditLog per changed row
 /// to the same SaveChanges, so data and audit are committed (or rolled back) together.
 /// Requires keys to be known before saving (HiLo sequence or client-generated GUIDs).
+/// M11: records who acted (<see cref="AuditActors"/>) – a named system process when an <see cref="AuditActorScope"/> is
+/// active (never the browser user then), otherwise the signed-in user or "anonymous" – and refuses any change to
+/// audit records or security events (append-only, AC-11.3; the database refuses it too).
 /// </summary>
 internal sealed class AuditingSaveChangesInterceptor(TimeProvider timeProvider, ICurrentUser currentUser) : SaveChangesInterceptor
 {
@@ -68,23 +71,35 @@ internal sealed class AuditingSaveChangesInterceptor(TimeProvider timeProvider, 
         }
 
         DateTimeOffset now = timeProvider.GetUtcNow();
-        Guid? userId = currentUser.UserId;
-        string? userEmail = currentUser.Email;
+        string? systemActor = AuditActorScope.Current;
+        Guid? userId = systemActor is null ? currentUser.UserId : null;
+        string? userEmail = systemActor is null ? currentUser.Email : null;
+        string actor = systemActor ?? (userId is null ? AuditActors.Anonymous : AuditActors.User);
         string? traceId = Activity.Current?.TraceId.ToString();
 
         var auditLogs = new List<AuditLog>();
 
         foreach (EntityEntry entry in context.ChangeTracker.Entries().ToList())
         {
-            if (entry.Entity is AuditLog or SecurityEvent ||
-                entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
+            if (entry.Entity is AuditLog or SecurityEvent)
+            {
+                if (entry.State is EntityState.Modified or EntityState.Deleted)
+                {
+                    throw new InvalidOperationException(
+                        "Audit records and security events are append-only: they cannot be changed or deleted.");
+                }
+
+                continue;
+            }
+
+            if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
             {
                 continue;
             }
 
             ApplyTimestamps(entry, now);
 
-            AuditLog? auditLog = CreateAuditLog(entry, now, userId, userEmail, traceId);
+            AuditLog? auditLog = CreateAuditLog(entry, now, userId, userEmail, traceId, actor);
             if (auditLog is not null)
             {
                 auditLogs.Add(auditLog);
@@ -116,7 +131,8 @@ internal sealed class AuditingSaveChangesInterceptor(TimeProvider timeProvider, 
         }
     }
 
-    private static AuditLog? CreateAuditLog(EntityEntry entry, DateTimeOffset now, Guid? userId, string? userEmail, string? traceId)
+    private static AuditLog? CreateAuditLog(
+        EntityEntry entry, DateTimeOffset now, Guid? userId, string? userEmail, string? traceId, string actor)
     {
         string tableName = entry.Metadata.GetTableName() ?? entry.Metadata.ClrType.Name;
         bool isTokenTable = tableName == "user_tokens";
@@ -165,7 +181,8 @@ internal sealed class AuditingSaveChangesInterceptor(TimeProvider timeProvider, 
             JsonSerializer.Serialize(changes, JsonOptions),
             userId,
             userEmail,
-            traceId);
+            traceId,
+            actor);
     }
 
     // Regular properties plus the columns of complex properties such as Money (amount, currency_code).

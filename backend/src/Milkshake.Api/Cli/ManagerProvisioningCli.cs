@@ -1,5 +1,7 @@
 using System.Text;
 using Milkshake.Application.Accounts;
+using Milkshake.Application.Abstractions;
+using Milkshake.Domain.Auditing;
 
 namespace Milkshake.Api.Cli;
 
@@ -21,6 +23,7 @@ internal static class ManagerProvisioningCli
 
     public static async Task<int> RunAsync(IServiceProvider services, string[] args)
     {
+        using IDisposable actor = AuditActorScope.Begin(AuditActors.ManagerProvisioning);   // M11 audit attribution
         string? email = ReadOption(args, "--email");
         string? firstName = ReadOption(args, "--first-name");
 

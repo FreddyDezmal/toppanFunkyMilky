@@ -61,7 +61,10 @@ internal sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        builder.ToTable("audit_logs");
+        // Append-only (AC-11.3): UPDATE, DELETE and TRUNCATE are refused by triggers created in the
+        // AppendOnlyAuditAndActors migration (EF Core cannot express triggers).
+        builder.ToTable("audit_logs", table =>
+            table.HasCheckConstraint("ck_audit_logs_actor", $"actor IS NULL OR actor ~ '{AuditActors.DatabasePattern}'"));
         builder.HasKey(a => a.Id);
         builder.Property(a => a.Action).HasConversion<string>().HasMaxLength(10);
         builder.Property(a => a.TableName).HasMaxLength(100).IsRequired();
@@ -69,11 +72,15 @@ internal sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.Property(a => a.Changes).HasColumnType("jsonb").IsRequired();
         builder.Property(a => a.UserEmail).HasMaxLength(256);
         builder.Property(a => a.TraceId).HasMaxLength(64);
+        builder.Property(a => a.Actor).HasMaxLength(AuditActors.MaxLength);
 
         // No foreign key to users on purpose: audit history must survive user deletion.
         builder.HasIndex(a => a.OccurredAt);
         builder.HasIndex(a => new { a.TableName, a.RecordId });
         builder.HasIndex(a => a.UserId);
+
+        // Newest-first keyset paging for the audit query (AC-11.4).
+        builder.HasIndex(a => new { a.OccurredAt, a.Id }).IsDescending(true, true);
     }
 }
 
@@ -84,6 +91,7 @@ internal sealed class SecurityEventConfiguration : IEntityTypeConfiguration<Secu
     {
         ArgumentNullException.ThrowIfNull(builder);
 
+        // Append-only, like audit_logs (triggers in the AppendOnlyAuditAndActors migration).
         builder.ToTable("security_events");
         builder.HasKey(e => e.Id);
         builder.Property(e => e.EventType).HasConversion<string>().HasMaxLength(30);
@@ -94,5 +102,6 @@ internal sealed class SecurityEventConfiguration : IEntityTypeConfiguration<Secu
         // No foreign key to users: the trail must survive account deletion.
         builder.HasIndex(e => e.OccurredAt);
         builder.HasIndex(e => e.UserId);
+        builder.HasIndex(e => new { e.OccurredAt, e.Id }).IsDescending(true, true);
     }
 }

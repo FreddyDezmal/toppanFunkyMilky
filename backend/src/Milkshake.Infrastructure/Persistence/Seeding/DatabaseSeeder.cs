@@ -8,6 +8,8 @@ using Milkshake.Domain.Restaurants;
 using Milkshake.Domain.Settings;
 using Milkshake.Domain.Users;
 using Milkshake.Infrastructure.Identity;
+using Milkshake.Application.Abstractions;
+using Milkshake.Domain.Auditing;
 
 namespace Milkshake.Infrastructure.Persistence.Seeding;
 
@@ -30,6 +32,7 @@ internal sealed partial class DatabaseSeeder(
     public async Task SeedAsync(MilkshakeDbContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
+        using IDisposable actor = AuditActorScope.Begin(AuditActors.Seeding);   // M11 audit attribution
 
         int roles = await SeedRolesAsync(context, cancellationToken);
 

@@ -5,6 +5,8 @@ using Milkshake.Domain.Orders;
 using Milkshake.Domain.Payments;
 using Milkshake.Infrastructure.Persistence;
 using Npgsql;
+using Milkshake.Application.Abstractions;
+using Milkshake.Domain.Auditing;
 
 namespace Milkshake.Infrastructure.Payments;
 
@@ -30,6 +32,7 @@ internal sealed partial class PaymentNotificationService(
     public async Task<NotificationOutcome> HandleAsync(PaymentNotification notification, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(notification);
+        using IDisposable actor = AuditActorScope.Begin(AuditActors.PaystackWebhook);   // M11: never the browser user
 
         if (notification.EventType != ChargeSuccess)
         {
@@ -89,6 +92,7 @@ internal sealed partial class PaymentNotificationService(
     public async Task<NotificationOutcome> HandleRefundAsync(RefundNotification notification, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(notification);
+        using IDisposable actor = AuditActorScope.Begin(AuditActors.PaystackWebhook);
 
         // Paystack treats references case-insensitively; ours are stored in upper case.
         string? refundReference = notification.RefundReference?.Trim().ToUpperInvariant();

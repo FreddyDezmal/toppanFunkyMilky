@@ -8,6 +8,7 @@ using Milkshake.Application.Payments;
 using Milkshake.Domain.Orders;
 using Milkshake.Domain.Payments;
 using Milkshake.Infrastructure.Persistence;
+using Milkshake.Domain.Auditing;
 
 namespace Milkshake.Infrastructure.Payments;
 
@@ -44,6 +45,7 @@ internal sealed partial class PaymentReconciler(
 {
     public async Task<int> ReconcileAsync(CancellationToken cancellationToken)
     {
+        using IDisposable actor = AuditActorScope.Begin(AuditActors.PaymentReconciliation);   // M11 audit attribution
         DateTimeOffset initiatingBefore = clock.GetUtcNow() - PaymentService.InitiatingGrace;
         List<int> open = await db.Payments
             .Where(p => p.Status == PaymentStatus.Pending || (p.Status == PaymentStatus.Initiating && p.CreatedAt < initiatingBefore))
