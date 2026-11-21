@@ -218,6 +218,7 @@ internal sealed partial class PaymentReconciler(
             .Where(r => r.Status == CancellationRequestStatus.Pending)
             .Join(db.Orders.Where(o => o.PickupAtUtc <= now || o.Status == OrderStatus.Cancelled), r => r.OrderId, o => o.Id,
                 (r, o) => new { Request = r, Order = o })
+            .OrderBy(x => x.Request.Id) // oldest first, so a batch is deterministic (M13: EF Core warning 10102)
             .Take(Batch)
             .ToListAsync(cancellationToken);
 
