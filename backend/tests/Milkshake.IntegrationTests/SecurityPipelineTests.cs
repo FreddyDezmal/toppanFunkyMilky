@@ -99,7 +99,7 @@ public sealed class SecurityPipelineTests(MilkshakeApiFactory factory) : IClassF
         Assert.Equal(5, identity.Lockout.MaxFailedAccessAttempts);
         Assert.Equal(TimeSpan.FromMinutes(15), identity.Lockout.DefaultLockoutTimeSpan);
         Assert.Equal(TimeSpan.FromMinutes(5), stamp.ValidationInterval);
-    }
+    }
 
     [Theory]
     [InlineData("/api/health")]           // 200
