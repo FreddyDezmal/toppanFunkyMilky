@@ -3,6 +3,9 @@
 //   --perf             after the tests, PERF-01: k6 (Docker) with 50 virtual patrons (e2e-local/perf/order-and-pay.js)
 //   --zap              after the tests, SEC: OWASP ZAP baseline scan of the site and API scan from the OpenAPI document
 //   --no-e2e           skip Playwright (with --perf and/or --zap)
+//   --backup-drill     M14 Step 7: after the tests, stop the app, back up the run's database with tools/db/backup.mjs,
+//                      restore it with tools/db/restore-drill.mjs into a separate disposable PostgreSQL, and require
+//                      the integrity checks, the append-only audit check and exact row counts to pass
 //   --container        M14: test the production image instead of `dotnet run` + `vite preview`. Builds the Dockerfile,
 //                      runs it with ASPNETCORE_ENVIRONMENT=Production (forwarded headers, database key ring with a
 //                      throwaway certificate), behind a local HTTPS proxy on :5173 that ends TLS and adds
@@ -18,7 +21,7 @@
 // 5. Runs Playwright (playwright.local.config.ts), then the read-only integrity checks, then removes everything.
 //
 // Needs Docker running, the dotnet-ef tool, and the normal dev API and Vite STOPPED (it uses the same ports).
-import { execFileSync, spawn } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { createWriteStream, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { request as httpRequest } from 'node:http'
@@ -27,6 +30,7 @@ import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { TABLE_COUNTS_SQL, parseCounts } from '../../tools/db/backup-lib.mjs'
 
 const frontend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const repo = path.resolve(frontend, '..')
@@ -50,12 +54,13 @@ const site = `https://localhost:${PORTS.vite}`
 const dockerSite = `https://host.docker.internal:${PORTS.vite}`
 const zapContainers = [`milkshake-e2e-zap-baseline-${process.pid}`, `milkshake-e2e-zap-api-${process.pid}`]
 const k6Container = `milkshake-e2e-k6-${process.pid}`
-const OUR_FLAGS = ['--perf', '--zap', '--no-e2e', '--container']
+const OUR_FLAGS = ['--perf', '--zap', '--no-e2e', '--container', '--backup-drill']
 const flags = new Set(process.argv.slice(2).filter((arg) => OUR_FLAGS.includes(arg)))
 const containerMode = flags.has('--container')
 const appContainer = `milkshake-e2e-app-${process.pid}`
 const appImage = 'milkshake:e2e'
 const keyRingPassword = randomBytes(18).toString('base64url')
+const backupPassphrase = randomBytes(24).toString('base64url')
 let edgeProxy
 const playwrightArgs = process.argv.slice(2).filter((arg) => !OUR_FLAGS.includes(arg))
 
@@ -66,7 +71,7 @@ function log(message) {
 /** Never prints the random database password or the E2E secrets. */
 function masked(text) {
   return text.replaceAll(dbPassword, '***').replaceAll(managerPassword, '***').replaceAll(simulatorSecret, '***')
-    .replaceAll(keyRingPassword, '***')
+    .replaceAll(keyRingPassword, '***').replaceAll(backupPassphrase, '***')
 }
 
 function run(command, args, options = {}) {
@@ -428,6 +433,68 @@ async function startContainer() {
     '--memory', '512m', '-p', `127.0.0.1:${PORTS.app}:8080`, appImage])
 }
 
+/** Runs a tools/db script with node; its output goes to <name>.log (masked) and to the console. Returns the exit code. */
+function runTool(name, script, args, env) {
+  const result = spawnSync(process.execPath, [path.join(repo, 'tools', 'db', script), ...args], { env, encoding: 'utf8' })
+  const output = masked(`${result.stdout ?? ''}${result.stderr ?? ''}`)
+  writeFileSync(path.join(logDir, 'backup', `${name}.log`), output)
+  for (const line of output.split(/\r?\n/).filter((l) => l.startsWith('[backup]'))) {
+    log(line.replace('[backup] ', `${name}: `))
+  }
+  return result.status ?? 1
+}
+
+/**
+ * M14 Step 7 (D-12): the backup and restore drill on real test data. The app is stopped first so nothing writes while
+ * the backup is taken; the source row counts are then read with the same counts-only query, and the restore must
+ * reproduce them exactly.
+ */
+function backupDrill() {
+  mkdirSync(path.join(logDir, 'backup'), { recursive: true })
+  if (containerMode) {
+    run('docker', ['stop', appContainer])
+  } else {
+    for (const { name, child } of children) {
+      if (name === 'api' && child.exitCode === null) {
+        log('stopping api (no writes during the backup)')
+        try {
+          if (isWindows) {
+            execFileSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' })
+          } else {
+            child.kill('SIGTERM')
+          }
+        } catch {
+          // already gone
+        }
+      }
+    }
+  }
+
+  const file = path.join(logDir, 'backup', 'e2e.msbk')
+  const backupCode = runTool('backup', 'backup.mjs', [file], {
+    ...process.env,
+    PGHOST: 'host.docker.internal',
+    PGPORT: String(PORTS.db),
+    PGUSER: 'postgres',
+    PGPASSWORD: dbPassword,
+    PGDATABASE: 'milkshake_e2e',
+    BACKUP_PASSPHRASE: backupPassphrase,
+  })
+  if (backupCode !== 0) {
+    return backupCode
+  }
+
+  const counts = parseCounts(execFileSync('docker', ['exec', '-i', dbContainer, 'psql', '-U', 'postgres', '-d', 'milkshake_e2e',
+    '-v', 'ON_ERROR_STOP=1', '-A', '-F', '|', '-t'], { input: TABLE_COUNTS_SQL, encoding: 'utf8' }))
+  const countsFile = path.join(logDir, 'backup', 'source-counts.json')
+  writeFileSync(countsFile, JSON.stringify(counts, null, 2))
+  log(`backup drill: source has ${Object.keys(counts).length} tables, ${Object.values(counts).reduce((a, b) => a + b, 0)} rows`)
+
+  return runTool('restore-drill', 'restore-drill.mjs',
+    [file, '--expect-counts', countsFile, '--report', path.join(logDir, 'backup', 'restore-report.json')],
+    { ...process.env, BACKUP_PASSPHRASE: backupPassphrase })
+}
+
 async function main() {
   for (const [name, port] of Object.entries(PORTS)) {
     if (!(await portFree(port))) {
@@ -516,8 +583,10 @@ async function main() {
   const violations = integrity.split(/\r?\n/).filter((line) => line.includes('|')).filter((line) => Number(line.split('|')[1]) > 0)
   log(violations.length === 0 ? 'integrity checks: no violations' : `integrity checks FAILED:\n${violations.join('\n')}`)
 
+  const drillCode = flags.has('--backup-drill') ? backupDrill() : 0
+
   log(`logs: ${logDir}`)
-  return exitCode === 0 && violations.length === 0 && perfCode === 0 && zapCode === 0 ? 0 : 1
+  return exitCode === 0 && violations.length === 0 && perfCode === 0 && zapCode === 0 && drillCode === 0 ? 0 : 1
 }
 
 let code = 1

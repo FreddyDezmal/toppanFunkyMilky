@@ -1,0 +1,71 @@
+# Database backup and restore drill (M14 decision D-12). Supabase Free has no platform backups, so this is the backup.
+#
+# OFF until switched on: the job runs only when the repository variable BACKUP_ENABLED is "true" (set in Step 8, after
+# the live database exists and the secrets below are added). Until then a scheduled run is skipped.
+#
+# Each run: pg_dump of schema "milkshake" (read-only) -> encrypted file (AES-256-GCM, BACKUP_PASSPHRASE) -> restored
+# into a disposable PostgreSQL 17 on the runner (never into the live database) -> integrity checks, append-only audit
+# check, migration history -> encrypted file and a counts-only report kept as a workflow artifact for 30 days.
+#
+# Repository secrets: BACKUP_PGHOST, BACKUP_PGPORT, BACKUP_PGUSER, BACKUP_PGPASSWORD, BACKUP_PGDATABASE,
+# BACKUP_PASSPHRASE. Values are never printed. Keep a copy of BACKUP_PASSPHRASE outside GitHub: without it the backups
+# cannot be decrypted.
+name: Database backup
+
+on:
+  schedule:
+    - cron: '23 1 * * *'   # daily 01:23 UTC (03:23 South African time)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Back up and restore-test the database
+    if: vars.BACKUP_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Back up schema milkshake (read-only)
+        env:
+          PGHOST: ${{ secrets.BACKUP_PGHOST }}
+          PGPORT: ${{ secrets.BACKUP_PGPORT }}
+          PGUSER: ${{ secrets.BACKUP_PGUSER }}
+          PGPASSWORD: ${{ secrets.BACKUP_PGPASSWORD }}
+          PGDATABASE: ${{ secrets.BACKUP_PGDATABASE }}
+          PGSSLMODE: require
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: node tools/db/backup.mjs "backup/milkshake-$(date -u +%Y%m%dT%H%M%SZ).msbk"
+
+      - name: Restore drill into a disposable PostgreSQL 17
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: node tools/db/restore-drill.mjs backup/*.msbk --report backup/restore-report.json
+
+      - name: Keep the encrypted backup and the report
+        if: ${{ !cancelled() && hashFiles('backup/*.msbk') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: milkshake-backup-${{ github.run_id }}
+          path: backup/
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Summary (counts only)
+        if: ${{ !cancelled() && hashFiles('backup/restore-report.json') != '' }}
+        run: |
+          node -e '
+            const r = require("./backup/restore-report.json");
+            const rows = Object.entries(r.counts ?? {}).map(([t, c]) => `| ${t} | ${c} |`).join("\n");
+            console.log(`## Backup ${r.result}\n\nIntegrity checks: ${r.checks?.integrityChecks ?? "?"}, violations: ${r.checks?.integrityViolations ?? "?"}. Audit change: ${r.checks?.auditUpdate ?? "?"}. Latest migration: ${r.latestMigration ?? "?"}.\n\n| Table | Rows |\n| --- | --- |\n${rows}`);
+          ' >> "$GITHUB_STEP_SUMMARY"

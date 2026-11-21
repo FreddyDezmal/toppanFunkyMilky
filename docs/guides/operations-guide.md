@@ -81,9 +81,46 @@ run against the deployed database.
 
 ## 7. Backups and restore
 
-*To complete in Step 7:* scheduled `pg_dump` of the `milkshake` schema by GitHub Actions to an encrypted artifact,
-retention, and the restore drill into a disposable PostgreSQL with the integrity checks
-(`tools/db/integrity-checks.sql`). Restores are never tested by overwriting the live database.
+Supabase Free keeps no backups, so the project makes its own (decision D-12).
+
+| Item | Detail |
+| --- | --- |
+| What | `pg_dump` of schema `milkshake` (all application tables, the audit trail with its append-only triggers, the migration history and the encrypted sign-in key ring), custom format |
+| How | `tools/db/backup.mjs` runs `pg_dump` in a `postgres:17` container (read-only) and encrypts the result with AES-256-GCM, using a key derived from `BACKUP_PASSPHRASE` |
+| When | `.github/workflows/backup.yml`, daily 03:23 South African time, and on demand (Actions → Database backup → Run workflow) |
+| Where | Encrypted file + counts-only restore report kept as a workflow artifact for 30 days |
+| Every backup is tested | The same workflow restores it with `tools/db/restore-drill.mjs` into a disposable PostgreSQL on the runner and fails if anything is wrong |
+| Switched on | Only when the repository variable `BACKUP_ENABLED` is `true` and these secrets exist: `BACKUP_PGHOST`, `BACKUP_PGPORT`, `BACKUP_PGUSER`, `BACKUP_PGPASSWORD`, `BACKUP_PGDATABASE`, `BACKUP_PASSPHRASE` (*set in Step 8*) |
+
+**The passphrase.** Keep a copy of `BACKUP_PASSPHRASE` outside GitHub (for example in a password manager). Without it
+no backup can be decrypted. Changing it affects new backups only; keep the old one until its backups expire.
+
+**What the restore drill checks** (`node tools/db/restore-drill.mjs <file.msbk> [--expect-counts counts.json] [--report report.json]`,
+with `BACKUP_PASSPHRASE` set; needs Docker):
+
+1. the file decrypts (a wrong passphrase or a changed byte is refused) and is a `pg_dump` archive;
+2. `pg_restore --exit-on-error` into a new, disposable PostgreSQL 17 container that is removed afterwards – it never
+   connects to any other database, so it cannot overwrite live data;
+3. the 18 integrity checks (`tools/db/integrity-checks.sql`) report 0;
+4. the audit trail is still append-only (its triggers are present and changing an audit row is refused);
+5. the migration history is present (latest migration reported);
+6. with `--expect-counts`, every table's row count equals the source.
+
+**Evidence (AC-14.4 "tested once", before deployment):** `npm run test:e2e:local -- --container --backup-drill`,
+run `2026-11-21T10-42-51-261Z`: after 19 of 19 E2E tests against the production image, the app was stopped, the test
+database was backed up (107 KB, 3.3 s), restored in 1 s, and the drill **passed**: 27 tables, 551 rows, counts equal
+to the source, 18 integrity checks at 0, 4 audit triggers, an audit change refused, latest migration
+`20261121091600_AddDataProtectionKeys`. The encrypted file contained no readable text and no log contained a secret.
+An earlier run (`2026-11-21T10-25-58-944Z`, 512 rows) also passed. *Step 8 adds the first backup of the live
+database and its drill on GitHub.*
+
+**Restoring for real** (only after a decision to do so; never test by overwriting the live database):
+
+1. Download the artifact from the chosen backup run and decrypt-test it with `restore-drill.mjs` first.
+2. Restore into a **new** Supabase project (or a new database), never over the existing one, with `pg_restore --no-owner
+   --no-privileges --exit-on-error`, then run the integrity checks there.
+3. Point the app at it by changing the connection secrets and redeploying; keep the old database untouched until the
+   new one is accepted.
 
 ## 8. Monitoring
 
