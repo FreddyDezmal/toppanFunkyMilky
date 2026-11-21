@@ -51,7 +51,8 @@ function fail(message) {
 /** Reads a line without echoing it (for passwords). */
 function askHidden(question) {
   return new Promise((resolve) => {
-    process.stdout.write(question)
+    // On stderr, so the question stays visible when stdout is filtered (e.g. piped to Select-String).
+    process.stderr.write(question)
     const stdin = process.stdin
     let value = ''
     stdin.setRawMode?.(true)
@@ -63,7 +64,7 @@ function askHidden(question) {
           stdin.setRawMode?.(false)
           stdin.pause()
           stdin.off('data', onData)
-          process.stdout.write('\n')
+          process.stderr.write('\n')
           resolve(value)
           return
         }
