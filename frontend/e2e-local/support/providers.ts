@@ -154,3 +154,19 @@ export async function countMailAfterQuietPeriod(page: Page, address: string, sub
   await page.waitForTimeout(15_000)
   return (await mailTo(address)).filter((m) => m.Subject === subject).length
 }
+
+// ---- Shared journey step --------------------------------------------------------------------------------------------
+
+/**
+ * Pays the order open on this page through the test checkout and waits until the page shows it as Paid (the order has
+ * been reloaded after the server verified the payment). Returns what the server sent "Paystack".
+ */
+export async function payOrder(page: Page, email: string): Promise<SimulatedTransaction> {
+  await page.getByRole('button', { name: 'Pay now' }).click()
+  await expect(page.getByRole('heading', { name: 'Test checkout (Paystack simulator)' })).toBeVisible()
+  const tx = await paystack.latestFor(email)
+  await page.getByRole('link', { name: 'Pay (test)' }).click()
+  await expect(page.getByText('Payment received. Your order is confirmed.')).toBeVisible()
+  await expect(page.getByText('Paid', { exact: true })).toBeVisible()
+  return tx
+}

@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test'
-import { countMailAfterQuietPeriod, mailMessage, paystack, useTestCheckout, waitForMail, type SimulatedTransaction } from '../support/providers'
+import { countMailAfterQuietPeriod, mailMessage, payOrder, paystack, useTestCheckout, waitForMail, type SimulatedTransaction } from '../support/providers'
 import { centsOf, expectNoSeriousAccessibilityProblems, managerPage, placeOrder, registerPatron, type PlacedOrder } from '../support/stack'
 
 /**
@@ -7,7 +7,6 @@ import { centsOf, expectNoSeriousAccessibilityProblems, managerPage, placeOrder,
  * (fee kept) or, at the restaurant's request, with the patron's agreement (full refund). Refunds go to the Paystack
  * simulator and count as complete only when "Paystack" confirms them (signed refund webhook, re-verified by the API).
  */
-const CONFIRMED = 'Payment received. Your order is confirmed.'
 const CANCELLED = 'Your order has been cancelled.'
 const DECLINED = 'You declined the request. Your order stays as it is.'
 const MONEY = String.raw`R\s?[\d\s.,]*\d`
@@ -27,11 +26,7 @@ test.beforeEach(async ({ page }) => {
 async function paidOrder(page: Page): Promise<{ email: string; order: PlacedOrder; tx: SimulatedTransaction }> {
   const email = await registerPatron(page)
   const order = await placeOrder(page)
-  await page.getByRole('button', { name: 'Pay now' }).click()
-  await expect(page.getByRole('heading', { name: 'Test checkout (Paystack simulator)' })).toBeVisible()
-  const tx = await paystack.latestFor(email)
-  await page.getByRole('link', { name: 'Pay (test)' }).click()
-  await expect(page.getByText(CONFIRMED)).toBeVisible()
+  const tx = await payOrder(page, email)
   return { email, order, tx }
 }
 

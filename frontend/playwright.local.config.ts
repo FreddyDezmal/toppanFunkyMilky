@@ -27,9 +27,17 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: /reports\.spec\.ts/ },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] }, grep: /@all-browsers/ },
     { name: 'webkit', use: { ...devices['Desktop Safari'] }, grep: /@all-browsers/ },
     { name: 'mobile', use: { ...devices['Pixel 7'] }, grep: /@all-browsers/ },
+    // Report totals are compared with exports and with each other, so they run once every other test has finished
+    // placing orders (M13 E2E-11). If an earlier project fails, Playwright skips this one: fix that failure first.
+    {
+      name: 'reports',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /reports\.spec\.ts/,
+      dependencies: ['chromium', 'firefox', 'webkit', 'mobile'],
+    },
   ],
 })

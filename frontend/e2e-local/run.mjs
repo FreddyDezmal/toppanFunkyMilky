@@ -152,6 +152,9 @@ function apiEnvironment() {
     Email__FromName: 'Milky Shaky Custom Drinks',
     Email__PublicBaseUrl: `${site}/`,
     Email__Dispatch__IntervalSeconds: '5',
+    // Every simulated patron and the manager sign in from 127.0.0.1, so the per-address limit on login and registration
+    // (10 a minute by default) would refuse the suite itself (M13 DEF-05). The limit is proven by the integration tests.
+    RateLimiting__AuthPermitLimit: '300',
     Logging__LogLevel__Default: 'Information',
     'Logging__LogLevel__Microsoft.EntityFrameworkCore': 'Warning',
     ...(process.env.E2E_LOCAL_EXTRA_ENV ? JSON.parse(process.env.E2E_LOCAL_EXTRA_ENV) : {}),

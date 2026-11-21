@@ -8,7 +8,9 @@ requirement does not work; Medium = works with a workaround, or a non-mandatory 
 | --- | --- | --- | --- | --- | --- |
 | DEF-01 | 21 Nov 2026 | E2E-03 (WebKit) | Low (test environment, not the product) | Paid-order journey timed out in WebKit on the return page | Fixed, retested (WebKit passed in 55 s) |
 | DEF-02 | 21 Nov 2026 | E2E-03 (Firefox) | Low (test tooling, provisional) | Firefox page crashed during the axe accessibility scan | Closed (retest `2026-11-21T03-47-03-449Z`: 7 of 7 passed) |
-| DEF-03 | 21 Nov 2026 | E2E-06 | Low (wording; money protected by the server) | Just after a payment is confirmed, the Cancel dialog briefly offered the unpaid wording ("nothing is charged") | Fixed, awaiting retest |
+| DEF-03 | 21 Nov 2026 | E2E-06 | Low (wording; money protected by the server) | Just after a payment is confirmed, the Cancel dialog briefly offered the unpaid wording ("nothing is charged") | Closed (retest `2026-11-21T04-03-22-923Z`: 4 of 4 passed) |
+| DEF-04 | 21 Nov 2026 | E2E-03 (WebKit) | Low (layout) | The live estimate appears above "Continue to pickup" and pushes it down about 110 px, so a click at that moment misses | Open (Low): test waits for the estimate; product change proposed for M14 |
+| DEF-05 | 21 Nov 2026 | E2E-06, E2E-07, E2E-10 | Low (test environment, not the product) | "Too many attempts" at sign-in and registration: every simulated user shares 127.0.0.1 | Closed (retest `2026-11-21T04-31-59-945Z`: 14 of 14 passed) |
 
 ## DEF-01 – WebKit journey timed out on the return from checkout
 
@@ -65,5 +67,31 @@ requirement does not work; Medium = works with a workaround, or a non-mandatory 
   "Cancellation details are unavailable right now." Regression test in `cancellation.test.tsx` ("never shows the
   unpaid figures while it reloads for the paid order"). The E2E helper now also waits for the order to show Paid, as
   the patron would.
-- **Retest:** Vitest and `npm run test:e2e:local -- cancellation` – pending.
+- **Retest:** Vitest (cancellation tests), lint and `npm run test:e2e:local -- cancellation`
+  (`2026-11-21T04-03-22-923Z`, 4 of 4, integrity checks all 0) passed on 21 Nov 2026. **Closed.**
+
+## DEF-04 – The live estimate moves the Continue button as it appears
+
+- **Run:** `.m13-logs/e2e/2026-11-21T04-12-49-193Z`, project `webkit`, `payment.spec.ts:19`, at `placeOrder`.
+- **Observed:** the test clicked "Continue to pickup" and stayed on the milkshakes step until the timeout. No "choice
+  missing" message: the click did not reach the button.
+- **Cause (trace):** the click was aimed at the button at y 547–583. At that moment the quote for the completed
+  milkshake arrived, and the Estimated price section grew by its price table, pushing the button to about y 674. The
+  click landed on the estimate instead.
+- **Impact:** a patron clicking at that moment needs a second click. Nothing is lost or charged. Layout only.
+- **Test change:** `reviewOrder` waits for "Estimated total" before continuing, as a patron reads the price first.
+- **Proposed product change (not made):** reserve the price table's space on the milkshakes page while the estimate
+  loads, or place the Continue button above the estimate. To be agreed in M14 UAT.
+
+## DEF-05 – Sign-in and registration refused as "Too many attempts" during the suite
+
+- **Run:** `.m13-logs/e2e/2026-11-21T04-12-49-193Z`: E2E-06 and E2E-07 (manager sign-in) and E2E-10 (registration).
+  Screenshot: "Too many attempts. Please wait a minute and try again."
+- **Cause:** login and registration are limited to 10 a minute per client address (`RateLimiting:AuthPermitLimit`).
+  On the local stack every simulated patron, and the manager, comes from 127.0.0.1, and the suite now signs in or
+  registers more than 10 times a minute. The control worked as designed.
+- **Fix:** `e2e-local/run.mjs` sets `RateLimiting__AuthPermitLimit=300` for the E2E API only. Production and
+  development keep 10. The limit itself is proven by the integration tests (429 after the limit).
+- **Retest:** full `npm run test:e2e:local` (`2026-11-21T04-31-59-945Z`): 14 of 14 passed, integrity checks all 0.
+  **Closed.**
 

@@ -60,15 +60,28 @@ export interface PlacedOrder {
  * Builds a one-milkshake order through the UI with the first option in each list and the latest pickup time, confirms
  * the server's total and places it. The local database holds only seed data plus what the tests add.
  */
-export async function placeOrder(page: Page): Promise<PlacedOrder> {
+/**
+ * Builds a one-milkshake order up to the review step and returns the estimated total shown there. The first option of
+ * each list is used, or the named flavour (matched by the start of its option text, which also shows the fee).
+ */
+export async function reviewOrder(page: Page, options: { flavour?: string } = {}): Promise<string> {
   await page.goto('/order')
   await page.getByLabel('Number of milkshakes').selectOption('1')
   await page.getByRole('button', { name: 'Continue' }).click()
   const card = page.getByRole('listitem', { name: 'Milkshake 1', exact: true })
   for (const field of ['Flavour', 'Consistency', 'Topping']) {
-    await card.getByLabel(field, { exact: true }).selectOption({ index: 1 })
+    const select = card.getByLabel(field, { exact: true })
+    if (field === 'Flavour' && options.flavour) {
+      const value = await select.locator('option').filter({ hasText: `${options.flavour} (` }).getAttribute('value')
+      await select.selectOption(value ?? '')
+    } else {
+      await select.selectOption({ index: 1 })
+    }
   }
   await card.getByRole('button', { name: 'Done with milkshake 1' }).click()
+  // The estimate appears above the button once the server has priced the milkshake; wait for it as a patron would,
+  // so the click is not moved by that layout change (M13 DEF-04).
+  await expect(page.getByRole('region', { name: 'Estimated price' }).getByText('Estimated total', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Continue to pickup' }).click()
   await page.getByLabel('Pickup restaurant').selectOption({ index: 1 })
   const time = page.getByLabel('Pickup date and time')
@@ -77,7 +90,11 @@ export async function placeOrder(page: Page): Promise<PlacedOrder> {
 
   const reviewPrice = page.getByRole('region', { name: 'Estimated price' })
   await expect(reviewPrice.getByText('Estimated total', { exact: true })).toBeVisible()
-  const totalText = ((await reviewPrice.locator('dd').last().textContent()) ?? '').trim()
+  return ((await reviewPrice.locator('dd').last().textContent()) ?? '').trim()
+}
+
+export async function placeOrder(page: Page, options: { flavour?: string } = {}): Promise<PlacedOrder> {
+  const totalText = await reviewOrder(page, options)
   await page.getByRole('button', { name: 'Place order' }).click()
   const dialog = page.getByRole('alertdialog')
   await expect(dialog).toContainText(totalText)
