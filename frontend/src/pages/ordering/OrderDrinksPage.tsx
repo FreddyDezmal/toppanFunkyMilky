@@ -7,7 +7,7 @@ import { EmptyDraft } from '../../features/ordering/EmptyDraft'
 import { DRAFT_FIELDS } from '../../features/ordering/errors'
 import { ESTIMATE_NOTE } from '../../features/ordering/format'
 import { useOrderDraft } from '../../features/ordering/orderDraftContext'
-import { PriceSummary } from '../../features/ordering/PriceSummary'
+import { PriceSummary, PriceSummaryPlaceholder } from '../../features/ordering/PriceSummary'
 import { DRINK_FIELD_LABELS, DRINK_FIELDS, type DrinkSelection } from '../../features/ordering/types'
 import { useLiveQuote, type LiveQuote } from '../../features/ordering/useLiveQuote'
 import { useOrdering } from '../../features/ordering/useOrdering'
@@ -168,11 +168,14 @@ export function OrderDrinksPage() {
         <p role="status" className="mt-1 text-sm text-slate-700">
           {estimateStatus(live, options.display.locale)}
         </p>
-        {live.quote?.totals && (
-          <div className="mt-3 max-w-sm">
+        {/* The table's space is kept while there is no estimate, so "Continue to pickup" never moves (DEF-04). */}
+        <div className="mt-3 max-w-sm">
+          {live.quote?.totals ? (
             <PriceSummary totals={live.quote.totals} locale={options.display.locale} />
-          </div>
-        )}
+          ) : (
+            <PriceSummaryPlaceholder />
+          )}
+        </div>
       </section>
 
       <div className="mt-6 flex flex-wrap gap-2">

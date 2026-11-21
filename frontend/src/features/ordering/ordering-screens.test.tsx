@@ -276,6 +276,33 @@ describe('live prices', () => {
     ])
   })
 
+  it('keeps the price table\u2019s space while the estimate loads, so the Continue button does not move (DEF-04)', async () => {
+    storeDraft({ drinks: [vanillaThickOreo] })
+    const pending: { release?: () => void } = {}
+    renderOrderingAt('/order/drinks', {
+      [QUOTE]: (init) =>
+        new Promise<Response>((resolve) => {
+          pending.release = () => resolve(jsonResponse(quoteFor(bodyOf(init))))
+        }),
+    })
+
+    // Before the estimate: the same four rows, without amounts, hidden from assistive technology.
+    const region = await screen.findByRole('region', { name: 'Estimated price' })
+    const placeholder = await within(region).findByTestId('price-summary-placeholder')
+    expect(placeholder).toHaveAttribute('aria-hidden', 'true')
+    expect(placeholder.querySelectorAll('dt')).toHaveLength(4)
+    await waitFor(() => expect(within(region).getByRole('status')).toHaveTextContent('Updating prices…'))
+
+    // After it: the same four rows with the server's amounts, and the placeholder gone.
+    await waitFor(() => expect(pending.release).toBeDefined())
+    await act(async () => {
+      pending.release?.()
+    })
+    expect(await within(region).findByText(`Estimated total ${zar(52.9)}.`)).toBeInTheDocument()
+    expect(within(region).queryByTestId('price-summary-placeholder')).not.toBeInTheDocument()
+    expect(region.querySelectorAll('dt')).toHaveLength(4)
+  })
+
   it('asks the server again after a change and shows the new price', async () => {
     storeDraft({ drinks: [vanillaThickOreo] })
     renderOrderingAt('/order/drinks')
@@ -468,7 +495,9 @@ describe('order page', () => {
   it('shows the order as stored, with its own names and prices, and makes clear it is not paid', async () => {
     renderOrderingAt('/orders/MS-7KQ2-X9TD', { 'GET /api/ordering/orders/MS-7KQ2-X9TD': () => jsonResponse(placedOrder()) })
 
-    expect(await screen.findByRole('heading', { name: 'Order MS-7KQ2-X9TD' })).toHaveFocus()
+    // Focus moves in an effect just after the heading renders, so wait for it (M14 DEF-07: checking at once was flaky).
+    const heading = await screen.findByRole('heading', { name: 'Order MS-7KQ2-X9TD' })
+    await waitFor(() => expect(heading).toHaveFocus())
     expect(screen.getByText(/^Vanilla \(old recipe\) ·/)).toBeInTheDocument()
     expect(screen.getByText('Awaiting payment')).toBeInTheDocument()
     expect(screen.getByText('Not paid')).toBeInTheDocument()

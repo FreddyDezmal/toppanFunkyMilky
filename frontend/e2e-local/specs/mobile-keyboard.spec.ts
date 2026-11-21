@@ -83,7 +83,7 @@ test.describe('on a phone-sized screen', () => {
     }
     await checkPage(page, 'Order – milkshakes (phone)')
     await card.getByRole('button', { name: 'Done with milkshake 1' }).tap()
-    await expect(page.getByRole('region', { name: 'Estimated price' }).getByText('Estimated total', { exact: true })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Estimated price' }).getByRole('status')).toHaveText(/^Estimated total .+\.$/)
     await page.getByRole('button', { name: 'Continue to pickup' }).tap()
     await page.getByLabel('Pickup restaurant').selectOption({ index: 1 })
     const time = page.getByLabel('Pickup date and time')
@@ -134,7 +134,7 @@ test('E2E-14 a patron registers, orders and pays using only the keyboard', async
     await chooseFirst(page, card.getByLabel(field, { exact: true }))
   }
   await press(page, card.getByRole('button', { name: 'Done with milkshake 1' }))
-  await expect(page.getByRole('region', { name: 'Estimated price' }).getByText('Estimated total', { exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Estimated price' }).getByRole('status')).toHaveText(/^Estimated total .+\.$/)
   await press(page, page.getByRole('button', { name: 'Continue to pickup' }))
 
   await chooseFirst(page, page.getByLabel('Pickup restaurant'))

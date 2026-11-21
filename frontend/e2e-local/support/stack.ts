@@ -79,9 +79,8 @@ export async function reviewOrder(page: Page, options: { flavour?: string } = {}
     }
   }
   await card.getByRole('button', { name: 'Done with milkshake 1' }).click()
-  // The estimate appears above the button once the server has priced the milkshake; wait for it as a patron would,
-  // so the click is not moved by that layout change (M13 DEF-04).
-  await expect(page.getByRole('region', { name: 'Estimated price' }).getByText('Estimated total', { exact: true })).toBeVisible()
+  // Wait for the server's estimate as a patron would read it before continuing (the space is reserved since DEF-04).
+  await expect(page.getByRole('region', { name: 'Estimated price' }).getByRole('status')).toHaveText(/^Estimated total .+\.$/)
   await page.getByRole('button', { name: 'Continue to pickup' }).click()
   await page.getByLabel('Pickup restaurant').selectOption({ index: 1 })
   const time = page.getByLabel('Pickup date and time')
