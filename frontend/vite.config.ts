@@ -2,6 +2,23 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { readFileSync } from 'node:fs'
+
+// HTTPS only for the local E2E stack (M13): e2e-local/run.mjs passes the exported ASP.NET development certificate.
+// WebKit refuses Secure cookies on plain http://localhost; `npm run dev` is unchanged.
+const e2eHttps =
+  process.env.E2E_VITE_CERT && process.env.E2E_VITE_KEY
+    ? { cert: readFileSync(process.env.E2E_VITE_CERT), key: readFileSync(process.env.E2E_VITE_KEY) }
+    : undefined
+
+// Same origin in development: the browser calls /api on Vite, which forwards to ASP.NET Core.
+// The SameSite=Strict session cookie then behaves exactly as it will behind one production domain.
+const apiProxy = {
+  '/api': {
+    target: 'https://localhost:7298',
+    secure: false, // Node does not trust the local ASP.NET Core development certificate
+  },
+}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -9,14 +26,15 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    // Same origin in development: the browser calls /api on Vite, which forwards to ASP.NET Core.
-    // The SameSite=Strict session cookie then behaves exactly as it will behind one production domain.
-    proxy: {
-      '/api': {
-        target: 'https://localhost:7298',
-        secure: false, // Node does not trust the local ASP.NET Core development certificate
-      },
-    },
+    https: e2eHttps,
+    proxy: apiProxy,
+  },
+  // `vite preview` serves the production build for the local E2E stack (M13) on the same address as dev.
+  preview: {
+    port: 5173,
+    strictPort: true,
+    https: e2eHttps,
+    proxy: apiProxy,
   },
   test: {
     environment: 'jsdom',
