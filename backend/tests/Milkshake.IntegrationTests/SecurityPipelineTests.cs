@@ -99,5 +99,29 @@ public sealed class SecurityPipelineTests(MilkshakeApiFactory factory) : IClassF
         Assert.Equal(5, identity.Lockout.MaxFailedAccessAttempts);
         Assert.Equal(TimeSpan.FromMinutes(15), identity.Lockout.DefaultLockoutTimeSpan);
         Assert.Equal(TimeSpan.FromMinutes(5), stamp.ValidationInterval);
+    }
+
+    [Theory]
+    [InlineData("/api/health")]           // 200
+    [InlineData("/api/auth/csrf")]        // 200 with a cookie
+    [InlineData("/api/manager/ping")]     // 401 problem details
+    [InlineData("/api/no-such-endpoint")] // 404
+    public async Task EveryApiResponse_CarriesTheSecurityHeaders(string path)
+    {
+        // M13 SEC: OWASP ZAP findings 10020 (clickjacking), 10021 (MIME sniffing), 10038 (CSP), 10063 and 90004.
+        using HttpClient client = factory.CreateHttpsClient();
+
+        using HttpResponseMessage response = await client.GetAsync(new Uri(path, UriKind.Relative));
+
+        Assert.Equal("nosniff", Header(response, "X-Content-Type-Options"));
+        Assert.Equal("DENY", Header(response, "X-Frame-Options"));
+        Assert.Equal(Milkshake.Api.Security.SecurityHeaders.ApiContentSecurityPolicy, Header(response, "Content-Security-Policy"));
+        Assert.Equal("no-referrer", Header(response, "Referrer-Policy"));
+        Assert.Equal("same-origin", Header(response, "Cross-Origin-Resource-Policy"));
+        Assert.Equal("same-origin", Header(response, "Cross-Origin-Opener-Policy"));
+        Assert.Equal(Milkshake.Api.Security.SecurityHeaders.PermissionsPolicy, Header(response, "Permissions-Policy"));
     }
+
+    private static string? Header(HttpResponseMessage response, string name) =>
+        response.Headers.TryGetValues(name, out IEnumerable<string>? values) ? string.Join(",", values) : null;
 }

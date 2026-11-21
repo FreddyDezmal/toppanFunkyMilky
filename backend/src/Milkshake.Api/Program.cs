@@ -172,6 +172,9 @@ builder.Services.AddOptions<RateLimiterOptions>().Configure<IConfiguration>((opt
 // Only origins listed in configuration (Cors:AllowedOrigins) may call the API from a browser.
 // Read lazily through options so tests and environments can supply origins without code changes.
 builder.Services.AddCors();
+
+// M13 SEC (ZAP 10035): browsers are told to use HTTPS only, for a year. UseHsts skips localhost by itself.
+builder.Services.AddHsts(options => options.MaxAge = TimeSpan.FromDays(365));
 builder.Services.AddOptions<CorsOptions>().Configure<IConfiguration>((options, configuration) =>
 {
     string[] allowedOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
@@ -218,6 +221,7 @@ if (ManagerProvisioningCli.IsInvoked(args))
 
 // ---- HTTP pipeline -------------------------------------------------------
 // Unhandled exceptions become RFC 9457 ProblemDetails JSON; no stack traces reach the client.
+app.UseSecurityHeaders();  // M13 SEC: on every response, error responses included
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
@@ -230,6 +234,11 @@ else if (app.Environment.IsEnvironment("E2E"))
 {
     // M13: the disposable local E2E stack publishes the document (only) so the OWASP ZAP API scan covers every endpoint.
     app.MapOpenApi().AllowAnonymous();
+}
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
 }
 
 app.UseHttpsRedirection();

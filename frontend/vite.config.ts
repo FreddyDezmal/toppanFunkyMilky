@@ -3,6 +3,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { readFileSync } from 'node:fs'
+import { SITE_SECURITY_HEADERS } from './security-headers.ts'
 
 // HTTPS only for the local E2E stack (M13): e2e-local/run.mjs passes the exported ASP.NET development certificate.
 // WebKit refuses Secure cookies on plain http://localhost; `npm run dev` is unchanged.
@@ -39,6 +40,8 @@ export default defineConfig({
     // Desktop forwards to 127.0.0.1. "localhost" would listen on ::1 only on Windows, so the E2E stack binds IPv4.
     host: e2eHttps ? '127.0.0.1' : undefined,
     allowedHosts: e2eHttps ? ['host.docker.internal'] : undefined,
+    // M13 SEC: the production build is served with the site's security headers (the production host must match).
+    headers: SITE_SECURITY_HEADERS,
   },
   test: {
     environment: 'jsdom',
