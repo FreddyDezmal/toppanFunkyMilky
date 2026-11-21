@@ -24,12 +24,11 @@ public sealed class MilkshakeApiFactory : WebApplicationFactory<ApiAssemblyMarke
         builder.ConfigureTestServices(services =>
             services.PostConfigure<HealthCheckServiceOptions>(options =>
             {
-                HealthCheckRegistration? database = options.Registrations
-                    .FirstOrDefault(registration => registration.Name == "database");
-
-                if (database is not null)
+                // No database here: drop every check that reads it ("database", and the M14 "workers" check).
+                foreach (HealthCheckRegistration registration in options.Registrations
+                             .Where(registration => registration.Tags.Contains("db")).ToList())
                 {
-                    options.Registrations.Remove(database);
+                    options.Registrations.Remove(registration);
                 }
             }));
     }

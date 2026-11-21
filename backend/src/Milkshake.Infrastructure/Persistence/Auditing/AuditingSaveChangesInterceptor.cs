@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
@@ -81,6 +82,13 @@ internal sealed class AuditingSaveChangesInterceptor(TimeProvider timeProvider, 
 
         foreach (EntityEntry entry in context.ChangeTracker.Entries().ToList())
         {
+            // The Data Protection key ring (M14 D-3) is managed by ASP.NET Core and is never audited: key material must
+            // not be copied into the audit trail.
+            if (entry.Entity is DataProtectionKey)
+            {
+                continue;
+            }
+
             if (entry.Entity is AuditLog or SecurityEvent)
             {
                 if (entry.State is EntityState.Modified or EntityState.Deleted)

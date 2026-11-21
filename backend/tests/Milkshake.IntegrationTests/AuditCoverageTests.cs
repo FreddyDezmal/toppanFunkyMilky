@@ -39,6 +39,7 @@ public sealed class AuditCoverageTests(PostgresApiFactory factory) : IDisposable
     {
         ["audit_logs"] = "the audit trail itself (append-only)",
         ["security_events"] = "the security trail itself (append-only)",
+        ["data_protection_keys"] = "the Data Protection key ring (M14 D-3): key material must never be copied into the audit trail",
         ["__ef_migrations_history"] = "schema history written by EF migrations, not by the application",
     };
 

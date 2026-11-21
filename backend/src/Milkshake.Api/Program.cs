@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Milkshake.Api.Hosting;
 using Milkshake.Api.Security;
 using Milkshake.Api.Services;
 using Milkshake.Application;
@@ -175,6 +176,11 @@ builder.Services.AddCors();
 
 // M13 SEC (ZAP 10035): browsers are told to use HTTPS only, for a year. UseHsts skips localhost by itself.
 builder.Services.AddHsts(options => options.MaxAge = TimeSpan.FromDays(365));
+
+// M14 Step 4 (production hosting), each switched on by configuration (appsettings.Production.json and host secrets):
+// forwarded headers behind the host's proxy, and the Data Protection key ring in the database (decision D-3).
+builder.Services.AddForwardedHeadersFromConfiguration(builder.Configuration);
+builder.Services.AddDataProtectionFromConfiguration(builder.Configuration, builder.Environment);
 builder.Services.AddOptions<CorsOptions>().Configure<IConfiguration>((options, configuration) =>
 {
     string[] allowedOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
@@ -221,6 +227,7 @@ if (ManagerProvisioningCli.IsInvoked(args))
 
 // ---- HTTP pipeline -------------------------------------------------------
 // Unhandled exceptions become RFC 9457 ProblemDetails JSON; no stack traces reach the client.
+app.UseForwardedHeadersFromConfiguration(app.Configuration);  // M14: first, so everything sees the client and HTTPS
 app.UseSecurityHeaders();  // M13 SEC: on every response, error responses included
 app.UseExceptionHandler();
 app.UseStatusCodePages();
@@ -242,12 +249,25 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// M14: the production container serves the built website (wwwroot) on the API's origin, so cookies stay SameSite=Strict
+// with no CORS. Development and the tests have no wwwroot and are unchanged.
+bool servesSite = app.Environment.HasSite();
+if (servesSite)
+{
+    app.UseSiteFiles();
+}
+
 app.UseCors(FrontendCorsPolicy);
 app.UseAuthentication();   // who is calling (reads the session cookie; no database work)
 app.UseRateLimiter();      // after authentication so ordering is limited per patron; login stays per IP
 app.UseAuthorization();    // what they may do (policies, roles)
 
 app.MapControllers();
+if (servesSite)
+{
+    app.MapSiteFallback();
+}
 
 await app.RunAsync();
 return 0;

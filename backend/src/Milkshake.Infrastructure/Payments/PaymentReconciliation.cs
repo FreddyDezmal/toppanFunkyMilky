@@ -7,6 +7,7 @@ using Milkshake.Application.Abstractions;
 using Milkshake.Application.Payments;
 using Milkshake.Domain.Orders;
 using Milkshake.Domain.Payments;
+using Milkshake.Infrastructure.Operations;
 using Milkshake.Infrastructure.Persistence;
 using Milkshake.Domain.Auditing;
 
@@ -252,11 +253,14 @@ internal sealed partial class PaymentReconciler(
 }
 
 /// <summary>
-/// Runs the reconciler every few minutes inside the API (no extra infrastructure). Skips runs while no provider key is
-/// configured, and never lets one failed run stop the next.
+/// Runs the reconciler once at start-up and then every few minutes inside the API (no extra infrastructure; M14 D-11:
+/// the free host stops idle instances, so work waiting from before a stop is picked up at once). Skips runs while no
+/// provider key is configured, never lets one failed run stop the next, and records a heartbeat after each completed
+/// (or deliberately skipped) run for the "workers" health check.
 /// </summary>
 internal sealed partial class PaymentReconciliationWorker(
     IServiceScopeFactory scopes,
+    WorkerHeartbeats heartbeats,
     IOptions<PaymentReconciliationOptions> options,
     IOptions<PaystackOptions> paystack,
     ILogger<PaymentReconciliationWorker> logger) : BackgroundService
@@ -268,11 +272,13 @@ internal sealed partial class PaymentReconciliationWorker(
             return;
         }
 
+        await Task.Yield();  // never hold up start-up
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(Math.Max(1, options.Value.IntervalMinutes)));
-        while (await timer.WaitForNextTickAsync(stoppingToken))
+        do
         {
             if (string.IsNullOrEmpty(paystack.Value.SecretKey))
             {
+                heartbeats.Beat(WorkerHeartbeats.PaymentReconciliation);
                 continue;
             }
 
@@ -280,6 +286,7 @@ internal sealed partial class PaymentReconciliationWorker(
             {
                 await using AsyncServiceScope scope = scopes.CreateAsyncScope();
                 await scope.ServiceProvider.GetRequiredService<IPaymentReconciler>().ReconcileAsync(stoppingToken);
+                heartbeats.Beat(WorkerHeartbeats.PaymentReconciliation);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -290,6 +297,7 @@ internal sealed partial class PaymentReconciliationWorker(
                 LogRunFailed(logger, exception);
             }
         }
+        while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "A payment reconciliation run failed; the next run will try again.")]

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Milkshake.Domain.Common;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +18,7 @@ namespace Milkshake.Infrastructure.Persistence;
 /// Entity mappings live in the Configurations folder and are discovered automatically.
 /// </summary>
 public sealed class MilkshakeDbContext(DbContextOptions<MilkshakeDbContext> options)
-    : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options)
+    : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options), IDataProtectionKeyContext
 {
     /// <summary>PostgreSQL schema holding all application tables, separate from Supabase-managed schemas.</summary>
     public const string Schema = "milkshake";
@@ -68,6 +69,13 @@ public sealed class MilkshakeDbContext(DbContextOptions<MilkshakeDbContext> opti
     public DbSet<CancellationRequest> CancellationRequests => Set<CancellationRequest>();
 
     public DbSet<EmailNotification> EmailNotifications => Set<EmailNotification>();
+
+    /// <summary>
+    /// ASP.NET Core Data Protection key ring (M14 decision D-3): protects session and anti-forgery cookies, so sign-ins
+    /// survive restarts. Encrypted with a certificate in production; never audited (the audit trail must not hold key
+    /// material). Used only when <c>DataProtection:StoreKeysInDatabase</c> is true.
+    /// </summary>
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder builder)

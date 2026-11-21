@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Milkshake.Application.Notifications;
 using Milkshake.Domain.Notifications;
+using Milkshake.Infrastructure.Operations;
 using Milkshake.Infrastructure.Persistence;
 using Milkshake.Application.Abstractions;
 using Milkshake.Domain.Auditing;
@@ -235,6 +236,7 @@ internal sealed partial class EmailDispatcher(
 /// </summary>
 internal sealed partial class EmailDispatchWorker(
     IServiceScopeFactory scopes,
+    WorkerHeartbeats heartbeats,
     IOptions<EmailOptions> options,
     ILogger<EmailDispatchWorker> logger) : BackgroundService
 {
@@ -246,13 +248,17 @@ internal sealed partial class EmailDispatchWorker(
             return;
         }
 
+        // M14 D-11: run once at start-up (emails queued before the free host stopped the app go out at once), then on
+        // the timer; a heartbeat after each completed run feeds the "workers" health check.
+        await Task.Yield();  // never hold up start-up
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(Math.Max(5, dispatch.IntervalSeconds)));
-        while (await timer.WaitForNextTickAsync(stoppingToken))
+        do
         {
             try
             {
                 await using AsyncServiceScope scope = scopes.CreateAsyncScope();
                 await scope.ServiceProvider.GetRequiredService<IEmailDispatcher>().DispatchAsync(stoppingToken);
+                heartbeats.Beat(WorkerHeartbeats.EmailDispatch);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -263,6 +269,7 @@ internal sealed partial class EmailDispatchWorker(
                 LogRunFailed(logger, exception);
             }
         }
+        while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "An email dispatch run failed; the next run will try again.")]

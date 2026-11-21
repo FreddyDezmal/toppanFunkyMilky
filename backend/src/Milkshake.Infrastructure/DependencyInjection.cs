@@ -16,6 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Milkshake.Application.Abstractions;
+using Milkshake.Infrastructure.Operations;
 using Milkshake.Infrastructure.Persistence;
 using Milkshake.Infrastructure.Persistence.Auditing;
 using Milkshake.Infrastructure.Persistence.Seeding;
@@ -107,6 +108,7 @@ public static class DependencyInjection
         services.AddScoped<RefundSubmitter>();
         services.AddScoped<IOrderCancellationService, OrderCancellationService>();
         services.AddScoped<IManagerOrderService, ManagerOrderService>();
+        services.TryAddSingleton<WorkerHeartbeats>();
         services.AddHostedService<PaymentReconciliationWorker>();
         services.AddScoped<IDiscountConfigurationSource, DiscountConfigurationSource>();
 
@@ -133,6 +135,12 @@ public static class DependencyInjection
                 name: "database",
                 failureStatus: HealthStatus.Unhealthy,
                 tags: ["db", "ready"],
+                timeout: TimeSpan.FromSeconds(20))
+            // M14 D-11/D-13: background work and anything waiting for a manager. Degraded (HTTP 200), never Unhealthy.
+            .AddCheck<WorkersHealthCheck>(
+                name: "workers",
+                failureStatus: HealthStatus.Degraded,
+                tags: ["db", "workers"],
                 timeout: TimeSpan.FromSeconds(20));
 
         return services;
