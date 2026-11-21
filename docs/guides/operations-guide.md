@@ -166,8 +166,8 @@ run `2026-11-21T10-42-51-261Z`: after 19 of 19 E2E tests against the production 
 database was backed up (107 KB, 3.3 s), restored in 1 s, and the drill **passed**: 27 tables, 551 rows, counts equal
 to the source, 18 integrity checks at 0, 4 audit triggers, an audit change refused, latest migration
 `20261121091600_AddDataProtectionKeys`. The encrypted file contained no readable text and no log contained a secret.
-An earlier run (`2026-11-21T10-25-58-944Z`, 512 rows) also passed. *Step 8 adds the first backup of the live
-database and its drill on GitHub.*
+An earlier run (`2026-11-21T10-25-58-944Z`, 512 rows) also passed. **Live database:** first scheduled-workflow backup run 44940639255 (21 Nov 2026) **passed** its
+restore drill: 27 tables, integrity 18 × 0, audit change refused (`docs/testing/m14-step8-deployment.md`).
 
 **Restoring for real** (only after a decision to do so; never test by overwriting the live database):
 
