@@ -56,7 +56,7 @@ Related: [integration test report](../testing/m13-integration-test-report.md) ·
 | Test environment E2E (`npm run test:e2e`, Supabase) | **9 passed** |
 | Performance (`--perf`, run `2026-11-21T05-53-08-262Z`) | All thresholds met; 5,702 requests, 0 failed |
 | ZAP baseline and API scans | High 0, Medium 0; Low 1 (site HSTS, deferred) |
-| E2E-15 manual sandbox payment | Order MS-2X9G-21TM paid (ZAR 62.10, Paystack MSP-T5XMB7S0QE8K): Confirmed and Paid |
+| E2E-15 manual sandbox payment | Order MS-2X9G-21TM paid (ZAR 62.10, Paystack MSP-T5XMB7S0QE8K): Confirmed and Paid; receipt email with R62,10 total paid and the payment reference |
 | Supabase integrity (read-only) | 18 of 18 at 0 |
 | `npm audit` / `dotnet list package --vulnerable --include-transitive` | 0 / none |
 | Secrets scan (`git grep`) | None found |

@@ -49,7 +49,7 @@ application code behaves differently for it.
 | E2E-12 | Cross-patron isolation and role boundaries over real HTTP | L, I, S | `isolation.spec.ts` (2 tests); `OrderingSecurityTests`, `ManagementSecurityTests` | Pass |
 | E2E-13 | Database integrity after the full run | L, Supabase | `tools/db/integrity-checks.sql` after every L run; on Supabase in a read-only transaction (decision D7) | Pass (18 of 18 at 0, both) |
 | E2E-14 | Patron journey on a phone and by keyboard only, with axe | L | `mobile-keyboard.spec.ts` (2 tests) | Pass |
-| E2E-15 | Real Paystack sandbox payment with the test card | M | Order MS-2X9G-21TM, ZAR 62.10, Paystack reference MSP-T5XMB7S0QE8K, Visa ending 4081: order Confirmed and Paid; Paystack receipt received. Screenshots in `evidence/` | Pass |
+| E2E-15 | Real Paystack sandbox payment with the test card | M | Order MS-2X9G-21TM, ZAR 62.10, Paystack reference MSP-T5XMB7S0QE8K, Visa ending 4081: order Confirmed and Paid; the app's receipt email (Mailpit) shows the order, the stored prices, R62,10 total paid, the Paystack reference and a link to the order; Paystack's own receipts also received. Screenshots in `evidence/` | Pass |
 | SEC-01 to 10 | OWASP Top 10 checklist; ZAP baseline and API scans | I, L | Security report | Pass |
 | PERF-01 | 50 concurrent users | L (k6) | Performance report | Pass |
 
@@ -75,7 +75,7 @@ application code behaves differently for it.
 | MR-05 | Confirmation email of orders and payments | E2E-03 (receipt), E2E-06 and E2E-07 (cancellation, refund and request emails) |
 | MR-06 | Payment gateway | E2E-03, E2E-04, E2E-05 (simulator), E2E-15 (real Paystack sandbox) |
 | MR-07 | Two user profiles with two logins | E2E-01, E2E-12 |
-| MR-08 | Final receipt by email | E2E-03 (exactly one receipt with the stored total and order link) |
+| MR-08 | Final receipt by email | E2E-03 (exactly one receipt with the stored total and order link), E2E-15 (receipt after a real sandbox payment) |
 | MR-09 | Patron report | E2E-03, E2E-06 (My orders: Paid, Refunded less fee) |
 | MR-10 | Management reports | E2E-03, E2E-07, E2E-11 |
 
