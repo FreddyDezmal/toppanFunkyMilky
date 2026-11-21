@@ -92,7 +92,7 @@ export function AppLayout() {
       <main className="mx-auto max-w-4xl px-4 py-10">
         <Outlet />
       </main>
-      <footer className="mx-auto max-w-4xl px-4 pb-8 text-xs text-slate-400">Development build</footer>
+      <footer className="mx-auto max-w-4xl px-4 pb-8 text-xs text-slate-600">Development build</footer>
     </div>
   )
 }

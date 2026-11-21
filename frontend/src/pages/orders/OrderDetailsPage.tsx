@@ -73,7 +73,7 @@ export function OrderDetailsPage() {
 
   if (state.kind === 'loading') {
     return (
-      <p role="status" className="text-sm text-slate-500">
+      <p role="status" className="text-sm text-slate-600">
         Loading your order…
       </p>
     )

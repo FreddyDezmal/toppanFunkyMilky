@@ -158,7 +158,7 @@ export function RestaurantsPage() {
             {loadError}
           </p>
         ) : restaurants === null ? (
-          <p role="status" className="text-sm text-slate-500">
+          <p role="status" className="text-sm text-slate-600">
             Loading restaurants…
           </p>
         ) : restaurants.length === 0 ? (

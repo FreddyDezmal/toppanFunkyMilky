@@ -192,7 +192,7 @@ function CatalogManager({ kind }: { kind: CatalogKind }) {
             {loadError}
           </p>
         ) : items === null ? (
-          <p role="status" className="text-sm text-slate-500">
+          <p role="status" className="text-sm text-slate-600">
             Loading {title.toLowerCase()}…
           </p>
         ) : items.length === 0 ? (

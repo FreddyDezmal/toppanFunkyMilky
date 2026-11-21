@@ -127,7 +127,11 @@ export async function expectNoSeriousAccessibilityProblems(page: Page, pageName:
   const results = await new AxeBuilder({ page }).include('main').withTags(['wcag2a', 'wcag2aa']).analyze()
   const serious = results.violations
     .filter((violation) => violation.impact === 'serious' || violation.impact === 'critical')
-    .map((violation) => `${pageName}: ${violation.id}: ${violation.help} (${violation.nodes.length} element(s))`)
+    .map((violation) => {
+      // Name each element and axe's reason (e.g. the contrast ratio), so a failure can be fixed without a re-run.
+      const elements = violation.nodes.map((node) => `${node.target.join(' ')} – ${(node.failureSummary ?? '').split('\n').slice(1).join(' ').trim()}`)
+      return `${pageName}: ${violation.id}: ${violation.help} (${violation.nodes.length} element(s)): ${elements.join('; ')}`
+    })
   expect(serious).toEqual([])
 }
 

@@ -11,6 +11,7 @@ requirement does not work; Medium = works with a workaround, or a non-mandatory 
 | DEF-03 | 21 Nov 2026 | E2E-06 | Low (wording; money protected by the server) | Just after a payment is confirmed, the Cancel dialog briefly offered the unpaid wording ("nothing is charged") | Closed (retest `2026-11-21T04-03-22-923Z`: 4 of 4 passed) |
 | DEF-04 | 21 Nov 2026 | E2E-03 (WebKit) | Low (layout) | The live estimate appears above "Continue to pickup" and pushes it down about 110 px, so a click at that moment misses | Open (Low): test waits for the estimate; product change proposed for M14 |
 | DEF-05 | 21 Nov 2026 | E2E-06, E2E-07, E2E-10 | Low (test environment, not the product) | "Too many attempts" at sign-in and registration: every simulated user shares 127.0.0.1 | Closed (retest `2026-11-21T04-31-59-945Z`: 14 of 14 passed) |
+| DEF-06 | 21 Nov 2026 | E2E-14 (phone) | Medium (accessibility: WCAG 2 AA 1.4.3 not met) | Loading messages and the footer were grey text on the pink page background below 4.5:1 contrast | Closed (retest `2026-11-21T04-47-51-794Z`: 18 of 18 passed) |
 
 ## DEF-01 – WebKit journey timed out on the return from checkout
 
@@ -95,3 +96,19 @@ requirement does not work; Medium = works with a workaround, or a non-mandatory 
 - **Retest:** full `npm run test:e2e:local` (`2026-11-21T04-31-59-945Z`): 14 of 14 passed, integrity checks all 0.
   **Closed.**
 
+## DEF-06 – Text on the page background below WCAG AA contrast
+
+- **Run:** `.m13-logs/e2e/2026-11-21T04-40-47-532Z`, `mobile-keyboard.spec.ts` (E2E-14, phone-sized screen). axe:
+  "color-contrast: Elements must meet minimum color contrast ratio thresholds (1 element(s))" on Order – quantity.
+- **Cause:** the scan ran while "Loading the menu…" was showing. It is `text-slate-500` (#64748b) directly on the page
+  background `brand-50` (#fdf2f8): **4.36:1**, below the 4.5:1 that WCAG 2 AA (1.4.3) requires for normal text. On the
+  white cards the same grey is 4.76:1, which is why earlier scans (taken after loading) passed. A review of other text
+  drawn straight on the page background found the same loading style on four more pages, and the footer
+  ("Development build", `slate-400`) at **2.35:1**. The footer is outside `<main>`, which the scans cover, so it had
+  not been reported.
+- **Fix:** those six elements use `text-slate-600` (#475569): 6.94:1 on the page background, 7.58:1 on white.
+  `OrderLayout.tsx` (loading the menu), `OrderDetailsPage.tsx` (loading your order), `CatalogPage.tsx`,
+  `DiscountTiersPage.tsx`, `RestaurantsPage.tsx` (loading lists) and `AppLayout.tsx` (footer).
+- **Test change:** accessibility failures now name each element and axe's reason (for contrast, the measured ratio).
+- **Retest:** full `npm run test:e2e:local` (`2026-11-21T04-47-51-794Z`: 18 of 18 passed, integrity checks all 0), Vitest and lint
+  passed on 21 Nov 2026. **Closed.**
