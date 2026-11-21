@@ -1,5 +1,5 @@
 # Continuous integration (M14 Step 4). Checks only: this workflow never deploys, never uses a secret and never touches
-# Supabase, Paystack or Resend. Deployment is a separate, manually started workflow (decision D-9).
+# Supabase, Paystack or Resend. Deployment is a separate, manually started workflow (decision D-14).
 name: CI
 
 on:

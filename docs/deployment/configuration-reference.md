@@ -11,7 +11,7 @@ environment variable `A__B` (double underscore); list items use an index, e.g. `
 | `ForwardedHeaders:Enabled` | `true` | Behind Koyeb's proxy: client address and HTTPS come from one forwarded hop. Only safe while the app is reachable solely through that proxy. |
 | `DataProtection:StoreKeysInDatabase` | `true` | D-3: sign-in keys in `milkshake.data_protection_keys`, so sign-ins survive restarts. Start-up fails in Production without the certificate below. |
 | `Cors:AllowedOrigins` | empty | D-2: one origin; the API serves the site, so no CORS. |
-| `Email:Provider` | `Resend` | D-6. Sends only to `Email:AllowedRecipients`. |
+| `Email:Provider` | `Resend` | D-5. Sends only to `Email:AllowedRecipients`. |
 
 ## Set on the host
 
