@@ -1,4 +1,8 @@
-// Local E2E stack for M13 (decisions D1 to D3). Run from frontend/:  npm run test:e2e:local [-- <playwright args>]
+// Local E2E stack for M13 (decisions D1 to D3). Run from frontend/:  npm run test:e2e:local [-- <options>]
+//   <playwright args>  passed to Playwright (e.g. a spec file name or --project=chromium)
+//   --perf             after the tests, PERF-01: k6 (Docker) with 50 virtual patrons (e2e-local/perf/order-and-pay.js)
+//   --zap              after the tests, SEC: OWASP ZAP baseline scan of the site and API scan from the OpenAPI document
+//   --no-e2e           skip Playwright (with --perf and/or --zap)
 //
 // 1. Starts a disposable PostgreSQL 17 and a disposable Mailpit (Docker). The database password is random for each run
 //    and lives only in this process's memory.
@@ -36,6 +40,13 @@ const isWindows = process.platform === 'win32'
 // The development certificate's key is exported here for Vite and deleted when the run ends.
 const certDir = mkdtempSync(path.join(tmpdir(), 'milkshake-e2e-cert-'))
 const site = `https://localhost:${PORTS.vite}`
+// Docker containers (ZAP, k6) reach this machine's site by this name (Docker Desktop).
+const dockerSite = `https://host.docker.internal:${PORTS.vite}`
+const zapContainers = [`milkshake-e2e-zap-baseline-${process.pid}`, `milkshake-e2e-zap-api-${process.pid}`]
+const k6Container = `milkshake-e2e-k6-${process.pid}`
+const OUR_FLAGS = ['--perf', '--zap', '--no-e2e']
+const flags = new Set(process.argv.slice(2).filter((arg) => OUR_FLAGS.includes(arg)))
+const playwrightArgs = process.argv.slice(2).filter((arg) => !OUR_FLAGS.includes(arg))
 
 function log(message) {
   console.log(`[e2e-local] ${message}`)
@@ -177,13 +188,129 @@ async function cleanup() {
     }
   }
   rmSync(certDir, { recursive: true, force: true })
-  for (const container of [dbContainer, mailContainer]) {
+  for (const container of [dbContainer, mailContainer, ...zapContainers, k6Container]) {
     try {
       execFileSync('docker', ['rm', '-f', container], { stdio: 'ignore' })
     } catch {
       // not running
     }
   }
+}
+
+/**
+ * Runs a Docker command in the foreground, its output to <name>.log in the run's folder; resolves to the exit code.
+ * After `limitMinutes` the container is removed (so a scan that hangs cannot hold the run) and the result is 124.
+ */
+function docker(name, args, container, limitMinutes) {
+  log(`$ docker ${args.join(' ')}`)
+  return new Promise((resolve) => {
+    const out = createWriteStream(path.join(logDir, `${name}.log`))
+    const child = spawn('docker', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    child.stdout.pipe(out)
+    child.stderr.pipe(out)
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      log(`${name}: stopped after ${limitMinutes} minutes`)
+      try {
+        execFileSync('docker', ['rm', '-f', container], { stdio: 'ignore' })
+      } catch {
+        // already gone
+      }
+    }, limitMinutes * 60_000)
+    child.on('exit', (code) => {
+      clearTimeout(timer)
+      resolve(timedOut ? 124 : (code ?? 1))
+    })
+  })
+}
+
+/** Fails fast if a container cannot reach the site (Docker Desktop forwards host.docker.internal to 127.0.0.1). */
+function assertReachableFromDocker(image) {
+  let status = ''
+  try {
+    status = execFileSync('docker', ['run', '--rm', '--entrypoint', 'curl', image, '-sk', '-o', '/dev/null', '-w', '%{http_code}',
+      '--max-time', '20', `${dockerSite}/api/health`], { encoding: 'utf8' }).trim()
+  } catch (error) {
+    status = error instanceof Error ? error.message.split('\n')[0] : String(error)
+  }
+  if (status !== '200') {
+    throw new Error(`Docker cannot reach the site at ${dockerSite} (got ${status}). Is Docker Desktop running?`)
+  }
+  log(`Docker reaches ${dockerSite}`)
+}
+
+function httpsGetText(url) {
+  return new Promise((resolve, reject) => {
+    httpsRequest(url, { rejectUnauthorized: false }, (res) => {
+      let body = ''
+      res.setEncoding('utf8')
+      res.on('data', (chunk) => (body += chunk))
+      res.on('end', () => (res.statusCode === 200 ? resolve(body) : reject(new Error(`GET ${url}: ${res.statusCode}`))))
+    })
+      .on('error', reject)
+      .end()
+  })
+}
+
+/** PERF-01 (AC-13.4): k6 with 50 virtual patrons; the script's thresholds decide the exit code. */
+async function loadTest() {
+  const outDir = path.join(logDir, 'k6')
+  mkdirSync(outDir, { recursive: true })
+  const code = await docker('k6', ['run', '--rm', '--name', k6Container,
+    '-v', `${path.join(frontend, 'e2e-local', 'perf')}:/scripts:ro`, '-v', `${outDir}:/out`,
+    'grafana/k6', 'run', '-e', `BASE=${dockerSite}`, '--summary-export', '/out/summary.json', '/scripts/order-and-pay.js'], k6Container, 10)
+  log(code === 0 ? 'k6: every threshold met (see k6.log)' : `k6: thresholds NOT met or the run failed (exit ${code}; see k6.log)`)
+  return code
+}
+
+const RISKS = ['Informational', 'Low', 'Medium', 'High']
+
+/** Counts a ZAP JSON report's alerts by risk and lists every Medium or High one. */
+function summariseZap(file, title) {
+  const report = JSON.parse(readFileSync(file, 'utf8'))
+  const alerts = (report.site ?? []).flatMap((site) => site.alerts ?? [])
+  const counts = RISKS.map((risk, code) => `${risk}: ${alerts.filter((a) => Number(a.riskcode) === code).length}`)
+  const serious = alerts
+    .filter((a) => Number(a.riskcode) >= 2)
+    .map((a) => `  [${RISKS[Number(a.riskcode)]}] ${a.name} (${a.instances?.length ?? a.count} instance(s)) – plugin ${a.pluginid}`)
+  return { high: alerts.filter((a) => Number(a.riskcode) === 3).length, text: [`${title}: ${counts.join(', ')}`, ...serious].join('\n') }
+}
+
+/** SEC (AC-13.3): OWASP ZAP baseline (passive) scan of the site and API scan (active) from the OpenAPI document. */
+async function zapScans() {
+  const zapDir = path.join(logDir, 'zap')
+  mkdirSync(zapDir, { recursive: true })
+  // The API's own description, pointed at the site so requests go the way a browser's do (through the same origin).
+  const document = JSON.parse(await httpsGetText(`https://localhost:${PORTS.api}/openapi/v1.json`))
+  document.servers = [{ url: dockerSite }]
+  writeFileSync(path.join(zapDir, 'openapi.json'), JSON.stringify(document, null, 2))
+
+  const image = 'ghcr.io/zaproxy/zaproxy:stable'
+  assertReachableFromDocker(image)
+  const mount = ['-v', `${zapDir}:/zap/wrk/:rw`]
+  await docker('zap-baseline', ['run', '--rm', '--name', zapContainers[0], ...mount, image,
+    'zap-baseline.py', '-t', `${dockerSite}/`, '-J', 'baseline.json', '-r', 'baseline.html', '-I', '-m', '3'], zapContainers[0], 15)
+  await docker('zap-api', ['run', '--rm', '--name', zapContainers[1], ...mount, image,
+    'zap-api-scan.py', '-t', '/zap/wrk/openapi.json', '-f', 'openapi', '-J', 'api.json', '-r', 'api.html', '-I',
+    '-z', '-config scanner.maxScanDurationInMins=20'], zapContainers[1], 30)
+
+  let high = 0
+  const parts = []
+  for (const [file, title] of [['baseline.json', 'ZAP baseline (site)'], ['api.json', 'ZAP API scan']]) {
+    try {
+      const summary = summariseZap(path.join(zapDir, file), title)
+      high += summary.high
+      parts.push(summary.text)
+    } catch (error) {
+      parts.push(`${title}: no report (${error instanceof Error ? error.message : String(error)}); see ${file.replace('.json', '')} log`)
+      high += 1
+    }
+  }
+  const text = parts.join('\n\n')
+  writeFileSync(path.join(zapDir, 'summary.txt'), text)
+  log(`security scans:\n${text}`)
+  return high === 0 ? 0 : 1
 }
 
 async function main() {
@@ -251,22 +378,29 @@ async function main() {
   await waitFor('Vite', () => httpsOk(`${site}/`), 60_000)
 
   // 5. Playwright, with the manager credentials and service addresses in memory only.
-  const playwright = spawn('npx', ['playwright', 'test', '-c', 'playwright.local.config.ts', ...process.argv.slice(2)], {
-    cwd: frontend,
-    shell: isWindows,
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      E2E_LOCAL: '1',
-      E2E_LOCAL_MANAGER_EMAIL: managerEmail,
-      E2E_LOCAL_MANAGER_PASSWORD: managerPassword,
-      E2E_SIMULATOR_URL: `http://127.0.0.1:${PORTS.simulator}`,
-      E2E_MAILPIT_URL: `http://127.0.0.1:${PORTS.mailpitUi}`,
-      E2E_LOG_DIR: logDir,
-      E2E_SITE: site,
-    },
-  })
-  const exitCode = await new Promise((resolve) => playwright.on('exit', (code) => resolve(code ?? 1)))
+  let exitCode = 0
+  if (!flags.has('--no-e2e')) {
+    const playwright = spawn('npx', ['playwright', 'test', '-c', 'playwright.local.config.ts', ...playwrightArgs], {
+      cwd: frontend,
+      shell: isWindows,
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        E2E_LOCAL: '1',
+        E2E_LOCAL_MANAGER_EMAIL: managerEmail,
+        E2E_LOCAL_MANAGER_PASSWORD: managerPassword,
+        E2E_SIMULATOR_URL: `http://127.0.0.1:${PORTS.simulator}`,
+        E2E_MAILPIT_URL: `http://127.0.0.1:${PORTS.mailpitUi}`,
+        E2E_LOG_DIR: logDir,
+        E2E_SITE: site,
+      },
+    })
+    exitCode = await new Promise((resolve) => playwright.on('exit', (code) => resolve(code ?? 1)))
+  }
+
+  // 6. Optional: performance smoke test, then security scans, against the same live stack.
+  const perfCode = flags.has('--perf') ? await loadTest() : 0
+  const zapCode = flags.has('--zap') ? await zapScans() : 0
 
   // AC-13.5: read-only integrity checks on everything the run created.
   const sql = readFileSync(path.join(repo, 'tools', 'db', 'integrity-checks.sql'), 'utf8')
@@ -277,7 +411,7 @@ async function main() {
   log(violations.length === 0 ? 'integrity checks: no violations' : `integrity checks FAILED:\n${violations.join('\n')}`)
 
   log(`logs: ${logDir}`)
-  return exitCode === 0 && violations.length === 0 ? 0 : 1
+  return exitCode === 0 && violations.length === 0 && perfCode === 0 && zapCode === 0 ? 0 : 1
 }
 
 let code = 1

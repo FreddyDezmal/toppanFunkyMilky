@@ -35,6 +35,10 @@ export default defineConfig({
     strictPort: true,
     https: e2eHttps,
     proxy: apiProxy,
+    // The M13 security and load tests run in Docker and reach this machine as host.docker.internal, which Docker
+    // Desktop forwards to 127.0.0.1. "localhost" would listen on ::1 only on Windows, so the E2E stack binds IPv4.
+    host: e2eHttps ? '127.0.0.1' : undefined,
+    allowedHosts: e2eHttps ? ['host.docker.internal'] : undefined,
   },
   test: {
     environment: 'jsdom',

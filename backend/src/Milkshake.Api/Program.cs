@@ -226,6 +226,11 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi().AllowAnonymous();              // OpenAPI document: /openapi/v1.json
     app.MapScalarApiReference().AllowAnonymous();   // Interactive API docs: /scalar
 }
+else if (app.Environment.IsEnvironment("E2E"))
+{
+    // M13: the disposable local E2E stack publishes the document (only) so the OWASP ZAP API scan covers every endpoint.
+    app.MapOpenApi().AllowAnonymous();
+}
 
 app.UseHttpsRedirection();
 app.UseCors(FrontendCorsPolicy);
