@@ -1,11 +1,12 @@
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearCsrfToken } from '../../lib/api/httpClient'
 import { formatMoney } from '../../lib/format/money'
-import { jsonResponse } from '../../test/mockApi'
+import { jsonResponse, mockApi } from '../../test/mockApi'
 import { placedOrder } from '../../test/orderingFixtures'
 import { callsTo, renderOrderingAt } from '../../test/renderOrdering'
+import { CancellationPanel } from './CancellationPanel'
 import { CANCELLATION_MESSAGES } from './cancellation'
 import type { OrderCancellation, PlacedOrder, RefundInfo } from './types'
 
@@ -251,5 +252,38 @@ describe('a request from the restaurant', () => {
     const notice = await screen.findByRole('region', { name: 'The restaurant has asked to cancel an order' })
     expect(notice).toHaveTextContent('Out of milk')
     expect(within(notice).getByRole('link', { name: `Review order ${REF}` })).toHaveAttribute('href', `/orders/${REF}`)
+  })
+})
+
+describe('after a payment is confirmed on the order page', () => {
+  it('never shows the unpaid figures while it reloads for the paid order (M13 DEF-03)', async () => {
+    const pending: { release?: () => void } = {}
+    let paid = false
+    mockApi({
+      [QUOTE]: () =>
+        paid
+          ? new Promise<Response>((resolve) => {
+              pending.release = () => resolve(jsonResponse(paidQuote()))
+            })
+          : jsonResponse(quote()),
+    })
+    const panel = (orderStatus: 'PendingPayment' | 'Confirmed') => (
+      <CancellationPanel reference={REF} orderStatus={orderStatus} locale="en-ZA" onOrderChanged={() => undefined} />
+    )
+    const view = render(panel('PendingPayment'))
+    expect(await screen.findByRole('button', { name: 'Cancel order' })).toBeInTheDocument()
+
+    // The order is now paid; the panel's details for it have not arrived yet.
+    paid = true
+    view.rerender(panel('Confirmed'))
+    expect(screen.queryByRole('button', { name: 'Cancel order' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/nothing is charged/)).not.toBeInTheDocument()
+
+    await waitFor(() => expect(pending.release).toBeDefined())
+    await act(async () => {
+      pending.release?.()
+    })
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel order' }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(`You paid ${zar(52.9)}`)
   })
 })

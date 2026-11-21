@@ -25,7 +25,11 @@ const DANGER_CLASS = 'rounded-lg border border-rose-300 bg-white px-4 py-2 text-
  * only sends back the refund the patron saw, and the server refuses it if it has changed.
  */
 export function CancellationPanel({ reference, orderStatus, locale, onOrderChanged }: CancellationPanelProps) {
-  const [data, setData] = useState<OrderCancellation | null>(null)
+  // Details are shown only for the order status they were loaded for (M13 DEF-03): while the panel reloads after a
+  // payment is confirmed, the unpaid figures ("nothing is charged") must not be shown or confirmed. The answer to the
+  // patron's own action is the server's latest state and stays shown until the order catches up.
+  const [loaded, setLoaded] = useState<{ data: OrderCancellation; forStatus: OrderStatus | null } | null>(null)
+  const data = loaded && (loaded.forStatus === null || loaded.forStatus === orderStatus) ? loaded.data : null
   const [loadFailed, setLoadFailed] = useState(false)
   const [dialog, setDialog] = useState<Dialog>(null)
   const [busy, setBusy] = useState(false)
@@ -35,9 +39,9 @@ export function CancellationPanel({ reference, orderStatus, locale, onOrderChang
   useEffect(() => {
     const controller = new AbortController()
     fetchCancellation(reference, controller.signal).then(
-      (loaded) => {
+      (cancellation) => {
         if (!controller.signal.aborted) {
-          setData(loaded)
+          setLoaded({ data: cancellation, forStatus: orderStatus })
         }
       },
       () => {
@@ -63,7 +67,7 @@ export function CancellationPanel({ reference, orderStatus, locale, onOrderChang
     setBusy(true)
     try {
       const result = await action()
-      setData(result)
+      setLoaded({ data: result, forStatus: null })
       setNotice({ tone: 'success', text: success })
       if (changesOrder) {
         onOrderChanged()
@@ -71,7 +75,7 @@ export function CancellationPanel({ reference, orderStatus, locale, onOrderChang
     } catch (error: unknown) {
       const changed = changedCancellation(error)
       if (changed) {
-        setData(changed)
+        setLoaded({ data: changed, forStatus: null })
         setNotice({ tone: 'warning', text: CANCELLATION_MESSAGES.refundChanged })
         onOrderChanged()
       } else {

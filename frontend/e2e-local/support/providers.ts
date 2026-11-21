@@ -14,6 +14,16 @@ export interface SimulatedTransaction {
   paidAmount?: number
 }
 
+/** A refund the API created at "Paystack" (amount in cents). */
+export interface SimulatedRefund {
+  id: number
+  reference: string
+  transaction: string
+  amount: number
+  currency: string
+  status: string
+}
+
 async function simulator<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
   const response = await fetch(`${stack.simulator}/__control${path}`, {
     method,
@@ -37,7 +47,7 @@ export const paystack = {
   webhook: (reference: string, times = 1) => simulator<{ statuses: number[] }>('POST', `/transactions/${encodeURIComponent(reference)}/webhook`, { times }),
   /** Settles the refunds of a transaction at "Paystack", optionally telling the API by a signed refund webhook. */
   settleRefunds: (transactionReference: string, status: 'processed' | 'failed', webhook = true) =>
-    simulator<{ statuses: number[] }>('POST', `/refunds/by-transaction/${encodeURIComponent(transactionReference)}`, { status, webhook }),
+    simulator<{ refunds: SimulatedRefund[]; statuses: number[] }>('POST', `/refunds/by-transaction/${encodeURIComponent(transactionReference)}`, { status, webhook }),
 }
 
 /**
