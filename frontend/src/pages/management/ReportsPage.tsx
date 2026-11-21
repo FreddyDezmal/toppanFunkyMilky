@@ -353,11 +353,11 @@ function OrdersPanel({ from, to, q, status, page, update }: OrdersPanelProps) {
         </p>
       )}
       {!report && !error && (
-        <p role="status" className="mt-4 text-sm text-slate-500">
+        <p role="status" className="mt-4 text-sm text-slate-600">
           Loading orders…
         </p>
       )}
-      {report && report.rows.length === 0 && <p className="mt-4 text-sm text-slate-500">No orders match.</p>}
+      {report && report.rows.length === 0 && <p className="mt-4 text-sm text-slate-600">No orders match.</p>}
 
       {report && report.rows.length > 0 && (
         <>
@@ -384,7 +384,7 @@ function OrdersPanel({ from, to, q, status, page, update }: OrdersPanelProps) {
                       <Link to={`/manager/orders?reference=${encodeURIComponent(row.reference)}`} className="text-brand-700 underline">
                         {row.reference}
                       </Link>
-                      {row.drinkNumber > 1 && <span className="ml-1 text-xs text-slate-500">(milkshake {row.drinkNumber})</span>}
+                      {row.drinkNumber > 1 && <span className="ml-1 text-xs text-slate-600">(milkshake {row.drinkNumber})</span>}
                     </td>
                     <td className="px-2 py-2">{row.flavour}</td>
                     <td className="px-2 py-2">{row.topping}</td>
@@ -410,7 +410,7 @@ function OrdersPanel({ from, to, q, status, page, update }: OrdersPanelProps) {
               <ol className="flex flex-wrap items-center gap-1">
                 {pageNumbers(report.page, report.totalPages).map((number, index) =>
                   number === null ? (
-                    <li key={`gap-${index}`} aria-hidden="true" className="px-1 text-slate-500">
+                    <li key={`gap-${index}`} aria-hidden="true" className="px-1 text-slate-600">
                       …
                     </li>
                   ) : (
@@ -492,7 +492,7 @@ function TrendsPanel({ from, to }: { from: string; to: string }) {
         </p>
       )}
       {!trends && !error && (
-        <p role="status" className="mt-4 text-sm text-slate-500">
+        <p role="status" className="mt-4 text-sm text-slate-600">
           Loading trends…
         </p>
       )}

@@ -111,7 +111,7 @@ export function DiscountTiersPage() {
         ) : (
           <table className="min-w-full text-left text-sm">
             <caption className="sr-only">Discount tiers</caption>
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-slate-600">
               <tr>
                 <th scope="col" className="py-2 pr-4">Tier</th>
                 <th scope="col" className="py-2 pr-4">Paid orders needed</th>

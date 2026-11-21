@@ -196,11 +196,11 @@ function CatalogManager({ kind }: { kind: CatalogKind }) {
             Loading {title.toLowerCase()}…
           </p>
         ) : items.length === 0 ? (
-          <p className="text-sm text-slate-500">No {title.toLowerCase()} to show.</p>
+          <p className="text-sm text-slate-600">No {title.toLowerCase()} to show.</p>
         ) : (
           <table className="min-w-full text-left text-sm">
             <caption className="sr-only">{title}</caption>
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-slate-600">
               <tr>
                 <th scope="col" className="py-2 pr-4">Name</th>
                 <th scope="col" className="py-2 pr-4">Order</th>

@@ -100,7 +100,7 @@ export function OrderPickupPage() {
             clearError(DRAFT_FIELDS.pickupLocal)
           }}
         />
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-600">
           Pickup times are provisional: opening hours and collection slots are not yet confirmed.
         </p>
       </div>

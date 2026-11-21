@@ -53,7 +53,8 @@ public sealed class EmailNotificationPersistenceTests(PostgresApiFactory factory
         int orderId = await SavedOrderAsync();
         await SaveAsync(Notification(orderId));
 
-        DbUpdateException duplicate = await Assert.ThrowsAsync<DbUpdateException>(() => SaveAsync(Notification(orderId)));
+        // M14 DEF-08: reported as a concurrency conflict (another request made the same change), still caught by the index.
+        DbUpdateConcurrencyException duplicate = await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => SaveAsync(Notification(orderId)));
 
         Assert.Equal((UniqueViolation, "ix_email_notifications_notification_key"), (SqlState(duplicate), Constraint(duplicate)));
     }

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Milkshake.Domain.Common;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Milkshake.Domain.Auditing;
 using Milkshake.Domain.Catalog;
 using Milkshake.Domain.Notifications;
@@ -76,6 +77,48 @@ public sealed class MilkshakeDbContext(DbContextOptions<MilkshakeDbContext> opti
     /// material). Used only when <c>DataProtection:StoreKeysInDatabase</c> is true.
     /// </summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+
+    /// <summary>Unique index on <c>email_notifications.notification_key</c> (one email per event, M9).</summary>
+    internal const string NotificationKeyIndex = "ix_email_notifications_notification_key";
+
+    /// <inheritdoc cref="SaveChangesAsync(bool, CancellationToken)" />
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        try
+        {
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+        catch (DbUpdateException exception) when (IsDuplicateNotification(exception))
+        {
+            throw SameChangeAlreadySaved(exception);
+        }
+    }
+
+    /// <summary>
+    /// Saves, reporting a clash on an email's notification key as a concurrency conflict (M14 DEF-08). The key is
+    /// derived from the change that queues the email (e.g. "order confirmed"), so a clash means another request made the
+    /// same change at the same moment. EF writes the email row before the row whose version check would otherwise report
+    /// the conflict, so without this the loser failed with an unhandled unique-key error (HTTP 500) instead of the
+    /// conflict every caller already handles. The whole save is rolled back either way.
+    /// </summary>
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsDuplicateNotification(exception))
+        {
+            throw SameChangeAlreadySaved(exception);
+        }
+    }
+
+    private static bool IsDuplicateNotification(DbUpdateException exception) =>
+        exception is not DbUpdateConcurrencyException &&
+        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: NotificationKeyIndex };
+
+    private static DbUpdateConcurrencyException SameChangeAlreadySaved(DbUpdateException exception) =>
+        new("Another request made the same change at the same moment; its email is already queued.", exception);
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder builder)

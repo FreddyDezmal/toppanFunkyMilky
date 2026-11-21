@@ -11,7 +11,7 @@ export function RequireAuth({ role }: { role?: string }) {
 
   if (status === 'loading') {
     return (
-      <p role="status" className="text-sm text-slate-500">
+      <p role="status" className="text-sm text-slate-600">
         Checking your session…
       </p>
     )

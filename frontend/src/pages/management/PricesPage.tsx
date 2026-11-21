@@ -148,7 +148,7 @@ function PriceManager({ kind, itemId }: { kind: CatalogKind; itemId: number }) {
           {loadError}
         </p>
       ) : history === null ? (
-        <p role="status" className="mt-6 text-sm text-slate-500">
+        <p role="status" className="mt-6 text-sm text-slate-600">
           Loading prices…
         </p>
       ) : (
@@ -167,7 +167,7 @@ function PriceManager({ kind, itemId }: { kind: CatalogKind; itemId: number }) {
           <div className="mt-6 overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <caption className="mb-2 text-left text-base font-semibold text-slate-900">Price history, newest first</caption>
-              <thead className="text-xs uppercase tracking-wide text-slate-500">
+              <thead className="text-xs uppercase tracking-wide text-slate-600">
                 <tr>
                   <th scope="col" className="py-2 pr-4">Price</th>
                   <th scope="col" className="py-2 pr-4">From</th>

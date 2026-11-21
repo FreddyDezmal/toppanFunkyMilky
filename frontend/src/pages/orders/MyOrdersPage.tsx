@@ -79,7 +79,7 @@ export function MyOrdersPage() {
       </h1>
 
       {state.kind === 'loading' && (
-        <p role="status" className="mt-4 text-sm text-slate-500">
+        <p role="status" className="mt-4 text-sm text-slate-600">
           Loading your orders…
         </p>
       )}
@@ -166,7 +166,7 @@ export function MyOrdersPage() {
               {more.kind === 'loading' ? 'Loading more orders…' : 'Load more orders'}
             </button>
           ) : (
-            <p className="mt-4 text-sm text-slate-500">That is all your orders.</p>
+            <p className="mt-4 text-sm text-slate-600">That is all your orders.</p>
           )}
         </>
       )}

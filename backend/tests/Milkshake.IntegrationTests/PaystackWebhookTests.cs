@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Milkshake.Api;
 using Milkshake.Api.Contracts.Ordering;
+using Milkshake.Application.Abstractions;
 using Milkshake.Application.Payments;
 using Milkshake.Domain.Auditing;
 using Milkshake.Domain.Notifications;
@@ -72,6 +73,35 @@ public sealed class PaystackWebhookTests(PostgresApiFactory factory) : IDisposab
         Assert.Equal(1, await PaymentUpdateAuditsAsync(payment));
         Assert.Equal((PaymentStatus.Succeeded, OrderStatus.Confirmed), await StateAsync(order, payment));
         Assert.Equal(1, await ConfirmationEmailsAsync(order));   // M9: one receipt, however often Paystack notifies
+    }
+
+    [Fact]
+    public async Task TwoConfirmationsAtTheSameMoment_TheLaterSaveIsAConcurrencyConflict()
+    {
+        // M14 DEF-08, step by step: two requests load the same pending payment and both confirm it. The second save must
+        // fail as a concurrency conflict (which every caller turns into "retry"/"in progress"), not as an unhandled
+        // unique-key error on the receipt email (HTTP 500 in CI). Nothing from the second save is kept.
+        (string order, string payment) = await PendingPaymentAsync();
+        await using AsyncServiceScope firstScope = factory.Services.CreateAsyncScope();
+        await using AsyncServiceScope secondScope = factory.Services.CreateAsyncScope();
+        MilkshakeDbContext first = firstScope.ServiceProvider.GetRequiredService<MilkshakeDbContext>();
+        MilkshakeDbContext second = secondScope.ServiceProvider.GetRequiredService<MilkshakeDbContext>();
+        using IDisposable actor = AuditActorScope.Begin(AuditActors.PaystackWebhook);
+
+        await ConfirmAsync(first, payment);
+        await ConfirmAsync(second, payment);
+        await first.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => second.SaveChangesAsync());
+        Assert.Equal((PaymentStatus.Succeeded, OrderStatus.Confirmed), await StateAsync(order, payment));
+        Assert.Equal(1, await ConfirmationEmailsAsync(order));
+    }
+
+    private static async Task ConfirmAsync(MilkshakeDbContext db, string paymentReference)
+    {
+        Payment payment = await db.Payments.SingleAsync(p => p.Reference == paymentReference);
+        Order order = await db.Orders.SingleAsync(o => o.Id == payment.OrderId);
+        payment.ApplyVerifiedOutcome(order, VerifiedOutcome.Paid, 2990, "ZAR", 504, null, false, DateTimeOffset.UtcNow);
     }
 
     [Fact]

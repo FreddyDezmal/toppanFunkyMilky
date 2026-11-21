@@ -180,8 +180,8 @@ export function EmailsPage() {
             {loadError}
           </p>
         )}
-        {!list && !loadError && <p className="mt-3 text-sm text-slate-500">Loading emails…</p>}
-        {list && list.items.length === 0 && <p className="mt-3 text-sm text-slate-500">No emails match.</p>}
+        {!list && !loadError && <p className="mt-3 text-sm text-slate-600">Loading emails…</p>}
+        {list && list.items.length === 0 && <p className="mt-3 text-sm text-slate-600">No emails match.</p>}
         {list && list.items.length > 0 && (
           <ul className="mt-3 divide-y divide-slate-100">
             {list.items.map((email) => (

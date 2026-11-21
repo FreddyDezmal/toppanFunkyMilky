@@ -58,7 +58,7 @@ export function AppLayout() {
                     Management
                   </NavLink>
                 )}
-                <span className="px-2 text-sm text-slate-500">Hi, {user.firstName}</span>
+                <span className="px-2 text-sm text-slate-600">Hi, {user.firstName}</span>
                 <button
                   type="button"
                   onClick={() => void handleLogout()}

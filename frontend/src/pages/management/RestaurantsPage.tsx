@@ -162,11 +162,11 @@ export function RestaurantsPage() {
             Loading restaurants…
           </p>
         ) : restaurants.length === 0 ? (
-          <p className="text-sm text-slate-500">No restaurants to show.</p>
+          <p className="text-sm text-slate-600">No restaurants to show.</p>
         ) : (
           <table className="min-w-full text-left text-sm">
             <caption className="sr-only">Restaurants</caption>
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-slate-600">
               <tr>
                 <th scope="col" className="py-2 pr-4">Name</th>
                 <th scope="col" className="py-2 pr-4">Address</th>

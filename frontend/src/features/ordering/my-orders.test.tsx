@@ -65,7 +65,7 @@ describe('My orders', () => {
 
     const first = (await screen.findByRole('link', { name: 'Order MS-7KQ2-X9TD' })).closest('li')!
     expect(within(first).getByRole('link', { name: 'Order MS-7KQ2-X9TD' })).toHaveAttribute('href', '/orders/MS-7KQ2-X9TD')
-    expect(first).toHaveTextContent(`Placed ${formatPlacedAt('2026-11-20T07:00:00+00:00', 'Africa/Johannesburg')}`)
+    expect(first).toHaveTextContent(`Placed ${formatPlacedAt('2026-11-20T07:00:00+00:00', 'Africa/Johannesburg', 'en-ZA')}`)  // the page formats with the store's locale, not the machine's
     expect(first).toHaveTextContent('2 milkshakes · Branch A')
     const drinks = within(first).getByRole('list', { name: 'Milkshakes in order MS-7KQ2-X9TD' })
     expect(within(drinks).getAllByRole('listitem').map((item) => item.textContent)).toEqual([

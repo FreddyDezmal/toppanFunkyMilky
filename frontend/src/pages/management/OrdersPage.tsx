@@ -161,7 +161,7 @@ export function OrdersPage() {
             {attentionError}
           </p>
         )}
-        {attention && attention.length === 0 && <p className="mt-3 text-sm text-slate-500">No refunds need attention.</p>}
+        {attention && attention.length === 0 && <p className="mt-3 text-sm text-slate-600">No refunds need attention.</p>}
         {attention && attention.length > 0 && (
           <ul className="mt-3 divide-y divide-slate-100 text-sm">
             {attention.map((refund) => (
@@ -260,7 +260,7 @@ function OrderCard({ order, locale, onChanged }: { order: ManagerOrder; locale: 
           }}
         />
       ) : (
-        <p className="mt-5 text-sm text-slate-500">
+        <p className="mt-5 text-sm text-slate-600">
           {order.requests.some((request) => request.isOpen)
             ? 'A cancellation request is waiting for the patron’s answer.'
             : 'This order can no longer be cancelled: it is cancelled or its pickup time has passed.'}
@@ -311,7 +311,7 @@ function RequestForm({ order, onRequested }: { order: ManagerOrder; onRequested:
   return (
     <form onSubmit={(event) => void onSubmit(event)} noValidate className="mt-5 max-w-xl">
       <h3 className="font-semibold">Ask the patron to cancel</h3>
-      <p id={hintId} className="text-xs text-slate-500">
+      <p id={hintId} className="text-xs text-slate-600">
         The patron sees this reason and decides. If the order was paid and they accept, they get everything back.
       </p>
       <label className="mt-2 block text-sm font-medium text-slate-700">
@@ -325,7 +325,7 @@ function RequestForm({ order, onRequested }: { order: ManagerOrder; onRequested:
           className={INPUT_CLASS}
         />
       </label>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 text-xs text-slate-600">
         {reason.length}/{REASON_MAX_LENGTH} characters
       </p>
       {error && (

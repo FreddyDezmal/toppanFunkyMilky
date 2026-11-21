@@ -189,7 +189,7 @@ export function PaymentPanel({ reference, awaitsPayment, amountLabel, returning,
           >
             {view.kind === 'starting' ? 'Opening secure checkout…' : 'Pay now'}
           </button>
-          <p id="payment-help" className="mt-2 text-xs text-slate-500">
+          <p id="payment-help" className="mt-2 text-xs text-slate-600">
             You will pay {amountLabel} on Paystack&rsquo;s secure page. We never see or store your card details. Your order is confirmed
             only once we have verified the payment.
           </p>

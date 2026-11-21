@@ -1,0 +1,10 @@
+# Secret-scan findings reviewed and accepted as false positives (M14 Step 7, 21 November 2026). Each line is one exact
+# finding (commit:file:rule:line); a new finding anywhere, even in the same file, still fails CI.
+#
+# A made-up Paystack-style test value ("sk_test_must_never_leak_0123456789") that the leak tests use on purpose to
+# prove a configured secret never appears in logs or error messages. Not a key from any account.
+b5a725667d79303b4a9897ad6dde5cafaca95d24:backend/tests/Milkshake.IntegrationTests/CancellationHardeningTests.cs:generic-api-key:19
+36df1abf7973144686bc2aca2defbb49cd07a475:backend/tests/Milkshake.IntegrationTests/PaymentHardeningTests.cs:generic-api-key:23
+# The IANA time zone name "Africa/Johannesburg" in test data (pickup time zone setting).
+b27757f1d2418dae3981b4486e4aaf309b2a02b3:backend/tests/Milkshake.IntegrationTests/Infrastructure/ManagementTestHelpers.cs:generic-api-key:109
+b27757f1d2418dae3981b4486e4aaf309b2a02b3:backend/tests/Milkshake.UnitTests/Management/SettingRulesTests.cs:generic-api-key:55

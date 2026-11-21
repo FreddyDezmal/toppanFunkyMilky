@@ -36,7 +36,7 @@ export function SystemStatusCard() {
         </button>
       </div>
 
-      {state.kind === 'loading' && <p className="mt-4 text-sm text-slate-500">Contacting the API…</p>}
+      {state.kind === 'loading' && <p className="mt-4 text-sm text-slate-600">Contacting the API…</p>}
 
       {state.kind === 'error' && (
         <div role="alert" className="mt-4 rounded-lg bg-rose-50 p-4 text-sm text-rose-800">
@@ -58,16 +58,16 @@ export function SystemStatusCard() {
               <div key={check.name} className="flex items-center justify-between gap-4 py-3">
                 <dt className="text-sm">
                   <span className="font-medium capitalize text-slate-900">{check.name}</span>
-                  {check.description && <span className="block text-xs text-slate-500">{check.description}</span>}
+                  {check.description && <span className="block text-xs text-slate-600">{check.description}</span>}
                 </dt>
                 <dd className="flex items-center gap-3">
-                  <span className="text-xs tabular-nums text-slate-400">{Math.round(check.durationMs)} ms</span>
+                  <span className="text-xs tabular-nums text-slate-600">{Math.round(check.durationMs)} ms</span>
                   <StatusBadge status={check.status} />
                 </dd>
               </div>
             ))}
           </dl>
-          <p className="mt-4 text-xs text-slate-500">
+          <p className="mt-4 text-xs text-slate-600">
             Connected to {describeApiTarget()} · checked {new Date(state.data.checkedAtUtc).toLocaleString()}
           </p>
         </>

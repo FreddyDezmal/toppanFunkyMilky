@@ -49,7 +49,7 @@ export function TrendChart({ title, description, points, label }: TrendChartProp
 
   return (
     <section aria-labelledby={headingId} className="rounded-xl p-4 ring-1 ring-slate-200">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Orders</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Orders</p>
       <h3 id={headingId} className="text-lg font-semibold">
         {title}
       </h3>
@@ -67,7 +67,7 @@ export function TrendChart({ title, description, points, label }: TrendChartProp
       </ul>
 
       {points.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-500">No orders in this period.</p>
+        <p className="mt-3 text-sm text-slate-600">No orders in this period.</p>
       ) : (
         <div className="mt-2 overflow-x-auto">
           <svg
@@ -76,7 +76,7 @@ export function TrendChart({ title, description, points, label }: TrendChartProp
             viewBox={`0 0 ${width} ${HEIGHT}`}
             width={width}
             height={HEIGHT}
-            className="max-w-none text-slate-500"
+            className="max-w-none text-slate-600"
           >
             {ticks.map((tick) => (
               <g key={tick}>

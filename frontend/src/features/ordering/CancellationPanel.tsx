@@ -54,7 +54,7 @@ export function CancellationPanel({ reference, orderStatus, locale, onOrderChang
   }, [reference, orderStatus])
 
   if (!data) {
-    return loadFailed ? <p className="mt-6 text-sm text-slate-500">{CANCELLATION_MESSAGES.loadFailed}</p> : null
+    return loadFailed ? <p className="mt-6 text-sm text-slate-600">{CANCELLATION_MESSAGES.loadFailed}</p> : null
   }
 
   const money = (amount: number) => formatMoney(amount, data.currencyCode, locale)
@@ -160,15 +160,15 @@ export function CancellationPanel({ reference, orderStatus, locale, onOrderChang
             Cancel order
           </button>
           {data.isPaid && (
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-slate-600">
               Cancelling keeps a fee of {formatPercent(data.feeRate, locale)} of the price before VAT; you get back {money(data.refundAmount)}.
             </p>
           )}
         </div>
       )}
-      {data.cannotCancelReason === 'PickupPassed' && <p className="mt-6 text-sm text-slate-500">{CANCELLATION_MESSAGES.pickupPassed}</p>}
+      {data.cannotCancelReason === 'PickupPassed' && <p className="mt-6 text-sm text-slate-600">{CANCELLATION_MESSAGES.pickupPassed}</p>}
       {!data.canCancel && data.cannotCancelReason === null && data.isPaid && (
-        <p className="mt-6 text-sm text-slate-500">{CANCELLATION_MESSAGES.unavailable}</p>
+        <p className="mt-6 text-sm text-slate-600">{CANCELLATION_MESSAGES.unavailable}</p>
       )}
 
       <ConfirmDialog

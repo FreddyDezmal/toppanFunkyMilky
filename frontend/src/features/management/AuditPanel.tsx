@@ -230,11 +230,11 @@ function Changes({ lookupsOnly, from, to }: { lookupsOnly: boolean; from: string
         </p>
       )}
       {!items && !error && (
-        <p role="status" className="mt-4 text-sm text-slate-500">
+        <p role="status" className="mt-4 text-sm text-slate-600">
           Loading changes…
         </p>
       )}
-      {items && items.length === 0 && <p className="mt-4 text-sm text-slate-500">No changes match.</p>}
+      {items && items.length === 0 && <p className="mt-4 text-sm text-slate-600">No changes match.</p>}
       {items && items.length > 0 && (
         <ol aria-label={lookupsOnly ? 'Lookup changes' : 'Changes'} className="mt-4 divide-y divide-slate-100">
           {items.map((change) => (
@@ -342,11 +342,11 @@ function SecurityEvents({ from, to }: { from: string; to: string }) {
         </p>
       )}
       {!items && !error && (
-        <p role="status" className="mt-4 text-sm text-slate-500">
+        <p role="status" className="mt-4 text-sm text-slate-600">
           Loading sign-in events…
         </p>
       )}
-      {items && items.length === 0 && <p className="mt-4 text-sm text-slate-500">No sign-in events match.</p>}
+      {items && items.length === 0 && <p className="mt-4 text-sm text-slate-600">No sign-in events match.</p>}
       {items && items.length > 0 && (
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">

@@ -10,6 +10,9 @@ here as `UAT-DEF-nn`.
 | --- | --- | --- | --- | --- | --- |
 | DEF-04 | 21 Nov 2026 (M13) | Milkshakes page | Low (layout) | The live estimate pushed "Continue to pickup" down about 110 px as it appeared | Closed (retest `2026-11-21T08-51-33-655Z`) |
 | DEF-07 | 21 Nov 2026 (M14 baseline) | Vitest `ordering-screens.test.tsx` | Low (test only) | "order page › shows the order as stored…" failed once: focus checked before the page's focus effect ran | Closed (Vitest 207 of 207, 21 Nov 2026 10:49) |
+| DEF-08 | 21 Nov 2026 (first CI run) | Payment confirmation (webhook, return, reconciliation) | Medium | Two requests confirming the same payment at the same moment: the later one failed with HTTP 500 instead of "retry" | Fixed; local retest passed; CI retest pending |
+| DEF-09 | 21 Nov 2026 (first CI run) | Vitest `my-orders.test.tsx` | Low (test only) | Expected "placed" time built with the machine's locale; the page uses the store's (en-ZA) | Fixed, awaiting CI retest |
+| DEF-10 | 21 Nov 2026 (E2E `2026-11-21T10-25-58-944Z`) | Whole site (grey secondary text) | Low (accessibility) | `text-slate-500` on the pink page background is 4.36:1, under WCAG AA 4.5:1 (seen on "Checking your session…") | Closed (E2E `2026-11-21T10-42-51-261Z` 19 of 19) |
 
 ## DEF-04 – The live estimate moved the Continue button (carried over from M13)
 
@@ -47,3 +50,50 @@ here as `UAT-DEF-nn`.
 `OrderPlacementTests` retry test and one unnamed integration test each failed once in M12. Since then the full backend
 suite has run five times (M13 ×4, M14 baseline) with no recurrence. The M14 baseline used `--logger trx`, so a
 recurrence will name the test. **Status: not reproduced.**
+
+## DEF-08 – Simultaneous confirmations of one payment: HTTP 500 for the later request
+
+- **Found:** first CI run on GitHub (21 Nov 2026), `PaystackWebhookTests.SimultaneousDuplicates_StoreOneReceipt_AndConfirmOnce`:
+  2 of 5 identical webhooks delivered at once got HTTP 500. The same test had always passed locally (timing).
+- **Effect:** no data harm – the losing save is rolled back; one receipt, one confirmation email and the correct
+  state were stored (the test's other assertions held). But Paystack (or the patron's browser) got a server error
+  instead of "retry"/"in progress", and the error was logged as unhandled.
+- **Cause:** confirming a payment queues the receipt email under a unique notification key. When two requests confirm
+  the same payment, EF writes `email_notifications` (alphabetical) before the `payments`/`orders` rows whose version
+  check reports the conflict, so the later save failed with a unique-key error that no caller handled. The same race
+  exists on every path that confirms a payment (webhook, return from checkout, reconciliation).
+- **Fix:** `MilkshakeDbContext.SaveChanges/SaveChangesAsync` report a clash on `ix_email_notifications_notification_key`
+  as `DbUpdateConcurrencyException` – which it is: another request made the same change at the same moment. Every
+  payment path already handles that (webhook → 503 so Paystack retries and then sees a duplicate; patron → "in
+  progress"; reconciliation → next run).
+- **Regression tests:** `PaystackWebhookTests.TwoConfirmationsAtTheSameMoment_TheLaterSaveIsAConcurrencyConflict`
+  reproduces the race deterministically with two database contexts; `EmailNotificationPersistenceTests.TheSameEvent_CanOnlyQueueOneEmail`
+  now expects the conflict and still checks the unique index caught it.
+- **Retest:** local, 21 Nov 2026: `PaystackWebhookTests` and `EmailNotificationPersistenceTests` 30 of 30 (including the new
+  race test); E2E against the production image 19 of 19 (`2026-11-21T10-42-51-261Z`). CI retest pending (next push).
+
+## DEF-09 – Locale-dependent expectation in a Vitest test
+
+- **Found:** first CI run: `my-orders.test.tsx` expected `Placed Nov 20, 2026, 9:00 AM` (the Linux runner's default
+  locale) but the page showed `Placed 20 Nov 2026, 09:00` (en-ZA, the store's locale from the API). Passed locally
+  because the developer machine's locale formats the same way as en-ZA.
+- **Fix:** the test formats its expected value with `en-ZA`, as the page does. No application change.
+- **Retest:** local Vitest 209 of 209 (the test passed on the developer machine before too); the CI run on the next push is
+  the real retest, because only the Linux runner's locale exposed it.
+
+## DEF-10 – Grey secondary text below WCAG AA contrast on the page background
+
+- **Found:** `npm run test:e2e:local -- --container --backup-drill` (`2026-11-21T10-25-58-944Z`), E2E-14 on a phone:
+  axe reported one `p` on "Order – quantity" with contrast 4.36:1 (`#62748e` on `#fdf2f8`, 14 px). The next test in
+  the same serial group did not run.
+- **Cause:** `RequireAuth` shows "Checking your session…" for a moment while the session loads; it sits directly on the
+  pink page background (brand-50) in `text-slate-500`. axe only catches it when it scans during that moment, which is
+  why earlier runs passed. `text-slate-500` (47 places) and `text-slate-400` (1 place) pass on white cards but not on
+  the page background.
+- **Fix:** every `text-slate-400/500` in the site is now `text-slate-600` (about 7:1 on brand-50), as already done for
+  DEF-06 in M13. Purely visual; no behaviour change.
+- **Regression test:** Vitest `app/text-contrast.test.ts` reads every component source and fails if grey text lighter
+  than slate-600 is used, so the check no longer depends on timing. The E2E axe checks still run on every page.
+- **Retest:** Vitest 209 of 209 including `text-contrast.test.ts`; lint and build clean; E2E against the production image
+  `2026-11-21T10-42-51-261Z` 19 of 19 with the axe checks on every page (E2E-14 on a phone passed). **Closed.**
+

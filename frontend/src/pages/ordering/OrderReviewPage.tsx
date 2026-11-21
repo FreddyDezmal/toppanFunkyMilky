@@ -148,7 +148,7 @@ export function OrderReviewPage() {
       </h1>
 
       {state.kind === 'checking' && (
-        <p role="status" className="mt-4 text-sm text-slate-500">
+        <p role="status" className="mt-4 text-sm text-slate-600">
           Checking your choices…
         </p>
       )}
@@ -198,7 +198,7 @@ export function OrderReviewPage() {
               <p className="mt-1 font-medium">{state.summary.restaurant.name}</p>
               {state.summary.restaurant.address && <p className="text-sm text-slate-600">{state.summary.restaurant.address}</p>}
               <p className="mt-2">{formatLocalTime(state.summary.pickup.local, locale)}</p>
-              <p className="text-xs text-slate-500">{timeZoneLabel(state.summary.pickup.timeZone, locale)}</p>
+              <p className="text-xs text-slate-600">{timeZoneLabel(state.summary.pickup.timeZone, locale)}</p>
             </div>
 
             <div>
@@ -300,7 +300,7 @@ export function OrderReviewPage() {
         >
           Start over
         </button>
-        <p role="status" className="w-full text-xs text-slate-500" id="place-order-note">
+        <p role="status" className="w-full text-xs text-slate-600" id="place-order-note">
           {placement.kind === 'placing'
             ? 'Placing your order…'
             : 'Placing your order saves it as awaiting payment. You will not be charged now: payment is not available yet.'}

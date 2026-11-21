@@ -96,7 +96,7 @@ export function SettingsPage() {
           {loadError}
         </p>
       ) : settings === null ? (
-        <p role="status" className="mt-6 text-sm text-slate-500">
+        <p role="status" className="mt-6 text-sm text-slate-600">
           Loading settings…
         </p>
       ) : (
@@ -110,7 +110,7 @@ export function SettingsPage() {
                   <div>
                     <h2 className="font-medium text-slate-900">{label}</h2>
                     <p className="mt-0.5 text-sm text-slate-700">{displayValue(setting, locale, currencyCode)}</p>
-                    {!isEditing && setting.hint && <p className="mt-1 text-xs text-slate-500">{setting.hint}</p>}
+                    {!isEditing && setting.hint && <p className="mt-1 text-xs text-slate-600">{setting.hint}</p>}
                   </div>
                   {setting.isEditable ? (
                     !isEditing && (

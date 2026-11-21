@@ -118,7 +118,7 @@ export function DrinkCard({ index, drink, options, editing, errors, canRemove, p
             const option = options[DRINK_FIELD_OPTIONS[field]].find((candidate) => candidate.id === drink[field])
             return (
               <div key={field} className="contents">
-                <dt className="text-slate-500">{TITLES[field]}</dt>
+                <dt className="text-slate-600">{TITLES[field]}</dt>
                 <dd className="text-slate-900">
                   {option ? `${option.name} · ${formatMoney(option.fee.amount, option.fee.currencyCode, locale)}` : 'Not chosen'}
                 </dd>

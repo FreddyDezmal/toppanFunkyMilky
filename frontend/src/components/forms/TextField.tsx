@@ -62,7 +62,7 @@ export function TextField({
         }`}
       />
       {hint && (
-        <p id={hintId} className="mt-1 text-xs text-slate-500">
+        <p id={hintId} className="mt-1 text-xs text-slate-600">
           {hint}
         </p>
       )}

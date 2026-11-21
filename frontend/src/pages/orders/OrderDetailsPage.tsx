@@ -135,7 +135,7 @@ export function OrderDetailsPage() {
           <p className="mt-1 font-medium">{order.restaurant.name}</p>
           {order.restaurant.address && <p className="text-sm text-slate-600">{order.restaurant.address}</p>}
           <p className="mt-2">{formatLocalTime(order.pickup.local, locale)}</p>
-          <p className="text-xs text-slate-500">{timeZoneLabel(order.pickup.timeZone, locale)}</p>
+          <p className="text-xs text-slate-600">{timeZoneLabel(order.pickup.timeZone, locale)}</p>
         </div>
 
         <div>
