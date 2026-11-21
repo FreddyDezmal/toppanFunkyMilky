@@ -37,7 +37,7 @@ jobs:
       RENDER_API: https://api.render.com/v1
       SERVICE: ${{ vars.RENDER_SERVICE_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: refs/tags/${{ inputs.tag }}
           fetch-depth: 0

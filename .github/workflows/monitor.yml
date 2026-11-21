@@ -1,0 +1,63 @@
+# Health monitoring (M14 decision D-13): every 6 hours, and on demand. The run FAILS – and GitHub emails a failure
+# notice – when the site does not answer or /api/health is anything but Healthy (database down, a background worker
+# stale, emails failed in the last 24 hours, refunds waiting for a manager).
+#
+# Periodic, not continuous: a problem can go unnoticed for up to 6 hours. Each run also wakes the sleeping free service
+# for about 15 minutes; it is a check, not a keep-alive (D-11).
+#
+# Alert test (AC-14.4 "tested once"): Actions -> Monitor -> Run workflow with "simulate_failure" ticked. The run fails on
+# purpose after the real check, so the failure notice can be seen to arrive.
+#
+# Repository variable: APP_URL. Notices go to whoever GitHub notifies for failed workflow runs (Settings ->
+# Notifications -> Actions; scheduled runs notify the user who last changed the schedule).
+name: Monitor
+
+on:
+  schedule:
+    - cron: '41 */6 * * *'   # 00:41, 06:41, 12:41, 18:41 UTC
+  workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: Fail on purpose after the check (alert test)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    name: Site health
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check /api/health
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          [ -n "$APP_URL" ] || { echo "::error::Repository variable APP_URL is not set."; exit 1; }
+          body=""
+          for attempt in 1 2 3 4 5 6; do   # a sleeping free service takes about a minute to wake
+            body=$(curl -fsS --max-time 90 "$APP_URL/api/health" || true)
+            [ -n "$body" ] && break
+            sleep 20
+          done
+          [ -n "$body" ] || { echo "::error::$APP_URL/api/health did not answer."; exit 1; }
+          status=$(printf '%s' "$body" | jq -r '.status')
+          # Names, statuses and descriptions only: the health response never holds personal data.
+          printf '%s' "$body" | jq -r '.checks[] | "\(.name): \(.status) – \(.description // "")"'
+          {
+            echo "## Health: $status"
+            echo ""
+            printf '%s' "$body" | jq -r '"| Check | Status | Detail |", "| --- | --- | --- |", (.checks[] | "| \(.name) | \(.status) | \(.description // "") |")'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" != "Healthy" ]; then
+            echo "::error::Site health is $status – see the checks above (Management → Emails / Orders → Refunds for Degraded)."
+            exit 1
+          fi
+
+      - name: Alert test (simulated failure)
+        if: ${{ inputs.simulate_failure }}
+        run: |
+          echo "::error::Simulated failure for the alert test (the real health check above passed)."
+          exit 1
