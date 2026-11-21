@@ -1,0 +1,96 @@
+# Continuous integration (M14 Step 4). Checks only: this workflow never deploys, never uses a secret and never touches
+# Supabase, Paystack or Resend. Deployment is a separate, manually started workflow (decision D-9).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend build and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore
+        run: dotnet restore Milkshake.slnx
+      - name: Build (warnings are errors)
+        run: dotnet build Milkshake.slnx --no-restore -warnaserror
+      - name: Tests (unit and integration; integration tests use a throwaway PostgreSQL container)
+        run: dotnet test Milkshake.slnx --no-build
+      - name: Vulnerable NuGet packages
+        shell: bash
+        run: |
+          dotnet list Milkshake.slnx package --vulnerable --include-transitive | tee vulnerable.txt
+          if grep -q "has the following vulnerable packages" vulnerable.txt; then
+            echo "::error::Vulnerable NuGet packages found (see above)."
+            exit 1
+          fi
+
+  frontend:
+    name: Frontend lint, build and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-fund
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+      - name: npm audit (moderate and above)
+        run: npm audit --audit-level=moderate
+
+  secrets:
+    name: Secret scan (whole history)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        run: >
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.0
+          git /repo --redact --verbose --exit-code 1
+
+  image:
+    name: Container image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the production image (not pushed)
+        run: docker build -t milkshake:ci .
+      - name: The image holds no secrets files or test projects
+        run: |
+          docker create --name inspect milkshake:ci
+          docker export inspect | tar -t > files.txt
+          docker rm inspect
+          if grep -E '(^|/)(appsettings\.Development\.json|secrets\.json|\.env|.*\.pfx|.*\.pem)$|IntegrationTests|UnitTests' files.txt; then
+            echo "::error::The image contains a file it must not."
+            exit 1
+          fi
+          grep -q '^app/wwwroot/index.html$' files.txt
+          grep -q '^app/Milkshake.Api.dll$' files.txt

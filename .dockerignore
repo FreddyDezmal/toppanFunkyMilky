@@ -1,0 +1,27 @@
+# Keep the build context small and free of secrets, local state and test output.
+.git
+.github
+.vs
+.vscode
+.m13-logs
+.m14-logs
+docs
+tools
+**/bin
+**/obj
+**/TestResults
+**/*.user
+**/.env
+**/.env.*
+!frontend/.env.example
+backend/tests
+backend/ControllerActions.tmp
+frontend/node_modules
+frontend/dist
+frontend/test-results
+frontend/playwright-report
+frontend/e2e
+frontend/e2e-local
+**/*.pfx
+**/*.pem
+**/*.key

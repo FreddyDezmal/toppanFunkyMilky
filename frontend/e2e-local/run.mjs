@@ -3,6 +3,11 @@
 //   --perf             after the tests, PERF-01: k6 (Docker) with 50 virtual patrons (e2e-local/perf/order-and-pay.js)
 //   --zap              after the tests, SEC: OWASP ZAP baseline scan of the site and API scan from the OpenAPI document
 //   --no-e2e           skip Playwright (with --perf and/or --zap)
+//   --container        M14: test the production image instead of `dotnet run` + `vite preview`. Builds the Dockerfile,
+//                      runs it with ASPNETCORE_ENVIRONMENT=Production (forwarded headers, database key ring with a
+//                      throwaway certificate), behind a local HTTPS proxy on :5173 that ends TLS and adds
+//                      X-Forwarded-For/Proto as the host's edge does. With --zap only the site baseline scan runs
+//                      (Production publishes no OpenAPI document).
 //
 // 1. Starts a disposable PostgreSQL 17 and a disposable Mailpit (Docker). The database password is random for each run
 //    and lives only in this process's memory.
@@ -16,7 +21,8 @@
 import { execFileSync, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { createWriteStream, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { request as httpsRequest } from 'node:https'
+import { request as httpRequest } from 'node:http'
+import { createServer as createHttpsServer, request as httpsRequest } from 'node:https'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -28,7 +34,7 @@ const runId = new Date().toISOString().replace(/[:.]/g, '-')
 const logDir = path.join(repo, '.m13-logs', 'e2e', runId)
 mkdirSync(logDir, { recursive: true })
 
-const PORTS = { api: 7298, vite: 5173, simulator: 4010, db: 55432, smtp: 1026, mailpitUi: 8026 }
+const PORTS = { api: 7298, vite: 5173, simulator: 4010, db: 55432, smtp: 1026, mailpitUi: 8026, app: 58080 }
 const dbContainer = `milkshake-e2e-db-${process.pid}`
 const mailContainer = `milkshake-e2e-mail-${process.pid}`
 const dbPassword = randomBytes(24).toString('base64url')
@@ -44,8 +50,13 @@ const site = `https://localhost:${PORTS.vite}`
 const dockerSite = `https://host.docker.internal:${PORTS.vite}`
 const zapContainers = [`milkshake-e2e-zap-baseline-${process.pid}`, `milkshake-e2e-zap-api-${process.pid}`]
 const k6Container = `milkshake-e2e-k6-${process.pid}`
-const OUR_FLAGS = ['--perf', '--zap', '--no-e2e']
+const OUR_FLAGS = ['--perf', '--zap', '--no-e2e', '--container']
 const flags = new Set(process.argv.slice(2).filter((arg) => OUR_FLAGS.includes(arg)))
+const containerMode = flags.has('--container')
+const appContainer = `milkshake-e2e-app-${process.pid}`
+const appImage = 'milkshake:e2e'
+const keyRingPassword = randomBytes(18).toString('base64url')
+let edgeProxy
 const playwrightArgs = process.argv.slice(2).filter((arg) => !OUR_FLAGS.includes(arg))
 
 function log(message) {
@@ -55,6 +66,7 @@ function log(message) {
 /** Never prints the random database password or the E2E secrets. */
 function masked(text) {
   return text.replaceAll(dbPassword, '***').replaceAll(managerPassword, '***').replaceAll(simulatorSecret, '***')
+    .replaceAll(keyRingPassword, '***')
 }
 
 function run(command, args, options = {}) {
@@ -187,8 +199,19 @@ async function cleanup() {
       }
     }
   }
+  if (edgeProxy) {
+    edgeProxy.close()
+  }
+  if (containerMode) {
+    try {
+      writeFileSync(path.join(logDir, 'app.log'), masked(execFileSync('docker', ['logs', appContainer],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024 })))
+    } catch {
+      // never started
+    }
+  }
   rmSync(certDir, { recursive: true, force: true })
-  for (const container of [dbContainer, mailContainer, ...zapContainers, k6Container]) {
+  for (const container of [appContainer, dbContainer, mailContainer, ...zapContainers, k6Container]) {
     try {
       execFileSync('docker', ['rm', '-f', container], { stdio: 'ignore' })
     } catch {
@@ -201,11 +224,11 @@ async function cleanup() {
  * Runs a Docker command in the foreground, its output to <name>.log in the run's folder; resolves to the exit code.
  * After `limitMinutes` the container is removed (so a scan that hangs cannot hold the run) and the result is 124.
  */
-function docker(name, args, container, limitMinutes) {
+function docker(name, args, container, limitMinutes, cwd = undefined) {
   log(`$ docker ${args.join(' ')}`)
   return new Promise((resolve) => {
     const out = createWriteStream(path.join(logDir, `${name}.log`))
-    const child = spawn('docker', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn('docker', args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
     child.stdout.pipe(out)
     child.stderr.pipe(out)
     let timedOut = false
@@ -282,22 +305,29 @@ async function zapScans() {
   const zapDir = path.join(logDir, 'zap')
   mkdirSync(zapDir, { recursive: true })
   // The API's own description, pointed at the site so requests go the way a browser's do (through the same origin).
-  const document = JSON.parse(await httpsGetText(`https://localhost:${PORTS.api}/openapi/v1.json`))
-  document.servers = [{ url: dockerSite }]
-  writeFileSync(path.join(zapDir, 'openapi.json'), JSON.stringify(document, null, 2))
+  // The production image publishes no OpenAPI document, so --container runs the site baseline scan only.
+  if (!containerMode) {
+    const document = JSON.parse(await httpsGetText(`https://localhost:${PORTS.api}/openapi/v1.json`))
+    document.servers = [{ url: dockerSite }]
+    writeFileSync(path.join(zapDir, 'openapi.json'), JSON.stringify(document, null, 2))
+  }
 
   const image = 'ghcr.io/zaproxy/zaproxy:stable'
   assertReachableFromDocker(image)
   const mount = ['-v', `${zapDir}:/zap/wrk/:rw`]
   await docker('zap-baseline', ['run', '--rm', '--name', zapContainers[0], ...mount, image,
     'zap-baseline.py', '-t', `${dockerSite}/`, '-J', 'baseline.json', '-r', 'baseline.html', '-I', '-m', '3'], zapContainers[0], 15)
-  await docker('zap-api', ['run', '--rm', '--name', zapContainers[1], ...mount, image,
-    'zap-api-scan.py', '-t', '/zap/wrk/openapi.json', '-f', 'openapi', '-J', 'api.json', '-r', 'api.html', '-I',
-    '-z', '-config scanner.maxScanDurationInMins=20'], zapContainers[1], 30)
+  const reports = [['baseline.json', 'ZAP baseline (site)']]
+  if (!containerMode) {
+    await docker('zap-api', ['run', '--rm', '--name', zapContainers[1], ...mount, image,
+      'zap-api-scan.py', '-t', '/zap/wrk/openapi.json', '-f', 'openapi', '-J', 'api.json', '-r', 'api.html', '-I',
+      '-z', '-config scanner.maxScanDurationInMins=20'], zapContainers[1], 30)
+    reports.push(['api.json', 'ZAP API scan'])
+  }
 
   let high = 0
   const parts = []
-  for (const [file, title] of [['baseline.json', 'ZAP baseline (site)'], ['api.json', 'ZAP API scan']]) {
+  for (const [file, title] of reports) {
     try {
       const summary = summariseZap(path.join(zapDir, file), title)
       high += summary.high
@@ -311,6 +341,91 @@ async function zapScans() {
   writeFileSync(path.join(zapDir, 'summary.txt'), text)
   log(`security scans:\n${text}`)
   return high === 0 ? 0 : 1
+}
+
+/** The M13 stack: the API with `dotnet run` (environment E2E) and the site with `vite preview`. */
+async function startDevStack(env, cert) {
+  start('api', 'dotnet', ['run', '--no-build', '--no-launch-profile', '--project', 'backend/src/Milkshake.Api'], env)
+  // The production build, served by `vite preview` (same port, HTTPS and /api proxy as dev). The dev server's hundreds
+  // of unbundled modules made each full page load take 15-20 s in WebKit, so journeys timed out (DEF-01).
+  // npm and npx are .cmd scripts on Windows, so they need a shell; their arguments are fixed and safe.
+  log('$ npm run build')
+  execFileSync('npm', ['run', 'build'], { cwd: frontend, shell: isWindows, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' })
+  const vite = spawn('npm', ['run', 'preview'], {
+    cwd: frontend,
+    shell: isWindows,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, E2E_VITE_CERT: cert, E2E_VITE_KEY: path.join(certDir, 'localhost.key') },
+  })
+  const viteLog = createWriteStream(path.join(logDir, 'vite.log'))
+  vite.stdout.pipe(viteLog)
+  vite.stderr.pipe(viteLog)
+  children.push({ name: 'vite', child: vite })
+
+  await waitFor('Paystack simulator', () => httpOk(`http://127.0.0.1:${PORTS.simulator}/__control/health`), 30_000)
+  await waitFor('API', () => httpsOk(`https://localhost:${PORTS.api}/api/health`), 180_000)
+  await waitFor('Vite', () => httpsOk(`${site}/`), 60_000)
+}
+
+/**
+ * M14 --container: stands in for the host's edge (Koyeb). Ends TLS on the site address with the development certificate
+ * and forwards plain HTTP to the container, replacing X-Forwarded-For with the caller's address and setting
+ * X-Forwarded-Proto: https, which the app trusts because ForwardedHeaders:Enabled is true in Production.
+ */
+function startEdgeProxy(certFile, keyFile) {
+  const server = createHttpsServer({ cert: readFileSync(certFile), key: readFileSync(keyFile) }, (req, res) => {
+    const client = (req.socket.remoteAddress ?? '').replace(/^::ffff:/, '')
+    const headers = { ...req.headers, 'x-forwarded-for': client, 'x-forwarded-proto': 'https' }
+    const upstream = httpRequest({ host: '127.0.0.1', port: PORTS.app, method: req.method, path: req.url, headers }, (reply) => {
+      res.writeHead(reply.statusCode ?? 502, reply.headers)
+      reply.pipe(res)
+    })
+    upstream.on('error', () => {
+      if (!res.headersSent) {
+        res.writeHead(502)
+      }
+      res.end()
+    })
+    req.pipe(upstream)
+  })
+  server.listen(PORTS.vite, '127.0.0.1')
+  return server
+}
+
+/** M14 --container: builds the production image and runs it with Production settings against the disposable services. */
+async function startContainer() {
+  const build = await docker('image-build', ['build', '-t', appImage, '.'], appContainer, 25, repo)
+  if (build !== 0) {
+    throw new Error(`docker build failed (exit ${build}); see image-build.log`)
+  }
+
+  // A throwaway certificate (the development certificate as PKCS#12) encrypts the database key ring, as in production.
+  const pfx = path.join(certDir, 'keyring.pfx')
+  run('dotnet', ['dev-certs', 'https', '--export-path', pfx, '--password', keyRingPassword])
+  const dockerHost = 'host.docker.internal'
+  const settings = {
+    ASPNETCORE_ENVIRONMENT: 'Production',
+    ConnectionStrings__MilkshakeDb: `Host=${dockerHost};Port=${PORTS.db};Database=milkshake_e2e;Username=postgres;Timeout=15;Command Timeout=60`,
+    Database__Password: dbPassword,
+    DataProtection__CertificateBase64: readFileSync(pfx).toString('base64'),
+    DataProtection__CertificatePassword: keyRingPassword,
+    Payments__Paystack__SecretKey: simulatorSecret,
+    Payments__Paystack__BaseUrl: `http://${dockerHost}:${PORTS.simulator}/`,
+    Payments__Paystack__ReturnBaseUrl: `${site}/`,
+    Email__Provider: 'Mailpit',
+    Email__Mailpit__Host: dockerHost,
+    Email__Mailpit__Port: String(PORTS.smtp),
+    Email__FromAddress: 'orders@milkyshaky.test',
+    Email__PublicBaseUrl: `${site}/`,
+    Email__Dispatch__IntervalSeconds: '5',
+    RateLimiting__AuthPermitLimit: '300',
+    ...(process.env.E2E_LOCAL_EXTRA_ENV ? JSON.parse(process.env.E2E_LOCAL_EXTRA_ENV) : {}),
+  }
+  // Secrets go in an env file in the run's temporary folder (removed at the end), never on the command line.
+  const envFile = path.join(certDir, 'app.env')
+  writeFileSync(envFile, Object.entries(settings).map(([key, value]) => `${key}=${value}`).join('\n'))
+  run('docker', ['run', '-d', '--name', appContainer, '--env-file', envFile, '--add-host', `${dockerHost}:host-gateway`,
+    '--memory', '512m', '-p', `127.0.0.1:${PORTS.app}:8080`, appImage])
 }
 
 async function main() {
@@ -354,28 +469,19 @@ async function main() {
     ...process.env,
     SIM_PORT: String(PORTS.simulator),
     SIM_SECRET: simulatorSecret,
-    SIM_WEBHOOK_URL: `https://localhost:${PORTS.api}/api/payments/paystack/webhook`,
+    // --container: through the edge proxy, the only way into the app, as at the host.
+    SIM_WEBHOOK_URL: containerMode
+      ? `${site}/api/payments/paystack/webhook`
+      : `https://localhost:${PORTS.api}/api/payments/paystack/webhook`,
   })
-  start('api', 'dotnet', ['run', '--no-build', '--no-launch-profile', '--project', 'backend/src/Milkshake.Api'], env)
-  // The production build, served by `vite preview` (same port, HTTPS and /api proxy as dev). The dev server's hundreds
-  // of unbundled modules made each full page load take 15-20 s in WebKit, so journeys timed out (DEF-01).
-  // npm and npx are .cmd scripts on Windows, so they need a shell; their arguments are fixed and safe.
-  log('$ npm run build')
-  execFileSync('npm', ['run', 'build'], { cwd: frontend, shell: isWindows, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' })
-  const vite = spawn('npm', ['run', 'preview'], {
-    cwd: frontend,
-    shell: isWindows,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, E2E_VITE_CERT: cert, E2E_VITE_KEY: path.join(certDir, 'localhost.key') },
-  })
-  const viteLog = createWriteStream(path.join(logDir, 'vite.log'))
-  vite.stdout.pipe(viteLog)
-  vite.stderr.pipe(viteLog)
-  children.push({ name: 'vite', child: vite })
-
-  await waitFor('Paystack simulator', () => httpOk(`http://127.0.0.1:${PORTS.simulator}/__control/health`), 30_000)
-  await waitFor('API', () => httpsOk(`https://localhost:${PORTS.api}/api/health`), 180_000)
-  await waitFor('Vite', () => httpsOk(`${site}/`), 60_000)
+  if (containerMode) {
+    await startContainer()
+    edgeProxy = startEdgeProxy(cert, path.join(certDir, 'localhost.key'))
+    await waitFor('Paystack simulator', () => httpOk(`http://127.0.0.1:${PORTS.simulator}/__control/health`), 30_000)
+    await waitFor('production container (through the edge proxy)', () => httpsOk(`${site}/api/health`), 180_000)
+  } else {
+    await startDevStack(env, cert)
+  }
 
   // 5. Playwright, with the manager credentials and service addresses in memory only.
   let exitCode = 0
