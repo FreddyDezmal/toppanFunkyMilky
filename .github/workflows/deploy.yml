@@ -1,0 +1,91 @@
+# Deployment (M14 decision D-14): only when started by hand, only a release tag on main whose CI run passed.
+#
+# Actions -> Deploy -> Run workflow, with the release tag (e.g. v1.0.0; it must already be pushed and be on main).
+#
+# Koyeb builds the image from the repository's Dockerfile at exactly that commit (--git-sha) and deploys it; automatic
+# deploys on push stay off (--git-no-deploy-on-push). No image registry or registry token is needed. The workflow waits
+# for the deployment, then checks /api/health over HTTPS. The database is never migrated here: migrations are reviewed
+# and applied separately (operations guide §5), before deploying code that needs them.
+#
+# Repository secret: KOYEB_TOKEN. Repository variables: KOYEB_SERVICE (app/service), APP_URL (https://<app>.koyeb.app).
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to deploy (e.g. v1.0.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.tag }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+
+      - name: The tag is a release tag on main
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::'$TAG' is not a release tag like v1.0.0."; exit 1; }
+          git fetch --quiet origin main
+          git merge-base --is-ancestor HEAD origin/main || { echo "::error::$TAG is not a commit on main."; exit 1; }
+          echo "SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: CI passed for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          result=$(gh run list --workflow ci.yml --commit "$SHA" --status success --limit 1 --json databaseId --jq 'length')
+          [ "$result" = "1" ] || { echo "::error::No successful CI run for $SHA. Push to main, wait for CI, then deploy."; exit 1; }
+
+      - name: Install the Koyeb CLI
+        uses: koyeb-community/koyeb-actions@v2
+        with:
+          api_token: ${{ secrets.KOYEB_TOKEN }}
+
+      - name: Build and deploy this commit on Koyeb
+        run: |
+          koyeb services update "${{ vars.KOYEB_SERVICE }}" --git-sha "$SHA" --git-no-deploy-on-push \
+            --wait --wait-timeout 25m
+
+      - name: Health over HTTPS
+        run: |
+          for attempt in $(seq 1 30); do
+            body=$(curl -fsS --max-time 20 "${{ vars.APP_URL }}/api/health" || true)
+            status=$(printf '%s' "$body" | jq -r '.status // empty' 2>/dev/null || true)
+            if [ "$status" = "Healthy" ] || [ "$status" = "Degraded" ]; then
+              echo "Health: $status"; echo "HEALTH=$status" >> "$GITHUB_ENV"; exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::/api/health did not report Healthy or Degraded within 5 minutes."; exit 1
+
+      - name: Record the deployment
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo "## Deployment of $TAG"
+            echo ""
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Commit | \`${SHA:-unknown}\` |"
+            echo "| Service | \`${{ vars.KOYEB_SERVICE }}\` |"
+            echo "| Health | ${HEALTH:-not reached} |"
+            echo "| Started by | ${{ github.actor }} |"
+            echo "| Finished (UTC) | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
+          } >> "$GITHUB_STEP_SUMMARY"

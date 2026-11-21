@@ -496,3 +496,6 @@ playwright-report/
 test-results/
 # Confidential client documents - keep out of the repository
 *.pdf
+# Local test logs, backups and deployment scripts (M13/M14) - never committed
+.m13-logs/
+.m14-deploy/

@@ -280,9 +280,11 @@ are entered on Paystack's page and never on the Milky Shaky site, and the order 
 
 ### P-18 · FR-07 · On successful payment, email a payment receipt and order confirmation
 
-**Role:** patron · **Preconditions:** the order paid in P-16 or P-17; access to your inbox.
+**Role:** patron, using the facilitator's patron account (decision E-1: only that address receives email) ·
+**Preconditions:** an order paid with that account; the facilitator's inbox open on screen. A manager tester can also
+confirm under **Management → Emails** that the other testers' receipts were created (shown as *Suppressed*).
 
-1. Check your inbox (and spam folder) within a few minutes of paying.
+1. Check the inbox (and spam folder) within a few minutes of paying.
 
 **Expected:** one email from Milky Shaky Custom Drinks, subject "Order MS-… confirmed – your receipt", confirming the
 order **and** the payment (decision Q-08/D1: one combined email), with the order reference, the drinks, the restaurant and pickup time, the amount paid and a link to

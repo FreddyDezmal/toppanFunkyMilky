@@ -54,30 +54,79 @@ the whole history and an image content check, on every push to `main`. CI never 
 
 ## 4. Deploying
 
-*To complete in Step 8:* Koyeb service settings, the manual deployment workflow, image tag and version recording,
-first-time secrets, Paystack test webhook URL, and the post-deploy checklist.
+Deployments are started by hand only (decision D-14), from a release tag on `main` whose CI run passed. The workflow
+`.github/workflows/deploy.yml` tells Koyeb to build the repository's Dockerfile at exactly that commit (`--git-sha`) and
+deploy it, keeps Koyeb's deploy-on-push off (`--git-no-deploy-on-push`), waits for the deployment, and checks
+`/api/health` over HTTPS. No image registry or registry token is involved. Each run's summary records the tag, commit,
+health and who started it: that summary is the deployment log.
+
+### 4.1 Every deployment
+
+1. Merge to `main`; wait for CI to pass.
+2. If the release adds migrations, apply them first (§5). Migrations must stay compatible with the version still running.
+3. Tag the commit and push the tag: `git tag -a v1.2.0 -m "…"` then `git push origin v1.2.0`.
+4. GitHub → Actions → **Deploy** → Run workflow → tag `v1.2.0`, deploy ✔.
+5. Check the run summary (health Healthy or Degraded) and open the site.
+
+### 4.2 First deployment (once)
+
+Accounts and secrets are created by the owner; values are never shown to the assistant, printed or committed.
+
+1. **Generated secrets:** `powershell -ExecutionPolicy Bypass -File tools/deploy/new-deployment-secrets.ps1`. It copies,
+   one at a time, `DataProtection__CertificateBase64`, `DataProtection__CertificatePassword` and `BACKUP_PASSPHRASE` to
+   the clipboard; paste each where the script says and into your password manager.
+2. **Supabase:** new **Free** project in **West EU (Ireland)**; save the database password in your password manager.
+   From Connect → *Session pooler*: host, port 5432, user `postgres.<project-ref>`, database `postgres`.
+3. **Database:** in a terminal at the repository root (Docker running):
+   ```
+   $env:MILKSHAKE_DEPLOY_HOST = "<pooler host>"
+   $env:MILKSHAKE_DEPLOY_USER = "postgres.<project-ref>"
+   node tools/deploy/database.mjs script                                   # review .m14-deploy/migrations-<date>.sql
+   node tools/deploy/database.mjs apply --confirm <project-ref> --seed     # asks for the password; first time only
+   node tools/deploy/database.mjs provision-manager --confirm <project-ref> --email <manager email> --first-name <name>
+   ```
+4. **Release tag:** on the approved commit (CI passed): `git tag -a v1.0.0 -m "First deployment"`, `git push origin v1.0.0`.
+5. **Koyeb:** sign up and connect GitHub, giving the Koyeb app access to **this repository only**. Secrets → one secret
+   per **secret** in the configuration reference. Create one **Web service** from the GitHub repository: branch `main`,
+   builder **Dockerfile**, **Autodeploy off**, instance **Free**, region **Frankfurt**, port **8080** (HTTP, public route
+   `/`), health check **HTTP `/api/health`** on 8080, and the environment variables from the configuration reference
+   (secrets as secret references). Koyeb builds and starts it once on creation.
+6. **GitHub settings for the workflows:** secret `KOYEB_TOKEN` (Koyeb → Settings → API → new token); variables
+   `KOYEB_SERVICE` (`<app>/<service>`) and `APP_URL`; the six `BACKUP_*` secrets (§7).
+7. **Paystack (test mode):** Settings → API Keys & Webhooks → test webhook URL
+   `https://<app>.koyeb.app/api/payments/paystack/webhook`.
+8. Actions → **Deploy** → `v1.0.0`: pins the service to that commit and records the first deployment. Then set
+   `BACKUP_ENABLED` = `true` and run **Database backup** once by hand.
+9. Step 9 checks (smoke test, ZAP, alert, rollback rehearsal).
 
 ## 5. Database migrations
 
-- Migrations are applied **explicitly**, never at start-up. Each release's migrations are reviewed as an idempotent SQL
-  script (`dotnet ef migrations script --idempotent`) before they are applied.
-- Only additive, backward-compatible migrations are applied to the live database without a separate approval. Never
-  drop the database, reset data, rewrite order snapshots or delete audit history.
+- Migrations are applied **explicitly**, never at start-up, with `tools/deploy/database.mjs` from the owner's machine
+  (never from CI). `--confirm <project-ref>` must match the target, so a command cannot run against the wrong database.
+- Before applying, generate the idempotent SQL with `node tools/deploy/database.mjs script` and review it: only
+  additive, backward-compatible changes are applied without a separate approval. Never drop the database, reset data,
+  rewrite order snapshots or delete audit history.
+- `apply` shows the applied migrations before and after. `--seed` (demonstration data) is refused once the database
+  has any flavours: seeding is for the first deployment only, because seeding again would restore items a manager
+  renamed.
+- Take a backup (Actions → Database backup → Run workflow) before applying migrations to the live database.
 - **Rolling back the application does not roll back the database.** Fix forward; down-migrations are not run on live
   data.
-- *To complete in Step 8:* the exact command and who approves it.
+- `node tools/deploy/database.mjs status --confirm <project-ref>` is read-only (migrations applied, latest, flavours).
 
 ## 6. Manager accounts
 
-Managers are created from the command line, never through the website. The password is read from the
-`MILKSHAKE_MANAGER_PASSWORD` environment variable so it never appears in the command or shell history:
+Managers are created from the command line, never through the website:
 
 ```
-provision-manager --email <address> --first-name <name>
+node tools/deploy/database.mjs provision-manager --confirm <project-ref> --email <address> --first-name <name>
 ```
 
-Locally: `dotnet run --project backend/src/Milkshake.Api -- provision-manager …`. *To complete in Step 8:* how this is
-run against the deployed database.
+It asks for the database password and the new manager's password (twice; typing is hidden), or reads
+`MILKSHAKE_DEPLOY_PASSWORD` and `MILKSHAKE_MANAGER_PASSWORD` if they are set. Passwords are passed to the tool only
+through its environment and masked in its output. Locally the same command is
+`dotnet run --project backend/src/Milkshake.Api -- provision-manager …` with `MILKSHAKE_MANAGER_PASSWORD` set.
+Give each manager tester their own account; the audit trail records who made each change.
 
 ## 7. Backups and restore
 
@@ -155,7 +204,8 @@ rehearsal. See §5: the database is never rolled back by an application rollback
 
 - Free hosting sleeps when idle; first request after sleep is slow; one instance only.
 - Paystack test mode only; no real payments (D-1).
-- Email via Resend's test sender to approved recipients only; no own sender domain (D-5).
+- Email via Resend's test sender: without an own domain Resend delivers only to the Resend account's own address
+  (E-1, amending D-5). Emails to anyone else are marked Suppressed and visible under Management → Emails.
 - Frequent-customer discounts switched off until the stakeholder supplies rates (Q-01–Q-04).
 - No email confirmation or password reset for patrons (M4 follow-up).
 - No "Collected" order status (B5).

@@ -11,7 +11,7 @@ environment variable `A__B` (double underscore); list items use an index, e.g. `
 | `ForwardedHeaders:Enabled` | `true` | Behind Koyeb's proxy: client address and HTTPS come from one forwarded hop. Only safe while the app is reachable solely through that proxy. |
 | `DataProtection:StoreKeysInDatabase` | `true` | D-3: sign-in keys in `milkshake.data_protection_keys`, so sign-ins survive restarts. Start-up fails in Production without the certificate below. |
 | `Cors:AllowedOrigins` | empty | D-2: one origin; the API serves the site, so no CORS. |
-| `Email:Provider` | `Resend` | D-5. Sends only to `Email:AllowedRecipients`. |
+| `Email:Provider` | `Resend` | D-5 as amended by E-1 (Step 8): no sending domain, so Resend delivers only to the Resend account's own address. Sends only to `Email:AllowedRecipients`. |
 
 ## Set on the host
 
@@ -25,10 +25,22 @@ environment variable `A__B` (double underscore); list items use an index, e.g. `
 | `Payments__Paystack__SecretKey` | **yes** | Paystack **test** key only (`sk_test_…`, D-1). Never a live key. |
 | `Payments__Paystack__ReturnBaseUrl` | no | The site's public address, with trailing `/`. |
 | `Email__Resend__ApiKey` | **yes** | Resend API key. |
-| `Email__FromAddress` | no | Sender address Resend accepts for the account. |
+| `Email__FromAddress` | no | `onboarding@resend.dev` (Resend's test sender; E-1). |
 | `Email__PublicBaseUrl` | no | The site's public address, with trailing `/`. |
-| `Email__AllowedRecipients__0`, `__1`, … | no (personal data: keep out of Git) | The tester addresses; every other email is suppressed. |
-| `SeedData__…` | no | Fresh demonstration data (decision for Step 8; set only for the first start). |
+| `Email__AllowedRecipients__0` | no (personal data: keep out of Git) | The Resend account's own email address – the only address Resend's test sender can deliver to (E-1). Every other email is marked Suppressed and visible under Management → Emails. |
+| `SeedData__…` | – | **Not set on the host.** Demonstration data is added once by `tools/deploy/database.mjs apply --seed` at the first deployment. |
+
+## GitHub Actions (deploy and backup workflows)
+
+| Name | Kind | Notes |
+|---|---|---|
+| `KOYEB_TOKEN` | secret | Koyeb API token used by the Deploy workflow |
+| `KOYEB_SERVICE` | variable | `<app>/<service>` on Koyeb |
+| `APP_URL` | variable | `https://<app>.koyeb.app` (no trailing `/`) |
+| `BACKUP_PGHOST`, `BACKUP_PGPORT`, `BACKUP_PGUSER`, `BACKUP_PGDATABASE` | secrets | Supabase session pooler connection (port 5432, user `postgres.<project-ref>`, database `postgres`) |
+| `BACKUP_PGPASSWORD` | secret | Supabase database password |
+| `BACKUP_PASSPHRASE` | secret | Encrypts backups; created by `tools/deploy/new-deployment-secrets.ps1`; keep a copy outside GitHub |
+| `BACKUP_ENABLED` | variable | `true` switches the daily backup on |
 
 ## Rules
 

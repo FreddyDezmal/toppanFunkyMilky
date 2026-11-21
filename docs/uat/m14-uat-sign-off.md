@@ -36,6 +36,7 @@ AC-14.2 requires **0 open Critical and 0 open High** defects.
 | Q-07 / AC-6.6 | VAT exclusive of fees, 15 %, rounding; calculation sheet `m6-calculation-sign-off.csv` | As built | |
 | B1.1–B1.4 | Patron cancellation with 10 % fee; restaurant-requested cancellation with full refund | As built (X-01, X-02) | |
 | Q-08 | One combined order confirmation and receipt email | As built | |
+| E-1 | No own email domain: receipts are delivered only to the facilitator's address; other patrons' emails are recorded as Suppressed (amends D-5) | As deployed | |
 | Q-14 / B6 | Retention of personal data (POPIA); demo holds test data only | Kept, masked in audit views | |
 | B5 / R7 | No "Collected" status after pickup | Not built (out of URS scope) | |
 | M4 follow-up | Email confirmation and password reset not implemented | Not built | |

@@ -50,7 +50,7 @@ domain for email (decision D-5).
 | Patron accounts | Each patron tester registers their own account during script P-01 |
 | Manager accounts | One per manager tester, created by the facilitator before the session; the password is given to the tester in person and changed by nobody else |
 | Payments | **Paystack test mode.** No real card and no real money. Use the test card on Paystack's "Test Payments" documentation page; the facilitator hands it out in the session |
-| Email | Emails are sent only to addresses on the approved list. Testers give the facilitator the address they will use before the session |
+| Email | **Decision E-1:** the demonstration has no own email domain, so the email service delivers only to one address: the facilitator's. Emails to any other patron are recorded and shown as *Suppressed* under Management → Emails. The email scripts (P-18 to P-20) are therefore run with the facilitator's patron account, with the testers watching and reading the received email on the facilitator's screen; every other patron script uses the testers' own accounts |
 | Browsers | Any current Chrome, Edge, Firefox or Safari; at least one tester also uses a phone |
 
 **Demonstration prices** (as seeded; if a manager tester has changed them, use the current values in
