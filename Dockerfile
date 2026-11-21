@@ -30,7 +30,8 @@ COPY --from=site /src/frontend/dist ./wwwroot
 ENV ASPNETCORE_ENVIRONMENT=Production \
     ASPNETCORE_HTTP_PORTS=8080 \
     DOTNET_gcServer=0
-# Plain HTTP inside the platform: the host (Koyeb) ends TLS and forwards X-Forwarded-For/Proto (ForwardedHeaders:Enabled).
+# Plain HTTP inside the platform: the host (Render, behind Cloudflare) ends TLS and forwards the client address and
+# X-Forwarded-Proto (ForwardedHeaders). Render routes to the port in its PORT variable, set to 8080 on the service.
 EXPOSE 8080
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Milkshake.Api.dll"]

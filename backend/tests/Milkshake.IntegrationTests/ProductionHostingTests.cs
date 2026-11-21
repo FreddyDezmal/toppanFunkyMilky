@@ -39,6 +39,28 @@ public sealed class ProductionHostingTests(PostgresApiFactory factory)
     }
 
     [Fact]
+    public async Task ForwardedForHeaderName_TakesTheClientAddressFromTheConfiguredHeaderOnly()
+    {
+        // Render (M14 E-3): the address comes from CF-Connecting-IP, set by Cloudflare; a client-supplied
+        // X-Forwarded-For is ignored, so it cannot choose the address that is recorded and rate limited.
+        using WebApplicationFactory<ApiAssemblyMarker> behindRender = factory.WithWebHostBuilder(builder => builder
+            .UseSetting("ForwardedHeaders:Enabled", "true")
+            .UseSetting("ForwardedHeaders:ForwardedForHeaderName", "CF-Connecting-IP"));
+        string email = await RegisterAsync(behindRender);
+
+        using (HttpClient client = behindRender.CreateSecureClient())
+        {
+            client.DefaultRequestHeaders.Add("CF-Connecting-IP", "203.0.113.9");
+            client.DefaultRequestHeaders.Add("X-Forwarded-For", ForwardedClientIp);
+            client.DefaultRequestHeaders.Add("X-Forwarded-Proto", "https");
+            using HttpResponseMessage response = await client.PostWithCsrfAsync(LoginPath, new LoginBody(email, "Wrong1Password"));
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        Assert.Equal("203.0.113.9", await LoginFailedIpAsync(email));
+    }
+
+    [Fact]
     public async Task ForwardedHeadersOff_TheHeaderIsIgnored()
     {
         // Negative control: without the setting a client cannot choose the address that is recorded and rate limited.

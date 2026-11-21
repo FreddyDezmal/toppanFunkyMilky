@@ -1,14 +1,15 @@
 # Production configuration reference (M14)
 
 Setting names only. **No values go in this file, in Git, in the image or in the frontend bundle**: secrets are set in
-the host's secret store (Koyeb secrets) and referenced by environment variables. ASP.NET Core reads `A:B` from the
+the host's environment settings (Render → service → Environment, stored encrypted) and never anywhere else. ASP.NET Core reads `A:B` from the
 environment variable `A__B` (double underscore); list items use an index, e.g. `Email__AllowedRecipients__0`.
 
 ## Committed defaults (`appsettings.Production.json`, no secrets)
 
 | Setting | Value | Why |
 |---|---|---|
-| `ForwardedHeaders:Enabled` | `true` | Behind Koyeb's proxy: client address and HTTPS come from one forwarded hop. Only safe while the app is reachable solely through that proxy. |
+| `ForwardedHeaders:Enabled` | `true` | Behind Render's proxy: client address and HTTPS come from one forwarded hop. Only safe while the app is reachable solely through that proxy. |
+| `ForwardedHeaders:ForwardedForHeaderName` | `CF-Connecting-IP` | E-3: Render is behind Cloudflare, which sets this header from the real connection; Render only appends to `X-Forwarded-For`, so its last entry is a proxy. Verified on the live site in Step 9. |
 | `DataProtection:StoreKeysInDatabase` | `true` | D-3: sign-in keys in `milkshake.data_protection_keys`, so sign-ins survive restarts. Start-up fails in Production without the certificate below. |
 | `Cors:AllowedOrigins` | empty | D-2: one origin; the API serves the site, so no CORS. |
 | `Email:Provider` | `Resend` | D-5 as amended by E-1 (Step 8): no sending domain, so Resend delivers only to the Resend account's own address. Sends only to `Email:AllowedRecipients`. |
@@ -17,7 +18,8 @@ environment variable `A__B` (double underscore); list items use an index, e.g. `
 
 | Setting (environment variable) | Secret? | Notes |
 |---|---|---|
-| `ASPNETCORE_ENVIRONMENT` | no | `Production`. |
+| `ASPNETCORE_ENVIRONMENT` | no | `Production` (also set in the image). |
+| `PORT` | no | `8080` – tells Render which port the app listens on (its default is 10000). |
 | `ConnectionStrings__MilkshakeDb` | no (password-free) | Supabase pooler connection string **without** the password, `SSL Mode=Require`. |
 | `Database__Password` | **yes** | Supabase database password. |
 | `DataProtection__CertificateBase64` | **yes** | Base64 PKCS#12 certificate that encrypts the key ring. Keep an offline copy: losing it signs everyone out (no data loss). |
@@ -34,9 +36,9 @@ environment variable `A__B` (double underscore); list items use an index, e.g. `
 
 | Name | Kind | Notes |
 |---|---|---|
-| `KOYEB_TOKEN` | secret | Koyeb API token used by the Deploy workflow |
-| `KOYEB_SERVICE` | variable | `<app>/<service>` on Koyeb |
-| `APP_URL` | variable | `https://<app>.koyeb.app` (no trailing `/`) |
+| `RENDER_API_KEY` | secret | Render API key used by the Deploy workflow (Account Settings → API Keys) |
+| `RENDER_SERVICE_ID` | variable | The service's id, `srv-…` (in its dashboard URL) |
+| `APP_URL` | variable | `https://<name>.onrender.com` (no trailing `/`) |
 | `BACKUP_PGHOST`, `BACKUP_PGPORT`, `BACKUP_PGUSER`, `BACKUP_PGDATABASE` | secrets | Supabase session pooler connection (port 5432, user `postgres.<project-ref>`, database `postgres`) |
 | `BACKUP_PGPASSWORD` | secret | Supabase database password |
 | `BACKUP_PASSPHRASE` | secret | Encrypts backups; created by `tools/deploy/new-deployment-secrets.ps1`; keep a copy outside GitHub |

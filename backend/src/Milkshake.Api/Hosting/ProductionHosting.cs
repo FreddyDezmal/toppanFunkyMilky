@@ -17,10 +17,16 @@ public static class ProductionHosting
     public const string DataProtectionSection = "DataProtection";
 
     /// <summary>
-    /// Behind the host's proxy (Koyeb), trusts one hop of <c>X-Forwarded-For</c> and <c>X-Forwarded-Proto</c>, so rate
-    /// limits and sign-in events see the client's address and the app knows the request was HTTPS (HTTPS redirection,
-    /// HSTS, Secure cookies). Off unless <c>ForwardedHeaders:Enabled</c> is true: the app must only ever be reachable
-    /// through that proxy when it is on, or a client could forge its address.
+    /// Behind the host's proxy, trusts one hop of the client-address header and <c>X-Forwarded-Proto</c>, so rate limits
+    /// and sign-in events see the client's address and the app knows the request was HTTPS (HTTPS redirection, HSTS,
+    /// Secure cookies). Off unless <c>ForwardedHeaders:Enabled</c> is true: the app must only ever be reachable through
+    /// that proxy when it is on, or a client could forge its address.
+    /// <para>
+    /// <c>ForwardedHeaders:ForwardedForHeaderName</c> (default <c>X-Forwarded-For</c>) names the header that carries the
+    /// client's address. On Render (M14 E-3) it is <c>CF-Connecting-IP</c>: Render's proxy only appends to
+    /// <c>X-Forwarded-For</c>, so its last entry is a proxy, while Cloudflare, in front of every Render service, sets
+    /// <c>CF-Connecting-IP</c> itself from the real connection.
+    /// </para>
     /// </summary>
     public static IServiceCollection AddForwardedHeadersFromConfiguration(this IServiceCollection services, IConfiguration configuration)
     {
@@ -33,6 +39,12 @@ public static class ProductionHosting
         {
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
             options.ForwardLimit = 1;
+            string? forwardedForHeader = configuration["ForwardedHeaders:ForwardedForHeaderName"];
+            if (!string.IsNullOrWhiteSpace(forwardedForHeader))
+            {
+                options.ForwardedForHeaderName = forwardedForHeader.Trim();
+            }
+
             // The proxy's address is not known in advance on a shared platform; the app is reachable only through it.
             options.KnownIPNetworks.Clear();
             options.KnownProxies.Clear();

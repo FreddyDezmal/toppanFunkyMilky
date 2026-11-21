@@ -9,7 +9,7 @@
     DataProtection__CertificatePassword  its password
     BACKUP_PASSPHRASE                    the backup encryption passphrase (decision D-12)
 
-  Nothing is printed and nothing is written to disk: each value is copied to the clipboard, you paste it into Koyeb or
+  Nothing is printed and nothing is written to disk: each value is copied to the clipboard, you paste it into Render or
   GitHub (and into your password manager), press Enter, and the next one is copied. The clipboard is cleared at the
   end, and the certificate is removed from the Windows certificate store once exported.
 
@@ -54,8 +54,8 @@ finally {
 }
 
 Write-Host "Three values will be copied to the clipboard one after another. Nothing is shown or saved."
-Hand-Over 'DataProtection__CertificateBase64' 'Koyeb: Secrets -> new secret, then the service variable of the same name' $certificateBase64
-Hand-Over 'DataProtection__CertificatePassword' 'Koyeb: Secrets -> new secret, then the service variable of the same name' $certificatePassword
+Hand-Over 'DataProtection__CertificateBase64' 'Render: the service -> Environment -> environment variable of the same name' $certificateBase64
+Hand-Over 'DataProtection__CertificatePassword' 'Render: the service -> Environment -> environment variable of the same name' $certificatePassword
 Hand-Over 'BACKUP_PASSPHRASE' 'GitHub: repository Settings -> Secrets and variables -> Actions -> New repository secret' $backupPassphrase
 
 Set-Clipboard -Value ' '

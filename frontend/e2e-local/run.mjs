@@ -373,14 +373,14 @@ async function startDevStack(env, cert) {
 }
 
 /**
- * M14 --container: stands in for the host's edge (Koyeb). Ends TLS on the site address with the development certificate
- * and forwards plain HTTP to the container, replacing X-Forwarded-For with the caller's address and setting
- * X-Forwarded-Proto: https, which the app trusts because ForwardedHeaders:Enabled is true in Production.
+ * M14 --container: stands in for the host's edge (Render behind Cloudflare). Ends TLS on the site address with the
+ * development certificate and forwards plain HTTP to the container with the caller's address in CF-Connecting-IP (and
+ * X-Forwarded-For) and X-Forwarded-Proto: https, as the production settings expect (appsettings.Production.json).
  */
 function startEdgeProxy(certFile, keyFile) {
   const server = createHttpsServer({ cert: readFileSync(certFile), key: readFileSync(keyFile) }, (req, res) => {
     const client = (req.socket.remoteAddress ?? '').replace(/^::ffff:/, '')
-    const headers = { ...req.headers, 'x-forwarded-for': client, 'x-forwarded-proto': 'https' }
+    const headers = { ...req.headers, 'cf-connecting-ip': client, 'x-forwarded-for': client, 'x-forwarded-proto': 'https' }
     const upstream = httpRequest({ host: '127.0.0.1', port: PORTS.app, method: req.method, path: req.url, headers }, (reply) => {
       res.writeHead(reply.statusCode ?? 502, reply.headers)
       reply.pipe(res)

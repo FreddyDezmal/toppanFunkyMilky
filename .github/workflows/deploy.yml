@@ -2,12 +2,13 @@
 #
 # Actions -> Deploy -> Run workflow, with the release tag (e.g. v1.0.0; it must already be pushed and be on main).
 #
-# Koyeb builds the image from the repository's Dockerfile at exactly that commit (--git-sha) and deploys it; automatic
-# deploys on push stay off (--git-no-deploy-on-push). No image registry or registry token is needed. The workflow waits
-# for the deployment, then checks /api/health over HTTPS. The database is never migrated here: migrations are reviewed
-# and applied separately (operations guide §5), before deploying code that needs them.
+# Host: Render free web service, Frankfurt (decision E-3: Koyeb closed its free plan to new accounts, so the approved
+# fallback from D-2 is used). Render builds the repository's Dockerfile at exactly that commit (API `commitId`) and
+# deploys it; the service's Auto-Deploy setting must be Off. The workflow waits for the deploy to go live, then checks
+# /api/health over HTTPS. The database is never migrated here: migrations are reviewed and applied separately
+# (operations guide §5), before deploying code that needs them.
 #
-# Repository secret: KOYEB_TOKEN. Repository variables: KOYEB_SERVICE (app/service), APP_URL (https://<app>.koyeb.app).
+# Repository secret: RENDER_API_KEY. Repository variables: RENDER_SERVICE_ID (srv-…), APP_URL (https://<name>.onrender.com).
 name: Deploy
 
 on:
@@ -30,9 +31,11 @@ jobs:
   deploy:
     name: Deploy ${{ inputs.tag }}
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     env:
       TAG: ${{ inputs.tag }}
+      RENDER_API: https://api.render.com/v1
+      SERVICE: ${{ vars.RENDER_SERVICE_ID }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,27 +56,43 @@ jobs:
           result=$(gh run list --workflow ci.yml --commit "$SHA" --status success --limit 1 --json databaseId --jq 'length')
           [ "$result" = "1" ] || { echo "::error::No successful CI run for $SHA. Push to main, wait for CI, then deploy."; exit 1; }
 
-      - name: Install the Koyeb CLI
-        uses: koyeb-community/koyeb-actions@v2
-        with:
-          api_token: ${{ secrets.KOYEB_TOKEN }}
-
-      - name: Build and deploy this commit on Koyeb
+      - name: Build and deploy this commit on Render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
         run: |
-          koyeb services update "${{ vars.KOYEB_SERVICE }}" --git-sha "$SHA" --git-no-deploy-on-push \
-            --wait --wait-timeout 25m
+          [ -n "$RENDER_API_KEY" ] && [ -n "$SERVICE" ] || { echo "::error::RENDER_API_KEY or RENDER_SERVICE_ID is not set."; exit 1; }
+          auth=(-H "Authorization: Bearer $RENDER_API_KEY" -H "Accept: application/json")
+          deploy=$(curl -fsS -X POST "${auth[@]}" -H "Content-Type: application/json" \
+            -d "{\"commitId\":\"$SHA\",\"clearCache\":\"do_not_clear\"}" "$RENDER_API/services/$SERVICE/deploys")
+          id=$(printf '%s' "$deploy" | jq -r '.id // empty')
+          [ -n "$id" ] || { echo "::error::Render did not return a deploy id."; exit 1; }
+          echo "DEPLOY_ID=$id" >> "$GITHUB_ENV"
+          echo "Render deploy $id started for $SHA"
+          # Poll until the deploy is live or has failed (build + start can take several minutes on the free plan).
+          for attempt in $(seq 1 120); do
+            sleep 15
+            status=$(curl -fsS "${auth[@]}" "$RENDER_API/services/$SERVICE/deploys/$id" | jq -r '.status // empty' || true)
+            echo "[$attempt] $status"
+            case "$status" in
+              live) echo "DEPLOY_STATUS=live" >> "$GITHUB_ENV"; exit 0 ;;
+              build_failed|update_failed|pre_deploy_failed|canceled|deactivated)
+                echo "DEPLOY_STATUS=$status" >> "$GITHUB_ENV"; echo "::error::Render deploy $id ended as $status."; exit 1 ;;
+            esac
+          done
+          echo "::error::Render deploy $id did not go live within 30 minutes."; exit 1
 
       - name: Health over HTTPS
         run: |
+          # A free service may be waking up: allow several minutes.
           for attempt in $(seq 1 30); do
-            body=$(curl -fsS --max-time 20 "${{ vars.APP_URL }}/api/health" || true)
+            body=$(curl -fsS --max-time 60 "${{ vars.APP_URL }}/api/health" || true)
             status=$(printf '%s' "$body" | jq -r '.status // empty' 2>/dev/null || true)
             if [ "$status" = "Healthy" ] || [ "$status" = "Degraded" ]; then
               echo "Health: $status"; echo "HEALTH=$status" >> "$GITHUB_ENV"; exit 0
             fi
             sleep 10
           done
-          echo "::error::/api/health did not report Healthy or Degraded within 5 minutes."; exit 1
+          echo "::error::/api/health did not report Healthy or Degraded."; exit 1
 
       - name: Record the deployment
         if: ${{ !cancelled() }}
@@ -84,7 +103,7 @@ jobs:
             echo "| | |"
             echo "| --- | --- |"
             echo "| Commit | \`${SHA:-unknown}\` |"
-            echo "| Service | \`${{ vars.KOYEB_SERVICE }}\` |"
+            echo "| Render deploy | \`${DEPLOY_ID:-not started}\` (${DEPLOY_STATUS:-unknown}) |"
             echo "| Health | ${HEALTH:-not reached} |"
             echo "| Started by | ${{ github.actor }} |"
             echo "| Finished (UTC) | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"

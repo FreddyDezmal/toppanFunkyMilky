@@ -6,10 +6,10 @@ filled in from evidence when that step is done; nothing here is claimed before i
 ## 1. Architecture
 
 ```
-Browser ──HTTPS──▶ Koyeb edge (TLS, free *.koyeb.app domain)
-                     │ HTTP + X-Forwarded-For/Proto
+Browser ──HTTPS──▶ Cloudflare + Render edge (TLS, free *.onrender.com domain)
+                     │ HTTP + CF-Connecting-IP + X-Forwarded-Proto
                      ▼
-        One container (Koyeb free instance, Frankfurt, 512 MB, scales to zero after 1 h idle)
+        One container (Render free web service, Frankfurt, 512 MB, 0.1 CPU, spins down after 15 min idle)
           ├─ /          built React site (wwwroot), SPA fallback, website security headers
           ├─ /api/*     ASP.NET Core 10 API (cookies SameSite=Strict, CSRF, rate limits)
           ├─ /api/payments/paystack/webhook ◀── Paystack (test mode)
@@ -23,19 +23,25 @@ GitHub Actions: CI on push (checks only); manual deploy; scheduled backup, resto
 
 Design decisions: `m14/2026-11-21_m14-step2-architecture-decisions.md` (D-1 to D-15).
 
-**Free-tier consequences (accepted):** the app sleeps after an hour without visitors; the first request afterwards
-takes several seconds while it starts, and the background workers do not run while it sleeps. On start-up both workers
-run at once, so payments and emails waiting from before are processed then. Paystack retries webhooks, and the patron's
-own page refresh also checks payment status.
+**Host (decision E-3):** Render's free plan, the fallback approved with D-2. Koyeb, the first choice, closed its free
+plan to new accounts after joining Mistral AI, which the "completely free" budget (D-8) rules out.
+
+**Free-tier consequences (accepted):** the app spins down after 15 minutes without visitors; the first request
+afterwards takes about a minute while it starts, and the background workers do not run while it sleeps. On start-up
+both workers run at once, so payments and emails waiting from before are processed then. Paystack retries webhooks,
+and the patron's own page refresh also checks payment status. Render may restart a free service at any time; the
+sign-in key ring is in the database, so nobody is signed out by a restart. 750 free instance hours a month cover one
+service running all month.
 
 ## 2. Configuration and secrets
 
 All settings and secrets: `docs/deployment/configuration-reference.md` (names only). Rules:
 
-- Secrets live only in Koyeb secrets and GitHub Actions secrets; never in Git, the image, the website bundle, logs or
+- Secrets live only in the Render service's environment settings and GitHub Actions secrets; never in Git, the image,
+  the website bundle, logs or
   documents.
 - Paystack **test** keys only (`sk_test_…`). A live key must never be configured (decision D-1).
-- Rotate a secret by replacing it in Koyeb and redeploying; record the date, not the value.
+- Rotate a secret by replacing it in Render (saving restarts the service); record the date, not the value.
 - The Data Protection certificate encrypts the sign-in key ring. Keep an offline copy. Losing it signs everyone out
   (no data is lost); replace it by setting a new certificate and redeploying.
 
@@ -55,9 +61,9 @@ the whole history and an image content check, on every push to `main`. CI never 
 ## 4. Deploying
 
 Deployments are started by hand only (decision D-14), from a release tag on `main` whose CI run passed. The workflow
-`.github/workflows/deploy.yml` tells Koyeb to build the repository's Dockerfile at exactly that commit (`--git-sha`) and
-deploy it, keeps Koyeb's deploy-on-push off (`--git-no-deploy-on-push`), waits for the deployment, and checks
-`/api/health` over HTTPS. No image registry or registry token is involved. Each run's summary records the tag, commit,
+`.github/workflows/deploy.yml` asks Render's API to build the repository's Dockerfile at exactly that commit
+(`commitId`) and deploy it, waits until the deploy is live, and checks `/api/health` over HTTPS. The service's
+Auto-Deploy setting is **Off**, so pushes never deploy by themselves. No image registry or registry token is involved. Each run's summary records the tag, commit,
 health and who started it: that summary is the deployment log.
 
 ### 4.1 Every deployment
@@ -86,15 +92,15 @@ Accounts and secrets are created by the owner; values are never shown to the ass
    node tools/deploy/database.mjs provision-manager --confirm <project-ref> --email <manager email> --first-name <name>
    ```
 4. **Release tag:** on the approved commit (CI passed): `git tag -a v1.0.0 -m "First deployment"`, `git push origin v1.0.0`.
-5. **Koyeb:** sign up and connect GitHub, giving the Koyeb app access to **this repository only**. Secrets → one secret
-   per **secret** in the configuration reference. Create one **Web service** from the GitHub repository: branch `main`,
-   builder **Dockerfile**, **Autodeploy off**, instance **Free**, region **Frankfurt**, port **8080** (HTTP, public route
-   `/`), health check **HTTP `/api/health`** on 8080, and the environment variables from the configuration reference
-   (secrets as secret references). Koyeb builds and starts it once on creation.
-6. **GitHub settings for the workflows:** secret `KOYEB_TOKEN` (Koyeb → Settings → API → new token); variables
-   `KOYEB_SERVICE` (`<app>/<service>`) and `APP_URL`; the six `BACKUP_*` secrets (§7).
+5. **Render:** sign up (no card needed for the free plan) and connect GitHub, giving Render access to **this repository
+   only**. New → **Web Service** → the repository; Language **Docker**; Branch `main`; Region **Frankfurt**; Instance
+   **Free**. Under Advanced: Health Check Path **`/api/health`**, Auto-Deploy **Off**. Environment: every setting in the
+   configuration reference (including `PORT` = `8080`). Render builds and starts it once on creation; note its address
+   (`https://<name>.onrender.com`) and set `Payments__Paystack__ReturnBaseUrl` and `Email__PublicBaseUrl` to it.
+6. **GitHub settings for the workflows:** secret `RENDER_API_KEY` (Render → Account Settings → API Keys); variables
+   `RENDER_SERVICE_ID` (`srv-…`) and `APP_URL`; the six `BACKUP_*` secrets (§7).
 7. **Paystack (test mode):** Settings → API Keys & Webhooks → test webhook URL
-   `https://<app>.koyeb.app/api/payments/paystack/webhook`.
+   `https://<name>.onrender.com/api/payments/paystack/webhook`.
 8. Actions → **Deploy** → `v1.0.0`: pins the service to that commit and records the first deployment. Then set
    `BACKUP_ENABLED` = `true` and run **Database backup** once by hand.
 9. Step 9 checks (smoke test, ZAP, alert, rollback rehearsal).
@@ -193,16 +199,17 @@ rehearsal. See §5: the database is never rolled back by an application rollback
 
 | Symptom | First checks |
 | --- | --- |
-| Site does not load | Koyeb service status and logs; `/api/health` |
+| Site does not load | Wait a minute (a sleeping free service is starting); then Render service events and logs; `/api/health` |
 | Health 503, `database` unhealthy | Supabase status; database password secret; Supabase project paused (free plan) |
-| Health Degraded, `workers` | Management → Emails (failed), Orders → Refunds; Koyeb logs for worker errors |
-| Payments stay unpaid | Paystack test dashboard; webhook URL; Koyeb logs for webhook errors; the reconciliation worker runs at start-up and every 5 min |
+| Health Degraded, `workers` | Management → Emails (failed), Orders → Refunds; Render logs for worker errors |
+| Payments stay unpaid | Paystack test dashboard; webhook URL; Render logs for webhook errors; the reconciliation worker runs at start-up and every 5 min |
 | Everyone signed out after a deploy | Data Protection certificate secret changed or missing |
 | Emails show Suppressed | Recipient not on `Email:AllowedRecipients` |
 
 ## 11. Known limitations
 
-- Free hosting sleeps when idle; first request after sleep is slow; one instance only.
+- Free hosting (Render) sleeps after 15 minutes idle; the first request after sleep takes about a minute; one
+  instance only; Render may restart it at any time.
 - Paystack test mode only; no real payments (D-1).
 - Email via Resend's test sender: without an own domain Resend delivers only to the Resend account's own address
   (E-1, amending D-5). Emails to anyone else are marked Suppressed and visible under Management → Emails.
