@@ -88,7 +88,8 @@ jobs:
           docker create --name inspect milkshake:ci
           docker export inspect | tar -t > files.txt
           docker rm inspect
-          if grep -E '(^|/)(appsettings\.Development\.json|secrets\.json|\.env|.*\.pfx|.*\.pem)$|IntegrationTests|UnitTests' files.txt; then
+          # Only the app's own folder: the base image's public root certificates (etc/ssl/certs/*.pem) are expected.
+          if grep -E '^app/(.*/)?(appsettings\.Development\.json|secrets\.json|\.env.*|[^/]*\.pfx|[^/]*\.pem|[^/]*\.key)$|^app/.*(IntegrationTests|UnitTests)' files.txt; then
             echo "::error::The image contains a file it must not."
             exit 1
           fi

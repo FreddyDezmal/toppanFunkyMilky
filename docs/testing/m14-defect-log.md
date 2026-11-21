@@ -13,6 +13,7 @@ here as `UAT-DEF-nn`.
 | DEF-08 | 21 Nov 2026 (first CI run) | Payment confirmation (webhook, return, reconciliation) | Medium | Two requests confirming the same payment at the same moment: the later one failed with HTTP 500 instead of "retry" | Fixed; local retest passed; CI retest pending |
 | DEF-09 | 21 Nov 2026 (first CI run) | Vitest `my-orders.test.tsx` | Low (test only) | Expected "placed" time built with the machine's locale; the page uses the store's (en-ZA) | Fixed, awaiting CI retest |
 | DEF-10 | 21 Nov 2026 (E2E `2026-11-21T10-25-58-944Z`) | Whole site (grey secondary text) | Low (accessibility) | `text-slate-500` on the pink page background is 4.36:1, under WCAG AA 4.5:1 (seen on "Checking your session…") | Closed (E2E `2026-11-21T10-42-51-261Z` 19 of 19) |
+| DEF-11 | 21 Nov 2026 (CI image check) | Production image | Low (configuration) | `appsettings.Development.json` (development seed data and localhost CORS origin; no secrets) was published into the image | Fixed; CI retest pending |
 
 ## DEF-04 – The live estimate moved the Continue button (carried over from M13)
 
@@ -96,4 +97,18 @@ recurrence will name the test. **Status: not reproduced.**
   than slate-600 is used, so the check no longer depends on timing. The E2E axe checks still run on every page.
 - **Retest:** Vitest 209 of 209 including `text-contrast.test.ts`; lint and build clean; E2E against the production image
   `2026-11-21T10-42-51-261Z` 19 of 19 with the axe checks on every page (E2E-14 on a phone passed). **Closed.**
+
+## DEF-11 – Development settings published into the production image
+
+- **Found:** CI "Container image builds" job (first run of the image content check, 21 Nov 2026): the image contained
+  `app/appsettings.Development.json`. The same run also listed the base image's public root certificates
+  (`etc/ssl/certs/*.pem`) – a false positive of an over-broad check, not a defect.
+- **Effect:** none at run time – Production does not load Development settings, and the file holds no secrets (only
+  demonstration seed data and the `http://localhost:5173` CORS origin). But development configuration does not belong
+  in a production image.
+- **Fix:** `Milkshake.Api.csproj` marks the file `CopyToPublishDirectory="Never"` (still in the build output for local
+  runs and tests; the deploy tool and E2E stack read it from the repository). The CI check now inspects only the app's
+  own folder (`app/…`) for settings, secret, certificate and key files and test assemblies.
+- **Retest:** the check's pattern was run against the failing listing (matches only the settings file) and a clean
+  listing (no matches); local image rebuild and the next CI run pending.
 
