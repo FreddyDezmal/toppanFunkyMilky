@@ -14,7 +14,7 @@ export function RequireAuth({ role }: { role?: string }) {
   if (status === 'loading') {
     // Page-shaped placeholder instead of a blank screen; the status text is for screen readers.
     return (
-      <div>
+      <div className="mx-auto max-w-4xl">
         <p role="status" className="sr-only">
           Checking your session…
         </p>
@@ -36,7 +36,7 @@ export function RequireAuth({ role }: { role?: string }) {
 
   if (role && !hasRole(user, role)) {
     return (
-      <Card as="section">
+      <Card as="section" className="mx-auto max-w-3xl">
         <h1 className="text-3xl font-semibold">Access denied</h1>
         <p className="mt-2 text-warm-grey">{"You don't have access to this page."}</p>
       </Card>

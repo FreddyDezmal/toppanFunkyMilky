@@ -19,18 +19,18 @@ export function PriceSummary({
   const { discount } = totals
 
   return (
-    <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
-      <dt className="text-slate-600">Subtotal</dt>
+    <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1.5 text-sm tabular-nums">
+      <dt className="text-warm-grey">Subtotal</dt>
       <dd className="text-right">{money(totals.subtotal)}</dd>
 
-      <dt className="text-slate-600">Frequent-customer discount</dt>
+      <dt className="text-warm-grey">Frequent-customer discount</dt>
       <dd className="text-right">{discount.tierNumber === null ? `${money(discount.amount)} (none)` : `−${money(discount.amount)}`}</dd>
 
-      <dt className="text-slate-600">VAT ({formatPercent(totals.vatRate, locale)})</dt>
+      <dt className="text-warm-grey">VAT ({formatPercent(totals.vatRate, locale)})</dt>
       <dd className="text-right">{money(totals.vat)}</dd>
 
-      <dt className="border-t border-slate-200 pt-1 font-semibold text-slate-900">{totalLabel}</dt>
-      <dd className="border-t border-slate-200 pt-1 text-right font-semibold text-slate-900">{money(totals.total)}</dd>
+      <dt className="border-t border-line pt-2 text-base font-semibold text-chocolate">{totalLabel}</dt>
+      <dd className="border-t border-line pt-2 text-right text-base font-semibold text-chocolate">{money(totals.total)}</dd>
     </dl>
   )
 }
@@ -42,18 +42,18 @@ export function PriceSummary({
  */
 export function PriceSummaryPlaceholder({ totalLabel = 'Estimated total' }: { totalLabel?: string }) {
   return (
-    <dl aria-hidden="true" data-testid="price-summary-placeholder" className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm text-slate-600">
-      <dt className="text-slate-600">Subtotal</dt>
+    <dl aria-hidden="true" data-testid="price-summary-placeholder" className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1.5 text-sm text-warm-grey">
+      <dt className="text-warm-grey">Subtotal</dt>
       <dd className="text-right">—</dd>
 
-      <dt className="text-slate-600">Frequent-customer discount</dt>
+      <dt className="text-warm-grey">Frequent-customer discount</dt>
       <dd className="text-right">—</dd>
 
-      <dt className="text-slate-600">VAT</dt>
+      <dt className="text-warm-grey">VAT</dt>
       <dd className="text-right">—</dd>
 
-      <dt className="border-t border-slate-200 pt-1 font-semibold text-slate-900">{totalLabel}</dt>
-      <dd className="border-t border-slate-200 pt-1 text-right font-semibold">—</dd>
+      <dt className="border-t border-line pt-2 text-base font-semibold text-chocolate">{totalLabel}</dt>
+      <dd className="border-t border-line pt-2 text-right text-base font-semibold">—</dd>
     </dl>
   )
 }

@@ -1,8 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { SelectField } from '../../components/forms/SelectField'
+import { ChoiceCardGroup } from '../../components/forms/ChoiceCardGroup'
 import { TextField } from '../../components/forms/TextField'
 import { focusFirstError } from '../../components/forms/focusFirstError'
+import { Alert } from '../../components/ui/Alert'
+import { Button } from '../../components/ui/Button'
+import { Card } from '../../components/ui/Card'
+import { Icon } from '../../components/ui/Icon'
 import { EmptyDraft } from '../../features/ordering/EmptyDraft'
 import { DRAFT_FIELDS } from '../../features/ordering/errors'
 import { formatLocalTime, timeZoneLabel } from '../../features/ordering/format'
@@ -55,72 +59,71 @@ export function OrderPickupPage() {
   }
 
   return (
-    <section aria-labelledby="pickup-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <h1 id="pickup-heading" className="text-2xl font-bold tracking-tight">
+    <Card as="section" aria-labelledby="pickup-heading" className="mx-auto max-w-3xl">
+      <h1 id="pickup-heading" className="text-3xl font-semibold text-chocolate sm:text-4xl">
         Where and when?
       </h1>
-      <p className="mt-1 text-sm text-slate-600">Choose the restaurant you will collect from and a pickup time.</p>
+      <p className="mt-2 text-warm-grey">Choose the restaurant you will collect from and a pickup time.</p>
 
       {!pickup.hasAvailableTimes && (
-        <p role="alert" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+        <Alert tone="warning" role="alert" className="mt-4">
           {RECONCILE_MESSAGES.noPickupTimes}
-        </p>
+        </Alert>
       )}
 
-      <div className="mt-6 max-w-md space-y-4">
-        <SelectField
+      <div className="mt-8 space-y-8">
+        <ChoiceCardGroup
           id={DRAFT_FIELDS.restaurantId}
-          label="Pickup restaurant"
+          name="pickup-restaurant"
+          legend="Pickup restaurant"
+          layout="list"
           value={draft.restaurantId === null ? '' : String(draft.restaurantId)}
-          placeholder="Choose a restaurant"
           options={options.restaurants.map((restaurant) => ({
             value: String(restaurant.id),
-            label: restaurant.address ? `${restaurant.name} – ${restaurant.address}` : restaurant.name,
+            label: restaurant.name,
+            detail: restaurant.address ?? undefined,
+            visual: (
+              <span className="flex size-10 items-center justify-center rounded-full bg-strawberry-tint text-raspberry">
+                <Icon name="store" />
+              </span>
+            ),
           }))}
           error={errors[DRAFT_FIELDS.restaurantId]}
           onChange={(value) => {
-            dispatch({ type: 'setRestaurant', restaurantId: value === '' ? null : Number(value) })
+            dispatch({ type: 'setRestaurant', restaurantId: Number(value) })
             clearError(DRAFT_FIELDS.restaurantId)
           }}
         />
-        <TextField
-          id={DRAFT_FIELDS.pickupLocal}
-          label="Pickup date and time"
-          type="datetime-local"
-          value={draft.pickupLocal ?? ''}
-          min={pickup.earliestLocal}
-          max={pickup.latestLocal}
-          disabled={!pickup.hasAvailableTimes}
-          hint={`Times are in ${zone}. Earliest: ${earliest}. Latest: ${latest}.`}
-          error={errors[DRAFT_FIELDS.pickupLocal]}
-          onChange={(value) => {
-            // Browsers send "yyyy-MM-ddTHH:mm"; anything longer is trimmed to the minute, the API's format.
-            const minutes = LOCAL_MINUTES.exec(value)?.[0] ?? null
-            dispatch({ type: 'setPickup', pickupLocal: minutes })
-            clearError(DRAFT_FIELDS.pickupLocal)
-          }}
-        />
-        <p className="text-xs text-slate-600">
-          Pickup times are provisional: opening hours and collection slots are not yet confirmed.
-        </p>
+        <div className="max-w-md">
+          <TextField
+            id={DRAFT_FIELDS.pickupLocal}
+            label="Pickup date and time"
+            type="datetime-local"
+            value={draft.pickupLocal ?? ''}
+            min={pickup.earliestLocal}
+            max={pickup.latestLocal}
+            disabled={!pickup.hasAvailableTimes}
+            hint={`Times are in ${zone}. Earliest: ${earliest}. Latest: ${latest}.`}
+            error={errors[DRAFT_FIELDS.pickupLocal]}
+            onChange={(value) => {
+              // Browsers send "yyyy-MM-ddTHH:mm"; anything longer is trimmed to the minute, the API's format.
+              const minutes = LOCAL_MINUTES.exec(value)?.[0] ?? null
+              dispatch({ type: 'setPickup', pickupLocal: minutes })
+              clearError(DRAFT_FIELDS.pickupLocal)
+            }}
+          />
+        </div>
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => void navigate('/order/drinks')}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
+      <div className="mt-10 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+        <Button variant="secondary" size="lg" onClick={() => void navigate('/order/drinks')} icon={<Icon name="chevron-left" />}>
           Back to milkshakes
-        </button>
-        <button
-          type="button"
-          onClick={handleContinue}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-        >
+        </Button>
+        <Button size="lg" onClick={handleContinue}>
           Review order
-        </button>
+          <Icon name="arrow-right" />
+        </Button>
       </div>
-    </section>
+    </Card>
   )
 }

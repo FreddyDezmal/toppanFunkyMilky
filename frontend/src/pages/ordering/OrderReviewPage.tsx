@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { Alert } from '../../components/ui/Alert'
+import { Button } from '../../components/ui/Button'
+import { buttonClasses } from '../../components/ui/buttonClasses'
+import { Card } from '../../components/ui/Card'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { Icon } from '../../components/ui/Icon'
+import { Skeleton } from '../../components/ui/Skeleton'
 import { formatMoney } from '../../lib/format/money'
 import { useAuth } from '../../features/auth/authContext'
 import { placeOrder, validateDraft } from '../../features/ordering/api'
@@ -28,7 +34,7 @@ type Placement =
   | { kind: 'priceChanged'; totals: OrderTotals }
   | { kind: 'failed'; message: string }
 
-const LINK_CLASS = 'rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50'
+const LINK_CLASS = buttonClasses({ variant: 'secondary', size: 'sm', className: 'whitespace-nowrap' })
 
 /** Which step fixes an error, by its field key. */
 function stepFor(field: string): { to: string; label: string } {
@@ -141,20 +147,30 @@ export function OrderReviewPage() {
     return formatMoney(option.fee.amount, option.fee.currencyCode, locale)
   }
 
+  const placeLabel =
+    placement.kind === 'placing' ? 'Placing your order…' : placement.kind === 'failed' ? 'Try again' : 'Place order'
+
   return (
-    <section aria-labelledby="review-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <h1 id="review-heading" className="text-2xl font-bold tracking-tight">
+    <section aria-labelledby="review-heading">
+      <h1 id="review-heading" className="text-3xl font-semibold text-chocolate sm:text-4xl">
         Review your order
       </h1>
 
       {state.kind === 'checking' && (
-        <p role="status" className="mt-4 text-sm text-slate-600">
-          Checking your choices…
-        </p>
+        <div className="mt-6">
+          <p role="status" className="text-warm-grey">
+            Checking your choices…
+          </p>
+          <Card className="mt-4 space-y-3">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-2/3" />
+          </Card>
+        </div>
       )}
 
       {state.kind === 'invalid' && (
-        <div role="alert" className="mt-4 rounded-lg bg-rose-50 p-4 text-sm text-rose-800">
+        <Alert tone="danger" role="alert" className="mt-6">
           <h2 className="font-semibold">Some choices need attention</h2>
           {state.errors.form && <p className="mt-1">{state.errors.form}</p>}
           {Object.keys(state.errors.fields).length > 0 && (
@@ -167,144 +183,157 @@ export function OrderReviewPage() {
           <div className="mt-3 flex flex-wrap gap-2">
             {[...new Map(Object.keys(state.errors.fields).map((field) => [stepFor(field).to, stepFor(field)])).values()].map(
               (step) => (
-                <Link key={step.to} to={step.to} className={`${LINK_CLASS} bg-white`}>
+                <Link key={step.to} to={step.to} className={LINK_CLASS}>
                   {step.label}
                 </Link>
               ),
             )}
             {state.errors.form && (
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => {
                   setState({ kind: 'checking' })
                   setAttempt((count) => count + 1)
                 }}
-                className={`${LINK_CLASS} bg-white`}
               >
                 Try again
-              </button>
+              </Button>
             )}
           </div>
-        </div>
+        </Alert>
       )}
 
-      {state.kind === 'valid' && (
-        <>
-          <p className="mt-4 rounded-lg bg-brand-50 p-3 text-sm font-medium text-brand-900">{state.summary.note}</p>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="min-w-0 space-y-6">
+          {state.kind === 'valid' && (
+            <>
+              <Alert tone="info">
+                <span className="font-semibold">{state.summary.note}</span>
+              </Alert>
 
-          <div className="mt-6 grid gap-6 sm:grid-cols-2">
-            <div>
-              <h2 className="text-lg font-semibold">Pickup</h2>
-              <p className="mt-1 font-medium">{state.summary.restaurant.name}</p>
-              {state.summary.restaurant.address && <p className="text-sm text-slate-600">{state.summary.restaurant.address}</p>}
-              <p className="mt-2">{formatLocalTime(state.summary.pickup.local, locale)}</p>
-              <p className="text-xs text-slate-600">{timeZoneLabel(state.summary.pickup.timeZone, locale)}</p>
-            </div>
+              <Card as="section" aria-labelledby="review-pickup-heading" padding="md">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 id="review-pickup-heading" className="flex items-center gap-2 font-display text-xl font-semibold text-chocolate">
+                    <Icon name="store" className="size-5 text-raspberry" />
+                    Pickup
+                  </h2>
+                  <Link to="/order/pickup" className={LINK_CLASS}>
+                    Change pickup
+                  </Link>
+                </div>
+                <p className="mt-3 font-semibold text-chocolate">{state.summary.restaurant.name}</p>
+                {state.summary.restaurant.address && <p className="text-sm text-warm-grey">{state.summary.restaurant.address}</p>}
+                <p className="mt-3 flex items-center gap-2 text-chocolate">
+                  <Icon name="clock" className="size-5 text-raspberry" />
+                  {formatLocalTime(state.summary.pickup.local, locale)}
+                </p>
+                <p className="mt-1 text-sm text-warm-grey">{timeZoneLabel(state.summary.pickup.timeZone, locale)}</p>
+              </Card>
 
-            <div>
-              <h2 className="text-lg font-semibold">
-                {state.summary.drinks.length === 1 ? '1 milkshake' : `${state.summary.drinks.length} milkshakes`}
+              <Card as="section" aria-labelledby="review-drinks-heading" padding="md">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 id="review-drinks-heading" className="font-display text-xl font-semibold text-chocolate">
+                    {state.summary.drinks.length === 1 ? '1 milkshake' : `${state.summary.drinks.length} milkshakes`}
+                  </h2>
+                  <Link to="/order/drinks" className={LINK_CLASS}>
+                    Change milkshakes
+                  </Link>
+                </div>
+                <ol className="mt-3 divide-y divide-line">
+                  {state.summary.drinks.map((drink) => (
+                    <li key={drink.number} className="py-3">
+                      <h3 className="flex justify-between gap-4 font-semibold text-chocolate">
+                        <span>Milkshake {drink.number}</span>{' '}
+                        <span className="tabular-nums">{formatMoney(drink.price, state.summary.totals.currencyCode, locale)}</span>
+                      </h3>
+                      <ul className="mt-1 text-sm text-warm-grey">
+                        <li>
+                          {drink.flavour.name} · {fee(drink.flavour)}
+                        </li>
+                        <li>
+                          {drink.consistency.name} · {fee(drink.consistency)}
+                        </li>
+                        <li>
+                          {drink.topping.name} · {fee(drink.topping)}
+                        </li>
+                      </ul>
+                    </li>
+                  ))}
+                </ol>
+              </Card>
+            </>
+          )}
+
+          {placement.kind === 'priceChanged' && (
+            <section role="alert" aria-labelledby="price-changed-heading" className="rounded-card border border-warning/30 bg-warning-tint p-5 text-sm text-warning">
+              <h2 id="price-changed-heading" className="font-semibold">
+                The price has changed
               </h2>
-              <ol className="mt-1 space-y-3">
-                {state.summary.drinks.map((drink) => (
-                  <li key={drink.number}>
-                    <h3 className="flex justify-between gap-4 font-medium">
-                      <span>Milkshake {drink.number}</span>{' '}
-                      <span>{formatMoney(drink.price, state.summary.totals.currencyCode, locale)}</span>
-                    </h3>
-                    <ul className="text-sm text-slate-700">
-                      <li>
-                        {drink.flavour.name} · {fee(drink.flavour)}
-                      </li>
-                      <li>
-                        {drink.consistency.name} · {fee(drink.consistency)}
-                      </li>
-                      <li>
-                        {drink.topping.name} · {fee(drink.topping)}
-                      </li>
-                    </ul>
-                  </li>
-                ))}
-              </ol>
+              <p className="mt-1">
+                Prices changed since you reviewed your order. The new total is{' '}
+                {formatMoney(placement.totals.total, placement.totals.currencyCode, locale)}. Nothing has been ordered yet.
+              </p>
+              <div className="mt-3 max-w-sm rounded-control bg-surface p-3 text-chocolate">
+                <PriceSummary totals={placement.totals} locale={locale} totalLabel="New total" />
+              </div>
+            </section>
+          )}
+
+          {placement.kind === 'failed' && (
+            <Alert tone="danger" role="alert">
+              {placement.message}
+            </Alert>
+          )}
+        </div>
+
+        <aside aria-label="Place your order" className="lg:sticky lg:top-24 lg:self-start">
+          <Card padding="md">
+            {state.kind === 'valid' && (
+              <section aria-labelledby="review-price-heading">
+                <h2 id="review-price-heading" className="mb-3 font-display text-xl font-semibold text-chocolate">
+                  Estimated price
+                </h2>
+                <PriceSummary totals={state.summary.totals} locale={locale} />
+              </section>
+            )}
+            <div className={`flex flex-col gap-2 ${state.kind === 'valid' ? 'mt-6' : ''}`}>
+              {state.kind === 'valid' && placement.kind === 'priceChanged' ? (
+                <Button size="lg" fullWidth onClick={() => void place(placement.totals)}>
+                  Place order at {formatMoney(placement.totals.total, placement.totals.currencyCode, locale)}
+                </Button>
+              ) : (
+                <Button
+                  size="lg"
+                  fullWidth
+                  disabled={state.kind !== 'valid' || placement.kind === 'placing'}
+                  aria-describedby="place-order-note"
+                  onClick={() => {
+                    if (state.kind === 'valid') {
+                      setPlacement({ kind: 'confirming', totals: state.summary.totals })
+                    }
+                  }}
+                >
+                  {placeLabel}
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                fullWidth
+                disabled={placement.kind === 'placing'}
+                onClick={() => setConfirmStartOver(true)}
+                className="text-danger hover:bg-danger-tint hover:text-danger"
+              >
+                Start over
+              </Button>
             </div>
-          </div>
-
-          <section aria-labelledby="review-price-heading" className="mt-6 max-w-sm rounded-xl bg-slate-50 p-4">
-            <h2 id="review-price-heading" className="mb-2 text-lg font-semibold">
-              Estimated price
-            </h2>
-            <PriceSummary totals={state.summary.totals} locale={locale} />
-          </section>
-
-          <div className="mt-6 flex flex-wrap gap-2">
-            <Link to="/order/drinks" className={LINK_CLASS}>
-              Change milkshakes
-            </Link>
-            <Link to="/order/pickup" className={LINK_CLASS}>
-              Change pickup
-            </Link>
-          </div>
-        </>
-      )}
-
-      {placement.kind === 'priceChanged' && (
-        <section role="alert" aria-labelledby="price-changed-heading" className="mt-6 rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
-          <h2 id="price-changed-heading" className="font-semibold">
-            The price has changed
-          </h2>
-          <p className="mt-1">
-            Prices changed since you reviewed your order. The new total is{' '}
-            {formatMoney(placement.totals.total, placement.totals.currencyCode, locale)}. Nothing has been ordered yet.
-          </p>
-          <div className="mt-3 max-w-sm rounded-lg bg-white p-3">
-            <PriceSummary totals={placement.totals} locale={locale} totalLabel="New total" />
-          </div>
-        </section>
-      )}
-
-      {placement.kind === 'failed' && (
-        <p role="alert" className="mt-6 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">
-          {placement.message}
-        </p>
-      )}
-
-      <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-6">
-        {state.kind === 'valid' && placement.kind === 'priceChanged' ? (
-          <button
-            type="button"
-            onClick={() => void place(placement.totals)}
-            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-          >
-            Place order at {formatMoney(placement.totals.total, placement.totals.currencyCode, locale)}
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={state.kind !== 'valid' || placement.kind === 'placing'}
-            aria-describedby="place-order-note"
-            onClick={() => {
-              if (state.kind === 'valid') {
-                setPlacement({ kind: 'confirming', totals: state.summary.totals })
-              }
-            }}
-            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-          >
-            {placement.kind === 'placing' ? 'Placing your order…' : placement.kind === 'failed' ? 'Try again' : 'Place order'}
-          </button>
-        )}
-        <button
-          type="button"
-          disabled={placement.kind === 'placing'}
-          onClick={() => setConfirmStartOver(true)}
-          className="rounded-lg px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-        >
-          Start over
-        </button>
-        <p role="status" className="w-full text-xs text-slate-600" id="place-order-note">
-          {placement.kind === 'placing'
-            ? 'Placing your order…'
-            : 'Placing your order saves it as awaiting payment. You will not be charged now: payment is not available yet.'}
-        </p>
+            <p role="status" className="mt-3 text-sm text-warm-grey" id="place-order-note">
+              {placement.kind === 'placing'
+                ? 'Placing your order…'
+                : 'Placing your order saves it as awaiting payment. You pay on the next page.'}
+            </p>
+          </Card>
+        </aside>
       </div>
 
       <ConfirmDialog
@@ -312,7 +341,7 @@ export function OrderReviewPage() {
         title="Place your order?"
         message={
           placement.kind === 'confirming'
-            ? `Your order will be placed for ${formatMoney(placement.totals.total, placement.totals.currencyCode, locale)} and saved as awaiting payment. You will not be charged now.`
+            ? `Your order will be placed for ${formatMoney(placement.totals.total, placement.totals.currencyCode, locale)} and saved as awaiting payment. You pay on the next page.`
             : ''
         }
         confirmLabel="Place order"
@@ -340,4 +369,4 @@ export function OrderReviewPage() {
       />
     </section>
   )
-}
+}

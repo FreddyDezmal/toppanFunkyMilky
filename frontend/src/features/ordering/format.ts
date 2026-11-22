@@ -1,6 +1,3 @@
-import { formatMoney } from '../../lib/format/money'
-import type { OrderingOption } from './types'
-
 const LOCAL_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/
 
 /**
@@ -34,11 +31,6 @@ export function timeZoneLabel(timeZone: string, locale?: string): string {
   }
 }
 
-/** "Vanilla (R 30,00)": the option with its current fee, formatted for the configured locale. */
-export function optionLabel(option: OrderingOption, locale?: string): string {
-  return `${option.name} (${formatMoney(option.fee.amount, option.fee.currencyCode, locale)})`
-}
-
 /** Shown wherever prices appear (M6): every amount is a server estimate, recalculated when the order is placed. */
 export const ESTIMATE_NOTE =
-  'Prices are estimates based on current fees and VAT. The final amount is calculated when you place your order.'
+  'Prices are estimates based on current fees and VAT. The final amount is calculated when you place your order.'

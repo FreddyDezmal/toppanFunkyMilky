@@ -25,7 +25,7 @@ export function HomePage() {
   const isManager = hasRole(user, ROLES.manager)
 
   return (
-    <div className="space-y-16 sm:space-y-20">
+    <div className="mx-auto max-w-5xl space-y-16 sm:space-y-20">
       {isPatron && <CancellationRequestNotice />}
 
       <section aria-labelledby="hero-heading" className="grid items-center gap-8 md:grid-cols-[1.15fr_0.85fr]">

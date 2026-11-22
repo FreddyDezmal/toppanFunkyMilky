@@ -15,7 +15,7 @@ export function AccountPage() {
   const isManager = hasRole(user, ROLES.manager)
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-3xl space-y-8">
       <PageHeader title="My account" description={`Hello, ${user.firstName}.`} />
 
       <Card as="section" aria-labelledby="details-heading">

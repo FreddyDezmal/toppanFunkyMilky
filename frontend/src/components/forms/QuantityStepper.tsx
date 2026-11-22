@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Icon } from '../ui/Icon'
 
 interface QuantityStepperProps {
@@ -23,6 +24,13 @@ export function QuantityStepper({ id, label, value, min, max, onChange, hint, er
   const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined
   const clamp = (next: number) => Math.min(max, Math.max(min, next))
   const thing = unit?.one ?? 'item'
+  // What is in the box while typing; empty is allowed mid-edit and puts the current value back on blur.
+  const [draftText, setDraftText] = useState<string | null>(null)
+
+  function step(next: number) {
+    setDraftText(null)
+    onChange(clamp(next))
+  }
 
   return (
     <div>
@@ -32,7 +40,7 @@ export function QuantityStepper({ id, label, value, min, max, onChange, hint, er
       <div className="mt-2 inline-flex items-center gap-2">
         <button
           type="button"
-          onClick={() => onChange(clamp(value - 1))}
+          onClick={() => step(value - 1)}
           disabled={value <= min}
           aria-controls={id}
           className="flex size-12 items-center justify-center rounded-full border border-line-strong bg-surface text-chocolate hover:bg-strawberry-wash disabled:cursor-not-allowed disabled:opacity-40"
@@ -47,20 +55,26 @@ export function QuantityStepper({ id, label, value, min, max, onChange, hint, er
           min={min}
           max={max}
           step={1}
-          value={value}
+          value={draftText ?? String(value)}
           aria-invalid={error ? 'true' : undefined}
           aria-describedby={describedBy}
           onChange={(event) => {
-            const next = Number.parseInt(event.target.value, 10)
-            if (!Number.isNaN(next)) {
-              onChange(clamp(next))
+            const text = event.target.value
+            const next = Number.parseInt(text, 10)
+            if (Number.isNaN(next)) {
+              setDraftText(text)
+              return
             }
+            const clamped = clamp(next)
+            setDraftText(clamped === next ? text : String(clamped))
+            onChange(clamped)
           }}
+          onBlur={() => setDraftText(null)}
           className="h-12 w-20 rounded-control border border-line-strong bg-surface text-center font-display text-2xl font-semibold text-chocolate focus:outline-none focus:ring-2 focus:ring-raspberry"
         />
         <button
           type="button"
-          onClick={() => onChange(clamp(value + 1))}
+          onClick={() => step(value + 1)}
           disabled={value >= max}
           aria-controls={id}
           className="flex size-12 items-center justify-center rounded-full bg-raspberry text-white hover:bg-raspberry-dark disabled:cursor-not-allowed disabled:opacity-40"

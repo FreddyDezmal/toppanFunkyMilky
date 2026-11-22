@@ -101,6 +101,13 @@
     scroll-padding-top: 5rem;
   }
 
+  /* Phones and tablets: also clear of the order builder's fixed action bar. */
+  @media (width < 64rem) {
+    html {
+      scroll-padding-bottom: 6rem;
+    }
+  }
+
   body {
     background-color: var(--color-cream);
     color: var(--color-chocolate);

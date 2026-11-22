@@ -1,14 +1,16 @@
-import { SelectField } from '../../components/forms/SelectField'
+import { ChoiceCardGroup, type ChoiceCardOption } from '../../components/forms/ChoiceCardGroup'
+import { Button } from '../../components/ui/Button'
+import { Icon } from '../../components/ui/Icon'
 import { formatMoney } from '../../lib/format/money'
 import { isDrinkComplete } from './draft'
 import { DRAFT_FIELDS } from './errors'
-import { optionLabel } from './format'
+import { flavourSwatch } from './flavourSwatch'
 import {
-  DRINK_FIELD_LABELS,
   DRINK_FIELD_OPTIONS,
   DRINK_FIELDS,
   type DrinkField,
   type DrinkSelection,
+  type OrderingOption,
   type OrderingOptions,
 } from './types'
 
@@ -30,96 +32,113 @@ interface DrinkCardProps {
   onRemove: () => void
 }
 
-/** One milkshake: three drop-downs while editing, a summary with Edit and Remove when done. */
+/**
+ * The fee shown on a card. The flavour is the base of the milkshake; consistencies and toppings add to it, and a
+ * free one is "Included". Current fees for information only: the server prices the milkshake.
+ */
+function feeText(field: DrinkField, option: OrderingOption, locale: string): string {
+  const money = formatMoney(option.fee.amount, option.fee.currencyCode, locale)
+  if (field === 'flavourId') {
+    return money
+  }
+  return option.fee.amount === 0 ? 'Included' : `+ ${money}`
+}
+
+/** One milkshake: three groups of choice cards while editing, a summary with Edit and Remove when done. */
 export function DrinkCard({ index, drink, options, editing, errors, canRemove, price, onChoose, onDone, onEdit, onRemove }: DrinkCardProps) {
   const number = index + 1
   const locale = options.display.locale
   const headingId = `drink-${index}-heading`
+  const complete = isDrinkComplete(drink)
 
   return (
-    <li aria-labelledby={headingId} className="rounded-xl p-4 ring-1 ring-slate-200">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 id={headingId} className="font-semibold text-slate-900">
-            Milkshake {number}
-          </h2>
-          <p className="text-sm text-slate-600">
-            {price !== null ? (
-              <>
-                Price: <span className="font-medium text-slate-900">{formatMoney(price, options.display.currencyCode, locale)}</span>
-              </>
-            ) : isDrinkComplete(drink) ? (
-              'Working out the price…'
-            ) : (
-              'Price shown once all three choices are made.'
-            )}
-          </p>
+    <li aria-labelledby={headingId} className="rounded-card border border-line bg-surface p-4 shadow-soft sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            className={`flex size-10 shrink-0 items-center justify-center rounded-full font-display text-lg font-semibold ${
+              complete && !editing ? 'bg-raspberry text-white' : 'bg-strawberry-tint text-raspberry-dark'
+            }`}
+          >
+            {complete && !editing ? <Icon name="check" className="size-5" /> : number}
+          </span>
+          <div>
+            <h2 id={headingId} className="font-display text-xl font-semibold text-chocolate">
+              Milkshake {number}
+            </h2>
+            <p className="text-sm text-warm-grey">
+              {price !== null ? (
+                <>
+                  Price: <span className="font-semibold text-chocolate">{formatMoney(price, options.display.currencyCode, locale)}</span>
+                </>
+              ) : complete ? (
+                'Working out the price…'
+              ) : (
+                'Price shown once all three choices are made.'
+              )}
+            </p>
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           {!editing && (
-            <button
-              id={`drink-${index}-edit`}
-              type="button"
-              onClick={onEdit}
-              aria-label={`Edit milkshake ${number}`}
-              className="rounded-md px-2 py-1 text-sm font-medium text-brand-700 hover:bg-brand-50"
-            >
+            <Button id={`drink-${index}-edit`} variant="ghost" size="sm" onClick={onEdit} aria-label={`Edit milkshake ${number}`}>
               Edit
-            </button>
+            </Button>
           )}
           {canRemove && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onRemove}
               aria-label={`Remove milkshake ${number}`}
-              className="rounded-md px-2 py-1 text-sm font-medium text-rose-700 hover:bg-rose-50"
+              className="text-danger hover:bg-danger-tint hover:text-danger"
             >
               Remove
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {editing ? (
-        <div className="mt-3 grid gap-4 sm:grid-cols-3">
+        <div className="mt-6 space-y-7">
           {DRINK_FIELDS.map((field) => {
             const id = DRAFT_FIELDS.drinkChoice(index, field)
             const value = drink[field]
+            const choices: ChoiceCardOption[] = options[DRINK_FIELD_OPTIONS[field]].map((option) => ({
+              value: String(option.id),
+              label: option.name,
+              detail: feeText(field, option, locale),
+              visual:
+                field === 'flavourId' ? (
+                  <span className={`block size-7 rounded-full ring-2 ring-surface ${flavourSwatch(option.name)}`} />
+                ) : undefined,
+            }))
             return (
-              <SelectField
+              <ChoiceCardGroup
                 key={field}
                 id={id}
-                label={TITLES[field]}
+                name={`drink-${index}-${field}`}
+                legend={TITLES[field]}
+                options={choices}
                 value={value === null ? '' : String(value)}
-                placeholder={`Choose a ${DRINK_FIELD_LABELS[field]}`}
-                options={options[DRINK_FIELD_OPTIONS[field]].map((option) => ({
-                  value: String(option.id),
-                  label: optionLabel(option, locale),
-                }))}
                 error={errors[id]}
-                onChange={(selected) => onChoose(field, selected === '' ? null : Number(selected))}
+                onChange={(selected) => onChoose(field, Number(selected))}
               />
             )
           })}
-          <div className="sm:col-span-3">
-            <button
-              type="button"
-              onClick={onDone}
-              aria-label={`Done with milkshake ${number}`}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Done
-            </button>
-          </div>
+          <Button variant="secondary" onClick={onDone} aria-label={`Done with milkshake ${number}`} icon={<Icon name="check" className="size-4" />}>
+            Done
+          </Button>
         </div>
       ) : (
-        <dl className="mt-2 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+        <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
           {DRINK_FIELDS.map((field) => {
             const option = options[DRINK_FIELD_OPTIONS[field]].find((candidate) => candidate.id === drink[field])
             return (
-              <div key={field} className="contents">
-                <dt className="text-slate-600">{TITLES[field]}</dt>
-                <dd className="text-slate-900">
+              <div key={field} className="rounded-control bg-cream px-3 py-2">
+                <dt className="text-warm-grey">{TITLES[field]}</dt>
+                <dd className="font-semibold text-chocolate">
                   {option ? `${option.name} · ${formatMoney(option.fee.amount, option.fee.currencyCode, locale)}` : 'Not chosen'}
                 </dd>
               </div>
@@ -129,4 +148,4 @@ export function DrinkCard({ index, drink, options, editing, errors, canRemove, p
       )}
     </li>
   )
-}
+}

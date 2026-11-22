@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router'
 import { AppLayout } from '../components/layout/AppLayout'
+import { NarrowContent } from '../components/layout/ContentWidth'
 import { RequireAuth } from '../features/auth/RequireAuth'
 import { ROLES } from '../features/auth/types'
 import { ManagementLayout } from '../features/management/ManagementLayout'
@@ -45,21 +46,25 @@ export function AppRoutes() {
             <Route path="pickup" element={<OrderPickupPage />} />
             <Route path="review" element={<OrderReviewPage />} />
           </Route>
-          <Route path="orders" element={<MyOrdersPage />} />
-          <Route path="orders/:reference" element={<OrderDetailsPage />} />
+          <Route element={<NarrowContent />}>
+            <Route path="orders" element={<MyOrdersPage />} />
+            <Route path="orders/:reference" element={<OrderDetailsPage />} />
+          </Route>
         </Route>
 
         <Route element={<RequireAuth role={ROLES.manager} />}>
-          <Route path="manager" element={<ManagementLayout />}>
-            <Route index element={<ManagerPage />} />
-            <Route path="catalog/:kind" element={<CatalogPage />} />
-            <Route path="catalog/:kind/:id/prices" element={<PricesPage />} />
-            <Route path="orders" element={<OrdersPage />} />
-            <Route path="emails" element={<EmailsPage />} />
-            <Route path="reports" element={<ReportsPage />} />
-            <Route path="restaurants" element={<RestaurantsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="discount-tiers" element={<DiscountTiersPage />} />
+          <Route element={<NarrowContent />}>
+            <Route path="manager" element={<ManagementLayout />}>
+              <Route index element={<ManagerPage />} />
+              <Route path="catalog/:kind" element={<CatalogPage />} />
+              <Route path="catalog/:kind/:id/prices" element={<PricesPage />} />
+              <Route path="orders" element={<OrdersPage />} />
+              <Route path="emails" element={<EmailsPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="restaurants" element={<RestaurantsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="discount-tiers" element={<DiscountTiersPage />} />
+            </Route>
           </Route>
         </Route>
 
@@ -67,4 +72,4 @@ export function AppRoutes() {
       </Route>
     </Routes>
   )
-}
+}

@@ -18,6 +18,15 @@ const empty = { flavourId: null, consistencyId: null, toppingId: null }
 // Intl uses a non-breaking space ("R 46,00"); Testing Library compares page text with ordinary spaces.
 const zar = (amount: number) => formatMoney(amount, 'ZAR', 'en-ZA').replace(/\s/g, ' ')
 
+/**
+ * Chooses a card in a group of choice cards (UI/UX redesign: radio cards replaced the drop-downs). The radio's name
+ * starts with the option's name, followed by its fee.
+ */
+async function choose(group: string, option: string, scope: HTMLElement = document.body) {
+  const fieldset = within(scope).getByRole('group', { name: group })
+  await userEvent.click(within(fieldset).getByRole('radio', { name: new RegExp(`^${option}\\b`) }))
+}
+
 function storeDraft(draft: Partial<OrderDraft>) {
   saveDraft(patronUser.id, { restaurantId: null, pickupLocal: null, drinks: [], ...draft })
 }
@@ -59,25 +68,27 @@ describe('starting an order', () => {
 })
 
 describe('quantity', () => {
-  it('offers the configured range and requires a choice', async () => {
+  it('offers the configured range with − and + buttons and keeps the number inside it', async () => {
     renderOrderingAt('/order')
-    const select = await screen.findByLabelText('Number of milkshakes')
+    const field = await screen.findByLabelText('Number of milkshakes')
 
-    expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual([
-      'Choose a number',
-      ...Array.from({ length: 10 }, (_, index) => String(index + 1)),
-    ])
-    await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(field).toHaveValue(1)
+    expect(field).toHaveAttribute('min', '1')
+    expect(field).toHaveAttribute('max', '10')
+    expect(screen.getByText('You can order 1 to 10 milkshakes.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove one milkshake' })).toBeDisabled()
 
-    expect(screen.getByText('Choose how many milkshakes you would like.')).toBeInTheDocument()
-    expect(select).toHaveFocus()
-    expect(select).toHaveAttribute('aria-invalid', 'true')
+    await userEvent.clear(field)
+    await userEvent.type(field, '12')
+    expect(field).toHaveValue(10)
+    expect(screen.getByRole('button', { name: 'Add one milkshake' })).toBeDisabled()
   })
 
   it('creates one card per milkshake', async () => {
     renderOrderingAt('/order')
 
-    await userEvent.selectOptions(await screen.findByLabelText('Number of milkshakes'), '2')
+    await userEvent.click(await screen.findByRole('button', { name: 'Add one milkshake' }))
+    expect(screen.getByLabelText('Number of milkshakes')).toHaveValue(2)
     await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
 
     expect(await screen.findByRole('heading', { name: 'Milkshake 1' })).toBeInTheDocument()
@@ -88,7 +99,10 @@ describe('quantity', () => {
     storeDraft({ drinks: [vanillaThickOreo, vanillaThickOreo, vanillaThickOreo] })
     renderOrderingAt('/order')
 
-    await userEvent.selectOptions(await screen.findByLabelText('Number of milkshakes'), '1')
+    const field = await screen.findByLabelText('Number of milkshakes')
+    expect(field).toHaveValue(3)
+    await userEvent.clear(field)
+    await userEvent.type(field, '1')
     await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
     const dialog = screen.getByRole('alertdialog', { name: 'Remove milkshakes?' })
     expect(dialog).toHaveTextContent('Milkshakes 2 to 3 and their choices will be removed from your order.')
@@ -109,21 +123,26 @@ describe('milkshakes', () => {
     storeDraft({ drinks: [empty] })
     renderOrderingAt('/order/drinks')
 
-    const flavour = await screen.findByLabelText('Flavour')
-    expect(within(flavour).getByRole('option', { name: /^Vanilla \(R/ })).toBeInTheDocument()
+    const flavour = await screen.findByRole('group', { name: 'Flavour' })
+    expect(within(flavour).getByRole('radio', { name: /^Vanilla,\s?R\s30,00$/ })).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: 'Consistency' })).getByRole('radio', { name: /^Thick,\s?\+ R\s6,00$/ })).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: 'Consistency' })).getByRole('radio', { name: /^Milky,\s?Included$/ })).toBeInTheDocument()
     expect(screen.getByText(/Prices are estimates based on current fees and VAT/)).toBeInTheDocument()
 
-    await userEvent.selectOptions(flavour, '3')
-    await userEvent.selectOptions(screen.getByLabelText('Consistency'), '29')
+    await choose('Flavour', 'Vanilla')
+    await choose('Consistency', 'Thick')
+    expect(within(flavour).getByRole('radio', { name: /^Vanilla/ })).toBeChecked()
     await userEvent.click(screen.getByRole('button', { name: 'Done with milkshake 1' }))
 
     expect(screen.getByText('Choose a topping for milkshake 1.')).toBeInTheDocument()
-    expect(screen.getByLabelText('Topping')).toHaveFocus()
+    const topping = screen.getByRole('group', { name: 'Topping' })
+    expect(topping).toHaveFocus()
+    expect(topping).toHaveAccessibleDescription('Choose a topping for milkshake 1.')
 
-    await userEvent.selectOptions(screen.getByLabelText('Topping'), '19')
+    await choose('Topping', 'Oreo crumbs')
     await userEvent.click(screen.getByRole('button', { name: 'Done with milkshake 1' }))
 
-    expect(screen.queryByLabelText('Flavour')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Flavour' })).not.toBeInTheDocument()
     expect(screen.getByText(/^Vanilla ·/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit milkshake 1' })).toHaveFocus()
   })
@@ -138,9 +157,9 @@ describe('milkshakes', () => {
     expect(screen.getByText('Choose a flavour for milkshake 2.')).toBeInTheDocument()
 
     const second = screen.getByRole('listitem', { name: 'Milkshake 2' })
-    await userEvent.selectOptions(within(second).getByLabelText('Flavour'), '4')
-    await userEvent.selectOptions(within(second).getByLabelText('Consistency'), '30')
-    await userEvent.selectOptions(within(second).getByLabelText('Topping'), '20')
+    await choose('Flavour', 'Chocolate', second)
+    await choose('Consistency', 'Milky', second)
+    await choose('Topping', 'Caramel', second)
     await userEvent.click(screen.getByRole('button', { name: 'Continue to pickup' }))
 
     expect(await screen.findByRole('heading', { name: 'Where and when?' })).toBeInTheDocument()
@@ -163,7 +182,7 @@ describe('milkshakes', () => {
     renderOrderingAt('/order/drinks')
 
     expect(await screen.findByText(RECONCILE_MESSAGES.choice('flavour', 1))).toBeInTheDocument()
-    expect(screen.getByLabelText('Flavour')).toHaveValue('')
+    expect(within(screen.getByRole('group', { name: 'Flavour' })).queryByRole('radio', { checked: true })).not.toBeInTheDocument()
   })
 })
 
@@ -179,9 +198,10 @@ describe('pickup', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Review order' }))
     expect(screen.getByText('Choose a pickup restaurant.')).toBeInTheDocument()
-    expect(screen.getByLabelText('Pickup restaurant')).toHaveFocus()
+    expect(screen.getByRole('group', { name: 'Pickup restaurant' })).toHaveFocus()
+    expect(screen.getByRole('radio', { name: /^Branch A,\s?1 Main Road$/ })).toBeInTheDocument()
 
-    await userEvent.selectOptions(screen.getByLabelText('Pickup restaurant'), '35')
+    await choose('Pickup restaurant', 'Branch A')
     fireEvent.change(time, { target: { value: '2026-11-27T09:00' } })
     await userEvent.click(screen.getByRole('button', { name: 'Review order' }))
     expect(screen.getByText(/^Choose a time between/)).toBeInTheDocument()
@@ -212,7 +232,9 @@ describe('review', () => {
     expect(within(price).getByText(zar(6.9))).toBeInTheDocument()
     expect(within(price).getByText(zar(52.9))).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Place order' })).toBeEnabled()
-    expect(screen.getByText(/You will not be charged now/)).toBeInTheDocument()
+    // Payment comes after placing (M8): the old "payment is not available yet" note is gone (redesign D-R7).
+    expect(screen.getByText(/saves it as awaiting payment\. You pay on the next page\./)).toBeInTheDocument()
+    expect(screen.queryByText(/not available yet/)).not.toBeInTheDocument()
 
     const [call] = callsTo(fetchMock, 'POST', '/api/ordering/draft/validate')
     expect(JSON.parse(String(call?.[1]?.body))).toEqual({
@@ -254,7 +276,8 @@ describe('review', () => {
     await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Start over' }))
 
     expect(await screen.findByRole('heading', { name: 'How many milkshakes?' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Number of milkshakes')).toHaveValue('')
+    // A new draft starts at the smallest allowed order.
+    expect(screen.getByLabelText('Number of milkshakes')).toHaveValue(1)
   })
 })
 
@@ -274,6 +297,17 @@ describe('live prices', () => {
       vanillaThickOreo,
       { flavourId: 4, consistencyId: 30, toppingId: 20 },
     ])
+  })
+
+  it('keeps every milkshake and the estimate in one summary beside the builder, with a single Continue button', async () => {
+    storeDraft({ drinks: [vanillaThickOreo, empty] })
+    renderOrderingAt('/order/drinks')
+
+    const summary = await screen.findByRole('complementary', { name: 'Order summary' })
+    expect(await within(summary).findByText(zar(46))).toBeInTheDocument()
+    expect(within(summary).getByText('Not finished')).toBeInTheDocument()
+    expect(within(summary).getByRole('region', { name: 'Estimated price' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Continue to pickup' })).toHaveLength(1)
   })
 
   it('keeps the price table\u2019s space while the estimate loads, so the Continue button does not move (DEF-04)', async () => {
@@ -309,7 +343,7 @@ describe('live prices', () => {
     expect(await screen.findByText(`Estimated total ${zar(52.9)}.`)).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Edit milkshake 1' }))
-    await userEvent.selectOptions(screen.getByLabelText('Flavour'), '4')
+    await choose('Flavour', 'Chocolate')
 
     // Chocolate 32 + 6 + 10 = 48.00; VAT 7.20; total 55.20.
     expect(await screen.findByText(`Estimated total ${zar(55.2)}.`)).toBeInTheDocument()
@@ -335,7 +369,7 @@ describe('live prices', () => {
     await waitFor(() => expect(calls).toBe(1))
 
     await userEvent.click(await screen.findByRole('button', { name: 'Edit milkshake 1' }))
-    await userEvent.selectOptions(screen.getByLabelText('Flavour'), '4')
+    await choose('Flavour', 'Chocolate')
     expect(await screen.findByText(`Estimated total ${zar(55.2)}.`)).toBeInTheDocument()
 
     await act(async () => {

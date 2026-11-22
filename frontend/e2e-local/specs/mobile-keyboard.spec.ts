@@ -1,6 +1,6 @@
 import { devices, expect, test, type Locator, type Page } from '@playwright/test'
 import { useTestCheckout } from '../support/providers'
-import { expectNoSeriousAccessibilityProblems, PATRON_PASSWORD } from '../support/stack'
+import { chooseCard, expectNoSeriousAccessibilityProblems, PATRON_PASSWORD, setQuantity } from '../support/stack'
 
 /**
  * M13 E2E-14 (FR-28): the patron journey on a phone-sized screen and by keyboard alone, with axe checks on every page.
@@ -41,11 +41,15 @@ async function typeInto(page: Page, field: Locator, text: string): Promise<void>
   await page.keyboard.type(text)
 }
 
-/** Chooses the next option of a closed list with the arrow key (the first real option after the placeholder). */
-async function chooseFirst(page: Page, select: Locator): Promise<void> {
-  await tabTo(page, select)
-  await page.keyboard.press('ArrowDown')
-  await expect(select).not.toHaveValue('')
+/**
+ * Chooses the first card of a group of choice cards by keyboard: Tab reaches the group (its first radio while none is
+ * chosen) and Space selects it, as in any radio group.
+ */
+async function chooseFirstCard(page: Page, group: Locator): Promise<void> {
+  const first = group.getByRole('radio').first()
+  await tabTo(page, first)
+  await page.keyboard.press('Space')
+  await expect(first).toBeChecked()
 }
 
 async function press(page: Page, control: Locator, key: 'Enter' | 'Space' = 'Enter'): Promise<void> {
@@ -75,17 +79,17 @@ test.describe('on a phone-sized screen', () => {
 
     await page.goto('/order')
     await checkPage(page, 'Order – quantity (phone)')
-    await page.getByLabel('Number of milkshakes').selectOption('1')
+    await setQuantity(page, 1)
     await page.getByRole('button', { name: 'Continue' }).tap()
     const card = page.getByRole('listitem', { name: 'Milkshake 1', exact: true })
     for (const field of ['Flavour', 'Consistency', 'Topping']) {
-      await card.getByLabel(field, { exact: true }).selectOption({ index: 1 })
+      await chooseCard(card, field)
     }
     await checkPage(page, 'Order – milkshakes (phone)')
     await card.getByRole('button', { name: 'Done with milkshake 1' }).tap()
     await expect(page.getByRole('region', { name: 'Estimated price' }).getByRole('status')).toHaveText(/^Estimated total .+\.$/)
     await page.getByRole('button', { name: 'Continue to pickup' }).tap()
-    await page.getByLabel('Pickup restaurant').selectOption({ index: 1 })
+    await chooseCard(page, 'Pickup restaurant')
     const time = page.getByLabel('Pickup date and time')
     await time.fill((await time.getAttribute('max')) ?? '')
     await checkPage(page, 'Order – pickup (phone)')
@@ -127,18 +131,21 @@ test('E2E-14 a patron registers, orders and pays using only the keyboard', async
   // From the header to the order screens by keyboard.
   await press(page, page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Order', exact: true }))
   await expect(page).toHaveURL(/\/order$/)
-  await chooseFirst(page, page.getByLabel('Number of milkshakes'))
+  // The quantity starts at the smallest order (1): reaching the field by Tab is what this checks.
+  const quantity = page.getByLabel('Number of milkshakes')
+  await tabTo(page, quantity)
+  await expect(quantity).toHaveValue('1')
   await press(page, page.getByRole('button', { name: 'Continue' }))
 
   const card = page.getByRole('listitem', { name: 'Milkshake 1', exact: true })
   for (const field of ['Flavour', 'Consistency', 'Topping']) {
-    await chooseFirst(page, card.getByLabel(field, { exact: true }))
+    await chooseFirstCard(page, card.getByRole('group', { name: field, exact: true }))
   }
   await press(page, card.getByRole('button', { name: 'Done with milkshake 1' }))
   await expect(page.getByRole('region', { name: 'Estimated price' }).getByRole('status')).toHaveText(/^Estimated total .+\.$/)
   await press(page, page.getByRole('button', { name: 'Continue to pickup' }))
 
-  await chooseFirst(page, page.getByLabel('Pickup restaurant'))
+  await chooseFirstCard(page, page.getByRole('group', { name: 'Pickup restaurant', exact: true }))
   // The pickup time is reached by Tab; its value is set directly because the native date picker's keyboard entry
   // differs by operating system and locale, which would test the browser rather than the application.
   const time = page.getByLabel('Pickup date and time')

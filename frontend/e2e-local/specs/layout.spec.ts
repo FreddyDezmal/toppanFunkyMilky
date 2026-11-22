@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { useTestCheckout } from '../support/providers'
-import { registerPatron } from '../support/stack'
+import { chooseCard, registerPatron, setQuantity } from '../support/stack'
 
 /**
  * M14 DEF-04 regression: "Continue to pickup" must not move when the live estimate arrives. Before the fix the price
@@ -19,11 +19,11 @@ test('DEF-04 the Continue to pickup button stays put when the estimate arrives',
   })
 
   await page.goto('/order')
-  await page.getByLabel('Number of milkshakes').selectOption('1')
+  await setQuantity(page, 1)
   await page.getByRole('button', { name: 'Continue' }).click()
   const card = page.getByRole('listitem', { name: 'Milkshake 1', exact: true })
   for (const field of ['Flavour', 'Consistency', 'Topping']) {
-    await card.getByLabel(field, { exact: true }).selectOption({ index: 1 })
+    await chooseCard(card, field)
   }
   await card.getByRole('button', { name: 'Done with milkshake 1' }).click()
 
@@ -42,5 +42,5 @@ test('DEF-04 the Continue to pickup button stays put when the estimate arrives',
 
   // And the click lands: the patron reaches the pickup step.
   await button.click()
-  await expect(page.getByLabel('Pickup restaurant')).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Pickup restaurant' })).toBeVisible()
 })

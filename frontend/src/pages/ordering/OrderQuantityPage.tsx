@@ -1,6 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
-import { SelectField } from '../../components/forms/SelectField'
+import { QuantityStepper } from '../../components/forms/QuantityStepper'
+import { MilkshakeIllustration } from '../../components/illustrations/MilkshakeIllustration'
+import { Button } from '../../components/ui/Button'
+import { Card } from '../../components/ui/Card'
+import { Icon } from '../../components/ui/Icon'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { quantityChoices } from '../../features/ordering/draft'
 import { useOrderDraft } from '../../features/ordering/orderDraftContext'
@@ -17,11 +21,11 @@ export function OrderQuantityPage() {
   const navigate = useNavigate()
   const choices = quantityChoices(options.drinkLimits)
   const { min, max } = options.drinkLimits
-  const [quantity, setQuantity] = useState(choices.includes(draft.drinks.length) ? String(draft.drinks.length) : '')
+  // Starts at the draft's quantity, or the smallest allowed order for a new draft.
+  const [chosen, setChosen] = useState(choices.includes(draft.drinks.length) ? draft.drinks.length : min)
   const [error, setError] = useState<string | undefined>()
   const [confirmRemoval, setConfirmRemoval] = useState(false)
 
-  const chosen = Number(quantity)
   const current = draft.drinks.length
 
   function apply() {
@@ -32,7 +36,7 @@ export function OrderQuantityPage() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!choices.includes(chosen)) {
-      setError(quantity === '' ? 'Choose how many milkshakes you would like.' : RECONCILE_MESSAGES.quantity(min, max))
+      setError(RECONCILE_MESSAGES.quantity(min, max))
       document.getElementById(FIELD_ID)?.focus()
       return
     }
@@ -51,30 +55,37 @@ export function OrderQuantityPage() {
       : `Milkshakes ${chosen + 1} to ${current} and their choices will be removed from your order.`
 
   return (
-    <section aria-labelledby="quantity-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <h1 id="quantity-heading" className="text-2xl font-bold tracking-tight">
-        How many milkshakes?
-      </h1>
-      <p className="mt-1 text-sm text-slate-600">Each milkshake gets its own flavour, consistency and topping.</p>
+    <Card as="section" aria-labelledby="quantity-heading" className="mx-auto max-w-3xl">
+      <div className="grid items-center gap-8 sm:grid-cols-[1fr_auto]">
+        <div>
+          <h1 id="quantity-heading" className="text-3xl font-semibold text-chocolate sm:text-4xl">
+            How many milkshakes?
+          </h1>
+          <p className="mt-2 text-warm-grey">Each milkshake gets its own flavour, consistency and topping.</p>
 
-      <form noValidate onSubmit={handleSubmit} className="mt-6 max-w-xs space-y-4">
-        <SelectField
-          id={FIELD_ID}
-          label="Number of milkshakes"
-          value={quantity}
-          placeholder="Choose a number"
-          options={choices.map((choice) => ({ value: String(choice), label: String(choice) }))}
-          hint={min === max ? `Each order has ${min} milkshake(s).` : `You can order ${min} to ${max} milkshakes.`}
-          error={error}
-          onChange={(value) => {
-            setQuantity(value)
-            setError(undefined)
-          }}
-        />
-        <button type="submit" className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
-          Continue
-        </button>
-      </form>
+          <form noValidate onSubmit={handleSubmit} className="mt-8 space-y-8">
+            <QuantityStepper
+              id={FIELD_ID}
+              label="Number of milkshakes"
+              value={chosen}
+              min={min}
+              max={max}
+              unit={{ one: 'milkshake' }}
+              hint={min === max ? `Each order has ${min} milkshake(s).` : `You can order ${min} to ${max} milkshakes.`}
+              error={error}
+              onChange={(value) => {
+                setChosen(value)
+                setError(undefined)
+              }}
+            />
+            <Button type="submit" size="lg">
+              Continue
+              <Icon name="arrow-right" />
+            </Button>
+          </form>
+        </div>
+        <MilkshakeIllustration className="hidden w-44 sm:block" animated={false} />
+      </div>
 
       <ConfirmDialog
         open={confirmRemoval}
@@ -88,6 +99,6 @@ export function OrderQuantityPage() {
         }}
         onCancel={() => setConfirmRemoval(false)}
       />
-    </section>
+    </Card>
   )
 }

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { mailMessage, payOrder, paystack, useTestCheckout, waitForMail } from '../support/providers'
-import { centsOf, expectNoSeriousAccessibilityProblems, managerPage, placeOrder, registerPatron, reviewOrder } from '../support/stack'
+import { centsOf, expectNoSeriousAccessibilityProblems, managerPage, placeOrder, registerPatron, reviewOrder, setQuantity } from '../support/stack'
 
 /**
  * M13 E2E-08, E2E-09 and E2E-10 (MR-02, MR-03, MR-04; FR-09, FR-21 to FR-23, FR-27) on the local E2E stack.
@@ -85,10 +85,10 @@ test('E2E-08 and E2E-09 a manager changes a flavour price and renames it: only n
 
   await test.step('a new quote uses the new price', async () => {
     await page.goto('/order')
-    await page.getByLabel('Number of milkshakes').selectOption('1')
+    await setQuantity(page, 1)
     await page.getByRole('button', { name: 'Continue' }).click()
-    const flavours = page.getByRole('listitem', { name: 'Milkshake 1', exact: true }).getByLabel('Flavour', { exact: true })
-    await expect(flavours.locator('option').filter({ hasText: `${name} (` })).toHaveText(new RegExp(`^${escape(name)} \\(${amount(20)}\\)$`))
+    const flavours = page.getByRole('listitem', { name: 'Milkshake 1', exact: true }).getByRole('group', { name: 'Flavour', exact: true })
+    await expect(flavours.getByRole('radio', { name: new RegExp(`^${escape(name)},\\s?${amount(20)}$`) })).toHaveCount(1)
     const newTotal = await reviewOrder(page, { flavour: name })
     expect(centsOf(newTotal)).toBeGreaterThan(centsOf(order.totalText))
   })

@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
+import { Alert } from '../../components/ui/Alert'
+import { Button } from '../../components/ui/Button'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { Icon } from '../../components/ui/Icon'
 import { isDrinkComplete } from '../../features/ordering/draft'
 import { DrinkCard } from '../../features/ordering/DrinkCard'
 import { EmptyDraft } from '../../features/ordering/EmptyDraft'
@@ -123,70 +126,99 @@ export function OrderDrinksPage() {
   }
 
   const errorCount = Object.keys(errors).length
+  const currency = options.display.currencyCode
+  const locale = options.display.locale
+  const totals = live.quote?.totals ?? null
 
   return (
-    <section aria-labelledby={HEADING_ID} className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <h1 id={HEADING_ID} tabIndex={-1} className="text-2xl font-bold tracking-tight focus:outline-none">
-        Choose your milkshakes
-      </h1>
-      <p className="mt-1 text-sm text-slate-600">{ESTIMATE_NOTE}</p>
+    // Phones: room at the bottom for the fixed action bar.
+    <div className="grid gap-8 pb-28 lg:grid-cols-[minmax(0,1fr)_22rem] lg:pb-0">
+      <section aria-labelledby={HEADING_ID} className="min-w-0">
+        <h1 id={HEADING_ID} tabIndex={-1} className="text-3xl font-semibold text-chocolate focus:outline-none sm:text-4xl">
+          Choose your milkshakes
+        </h1>
+        <p className="mt-2 text-warm-grey">{ESTIMATE_NOTE}</p>
 
-      {errorCount > 0 && (
-        <p role="alert" className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">
-          {errorCount === 1 ? 'One choice is missing.' : `${errorCount} choices are missing.`} Please complete every milkshake.
-        </p>
-      )}
+        {errorCount > 0 && (
+          <Alert tone="danger" role="alert" className="mt-4">
+            {errorCount === 1 ? 'One choice is missing.' : `${errorCount} choices are missing.`} Please complete every milkshake.
+          </Alert>
+        )}
 
-      <ol className="mt-6 space-y-4">
-        {draft.drinks.map((drink, index) => (
-          <DrinkCard
-            // Position is the identity: milkshakes are numbered, and removing one renumbers the rest.
-            key={index}
-            index={index}
-            drink={drink}
-            options={options}
-            editing={editing.has(index)}
-            errors={errors}
-            canRemove={canRemove}
-            price={live.quote?.drinks.find((line) => line.number === index + 1)?.price ?? null}
-            onChoose={(field, id) => {
-              dispatch({ type: 'setDrinkChoice', index, field, id })
-              const key = DRAFT_FIELDS.drinkChoice(index, field)
-              setErrors((current) => Object.fromEntries(Object.entries(current).filter(([name]) => name !== key)))
-            }}
-            onDone={() => handleDone(index)}
-            onEdit={() => handleEdit(index)}
-            onRemove={() => setRemoveIndex(index)}
-          />
-        ))}
-      </ol>
-
-      <section aria-labelledby="estimate-heading" aria-busy={live.status === 'updating'} className="mt-6 rounded-xl bg-slate-50 p-4">
-        <h2 id="estimate-heading" className="font-semibold text-slate-900">
-          Estimated price
-        </h2>
-        <p role="status" className="mt-1 text-sm text-slate-700">
-          {estimateStatus(live, options.display.locale)}
-        </p>
-        {/* The table's space is kept while there is no estimate, so "Continue to pickup" never moves (DEF-04). */}
-        <div className="mt-3 max-w-sm">
-          {live.quote?.totals ? (
-            <PriceSummary totals={live.quote.totals} locale={options.display.locale} />
-          ) : (
-            <PriceSummaryPlaceholder />
-          )}
-        </div>
+        <ol className="mt-6 space-y-5">
+          {draft.drinks.map((drink, index) => (
+            <DrinkCard
+              // Position is the identity: milkshakes are numbered, and removing one renumbers the rest.
+              key={index}
+              index={index}
+              drink={drink}
+              options={options}
+              editing={editing.has(index)}
+              errors={errors}
+              canRemove={canRemove}
+              price={live.quote?.drinks.find((line) => line.number === index + 1)?.price ?? null}
+              onChoose={(field, id) => {
+                dispatch({ type: 'setDrinkChoice', index, field, id })
+                const key = DRAFT_FIELDS.drinkChoice(index, field)
+                setErrors((current) => Object.fromEntries(Object.entries(current).filter(([name]) => name !== key)))
+              }}
+              onDone={() => handleDone(index)}
+              onEdit={() => handleEdit(index)}
+              onRemove={() => setRemoveIndex(index)}
+            />
+          ))}
+        </ol>
       </section>
 
-      <div className="mt-6 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={handleContinue}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-        >
-          Continue to pickup
-        </button>
-      </div>
+      {/* Summary: beside the builder and kept in view on wide screens; after it on phones. */}
+      <aside aria-label="Order summary" className="lg:sticky lg:top-24 lg:self-start">
+        <div className="rounded-card border border-line bg-surface p-5 shadow-soft sm:p-6">
+          <h2 className="font-display text-xl font-semibold text-chocolate">Your order</h2>
+          <ul className="mt-3 divide-y divide-line text-sm">
+            {draft.drinks.map((drink, index) => {
+              const price = live.quote?.drinks.find((line) => line.number === index + 1)?.price ?? null
+              return (
+                <li key={index} className="flex min-h-9 items-center justify-between gap-3 py-1.5">
+                  <span className="text-chocolate">Milkshake {index + 1}</span>
+                  <span className={price !== null ? 'font-semibold text-chocolate tabular-nums' : 'text-warm-grey'}>
+                    {price !== null ? formatMoney(price, currency, locale) : isDrinkComplete(drink) ? '…' : 'Not finished'}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+
+          <section aria-labelledby="estimate-heading" aria-busy={live.status === 'updating'} className="mt-4 rounded-control bg-cream p-4">
+            <h2 id="estimate-heading" className="font-semibold text-chocolate">
+              Estimated price
+            </h2>
+            {/* One reserved line, so a longer or shorter message never moves what is below it. */}
+            <p role="status" className="mt-1 min-h-10 text-sm text-warm-grey">
+              {estimateStatus(live, locale)}
+            </p>
+            {/* The table's space is kept while there is no estimate, so "Continue to pickup" never moves (DEF-04). */}
+            <div className="mt-2">
+              {totals ? <PriceSummary totals={totals} locale={locale} /> : <PriceSummaryPlaceholder />}
+            </div>
+          </section>
+        </div>
+
+        {/* One Continue button: a bar fixed to the bottom of the screen on phones, part of the summary on wide screens. */}
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 px-4 py-3 shadow-raised backdrop-blur lg:static lg:mt-4 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-none">
+          <div className="mx-auto flex max-w-xl items-center gap-4 lg:max-w-none">
+            <p aria-hidden="true" className="min-w-0 flex-1 text-sm text-warm-grey lg:hidden">
+              {draft.drinks.length === 1 ? '1 milkshake' : `${draft.drinks.length} milkshakes`}
+              <span className="block font-display text-lg font-semibold text-chocolate tabular-nums">
+                {totals ? formatMoney(totals.total, totals.currencyCode, locale) : '—'}
+              </span>
+            </p>
+            <Button size="lg" onClick={handleContinue} className="shrink-0 lg:w-full">
+              Continue to pickup
+              <Icon name="arrow-right" />
+            </Button>
+          </div>
+        </div>
+      </aside>
 
       <ConfirmDialog
         open={removeIndex !== null}
@@ -197,6 +229,6 @@ export function OrderDrinksPage() {
         onConfirm={handleRemove}
         onCancel={() => setRemoveIndex(null)}
       />
-    </section>
+    </div>
   )
-}
+}

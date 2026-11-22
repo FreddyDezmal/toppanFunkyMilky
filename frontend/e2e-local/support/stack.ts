@@ -62,6 +62,33 @@ export async function mainNavLink(page: Page, name: string): Promise<Locator> {
   return page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name, exact: true })
 }
 
+/** Escapes text for use inside a regular expression. */
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Chooses a card in a group of choice cards (UI/UX redesign: radio cards replaced the drop-downs) by clicking its
+ * card, as a patron would. `option` is the start of the option's name, or its position in the group (0 = first).
+ * Each radio's accessible name is the option's name, a comma and its fee (or the restaurant's address).
+ */
+export async function chooseCard(scope: Page | Locator, group: string, option: string | number = 0): Promise<void> {
+  const fieldset = scope.getByRole('group', { name: group, exact: true })
+  const radio =
+    typeof option === 'number'
+      ? fieldset.getByRole('radio').nth(option)
+      : fieldset.getByRole('radio', { name: new RegExp(`^${escapeRegExp(option)},`) })
+  await radio.locator('xpath=ancestor::label[1]').click()
+  await expect(radio).toBeChecked()
+}
+
+/** Sets the number of milkshakes on the quantity step (a number box with − and + buttons since the redesign). */
+export async function setQuantity(page: Page, quantity: number): Promise<void> {
+  const field = page.getByLabel('Number of milkshakes')
+  await field.fill(String(quantity))
+  await expect(field).toHaveValue(String(quantity))
+}
+
 export interface PlacedOrder {
   reference: string
   /** The total exactly as shown, e.g. "R 29,90". */
@@ -74,27 +101,21 @@ export interface PlacedOrder {
  */
 /**
  * Builds a one-milkshake order up to the review step and returns the estimated total shown there. The first option of
- * each list is used, or the named flavour (matched by the start of its option text, which also shows the fee).
+ * group is used, or the named flavour (matched by the start of its card's name, which also carries the fee).
  */
 export async function reviewOrder(page: Page, options: { flavour?: string } = {}): Promise<string> {
   await page.goto('/order')
-  await page.getByLabel('Number of milkshakes').selectOption('1')
+  await setQuantity(page, 1)
   await page.getByRole('button', { name: 'Continue' }).click()
   const card = page.getByRole('listitem', { name: 'Milkshake 1', exact: true })
-  for (const field of ['Flavour', 'Consistency', 'Topping']) {
-    const select = card.getByLabel(field, { exact: true })
-    if (field === 'Flavour' && options.flavour) {
-      const value = await select.locator('option').filter({ hasText: `${options.flavour} (` }).getAttribute('value')
-      await select.selectOption(value ?? '')
-    } else {
-      await select.selectOption({ index: 1 })
-    }
-  }
+  await chooseCard(card, 'Flavour', options.flavour ?? 0)
+  await chooseCard(card, 'Consistency')
+  await chooseCard(card, 'Topping')
   await card.getByRole('button', { name: 'Done with milkshake 1' }).click()
   // Wait for the server's estimate as a patron would read it before continuing (the space is reserved since DEF-04).
   await expect(page.getByRole('region', { name: 'Estimated price' }).getByRole('status')).toHaveText(/^Estimated total .+\.$/)
   await page.getByRole('button', { name: 'Continue to pickup' }).click()
-  await page.getByLabel('Pickup restaurant').selectOption({ index: 1 })
+  await chooseCard(page, 'Pickup restaurant')
   const time = page.getByLabel('Pickup date and time')
   await time.fill((await time.getAttribute('max')) ?? '')
   await page.getByRole('button', { name: 'Review order' }).click()

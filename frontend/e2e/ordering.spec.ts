@@ -47,24 +47,34 @@ function storedDrafts(page: Page): Promise<string[]> {
 }
 
 /**
- * Picks the first real option that no test created. The manager journey (run in parallel when manager credentials are
- * set) adds an "E2E Flavour …" and deactivates it seconds later; a draft holding it would correctly lose it.
+ * Picks the first real card that no test created (UI/UX redesign: choice cards replaced the drop-downs). The manager
+ * journey (run in parallel when manager credentials are set) adds an "E2E Flavour …" and deactivates it seconds later;
+ * a draft holding it would correctly lose it.
  */
-async function chooseFirstStableOption(select: Locator) {
-  const labels = await select.locator('option').allTextContents()
-  const index = labels.findIndex((label, i) => i > 0 && !label.trimStart().startsWith('E2E '))
-  expect(index, 'Every option in this list was created by a test.').toBeGreaterThan(0)
-  await select.selectOption({ index })
+async function chooseFirstStableCard(group: Locator) {
+  const labels = await group.locator('label').allTextContents()
+  const index = labels.findIndex((label) => !label.trimStart().startsWith('E2E '))
+  expect(index, 'Every option in this group was created by a test.').toBeGreaterThanOrEqual(0)
+  await group.locator('label').nth(index).click()
+  await expect(group.getByRole('radio').nth(index)).toBeChecked()
 }
 
-/** Picks an option whose fee differs from the current one (labels end in "(R 12,00)"), so the total must change. */
-async function chooseDifferentlyPricedOption(select: Locator) {
-  const fee = (label: string | null) => label?.match(/\(([^)]*)\)$/)?.[1]
-  const current = await select.locator('option:checked').textContent()
-  const labels = await select.locator('option').allTextContents()
-  const other = labels.findIndex((label, index) => index > 0 && !label.trimStart().startsWith('E2E ') && fee(label) !== fee(current))
-  test.skip(other < 0, 'Every option in this list has the same fee in this database.')
-  await select.selectOption({ index: other })
+/** Picks a card whose fee differs from the chosen one (cards read "Name, + R 12,00"), so the total must change. */
+async function chooseDifferentlyPricedCard(group: Locator) {
+  const fee = (label: string | null) => label?.split(', ').at(-1)?.trim()
+  const current = await group.locator('label:has(input:checked)').textContent()
+  const labels = await group.locator('label').allTextContents()
+  const other = labels.findIndex((label) => !label.trimStart().startsWith('E2E ') && fee(label) !== fee(current))
+  test.skip(other < 0, 'Every option in this group has the same fee in this database.')
+  await group.locator('label').nth(other).click()
+  await expect(group.getByRole('radio').nth(other)).toBeChecked()
+}
+
+/** Sets the number of milkshakes (a number box with − and + buttons since the redesign). */
+async function setQuantity(page: Page, quantity: number) {
+  const field = page.getByLabel('Number of milkshakes')
+  await field.fill(String(quantity))
+  await expect(field).toHaveValue(String(quantity))
 }
 
 /** True when the page is wider than the window (content would need sideways scrolling). */
@@ -82,7 +92,7 @@ test('a patron builds a draft: quantity, milkshakes, pickup and a server-checked
   // Quantity: within the configured limits.
   await expect(page.getByRole('heading', { name: 'How many milkshakes?' })).toBeVisible()
   await expectNoSeriousAccessibilityProblems(page, 'Quantity')
-  await page.getByLabel('Number of milkshakes').selectOption('2')
+  await setQuantity(page, 2)
   await page.getByRole('button', { name: 'Continue' }).click()
 
   // Milkshakes: one flavour, consistency and topping each (the first real option in every list that no test created).
@@ -91,7 +101,7 @@ test('a patron builds a draft: quantity, milkshakes, pickup and a server-checked
   for (const number of [1, 2]) {
     const card = page.getByRole('listitem', { name: `Milkshake ${number}`, exact: true })
     for (const label of ['Flavour', 'Consistency', 'Topping']) {
-      await chooseFirstStableOption(card.getByLabel(label, { exact: true }))
+      await chooseFirstStableCard(card.getByRole('group', { name: label, exact: true }))
     }
     await card.getByRole('button', { name: `Done with milkshake ${number}` }).click()
     await expect(card.getByRole('button', { name: `Edit milkshake ${number}` })).toBeFocused()
@@ -104,7 +114,7 @@ test('a patron builds a draft: quantity, milkshakes, pickup and a server-checked
   const firstTotal = await estimate.textContent()
   const second = page.getByRole('listitem', { name: 'Milkshake 2', exact: true })
   await second.getByRole('button', { name: 'Edit milkshake 2' }).click()
-  await chooseDifferentlyPricedOption(second.getByLabel('Topping', { exact: true }))
+  await chooseDifferentlyPricedCard(second.getByRole('group', { name: 'Topping', exact: true }))
   await second.getByRole('button', { name: 'Done with milkshake 2' }).click()
   await expect(async () => {
     const text = await estimate.textContent()
@@ -118,7 +128,7 @@ test('a patron builds a draft: quantity, milkshakes, pickup and a server-checked
   await expect(page.getByRole('heading', { name: 'Where and when?' })).toBeVisible()
   await expect(page.getByText(/Times are in .*Africa\/Johannesburg/)).toBeVisible()
   await expectNoSeriousAccessibilityProblems(page, 'Pickup')
-  await page.getByLabel('Pickup restaurant').selectOption({ index: 1 })
+  await chooseFirstStableCard(page.getByRole('group', { name: 'Pickup restaurant', exact: true }))
   const time = page.getByLabel('Pickup date and time')
   const latest = await time.getAttribute('max')
   expect(latest).toMatch(/^\d{4}-\d{2}-\d{2}T23:59$/)
@@ -207,7 +217,7 @@ test('forged prices and tampered drafts are refused, and the screens fit a phone
 
   await expect(page.getByText('The flavour chosen for milkshake 1 is no longer available. Please choose another.')).toBeVisible()
   await expect(page.getByText('The selected restaurant is no longer available. Please choose another.')).toBeVisible()
-  await expect(page.getByLabel('Flavour', { exact: true })).toHaveValue('')
+  await expect(page.getByRole('group', { name: 'Flavour', exact: true }).getByRole('radio', { checked: true })).toHaveCount(0)
   const stored = await storedDrafts(page)
   expect(stored.join('')).not.toMatch(/price|fee|999999999/)
 
@@ -217,7 +227,7 @@ test('forged prices and tampered drafts are refused, and the screens fit a phone
   await page.goto('/order')
   await expect(page.getByRole('heading', { name: 'How many milkshakes?' })).toBeVisible()
   expect(await overflowsHorizontally(page)).toBe(false)
-  await page.getByLabel('Number of milkshakes').selectOption('1')
+  await setQuantity(page, 1)
   await page.getByRole('button', { name: 'Continue' }).click()
   await expect(page.getByRole('heading', { name: 'Choose your milkshakes' })).toBeVisible()
   expect(await overflowsHorizontally(page)).toBe(false)
@@ -253,15 +263,15 @@ test('a patron places an order: confirmed total, stored unpaid, kept after a ref
 
   // A one-milkshake draft with the first real option in every list that no test created.
   await page.goto('/order')
-  await page.getByLabel('Number of milkshakes').selectOption('1')
+  await setQuantity(page, 1)
   await page.getByRole('button', { name: 'Continue' }).click()
   const card = page.getByRole('listitem', { name: 'Milkshake 1', exact: true })
   for (const field of ['Flavour', 'Consistency', 'Topping']) {
-    await chooseFirstStableOption(card.getByLabel(field, { exact: true }))
+    await chooseFirstStableCard(card.getByRole('group', { name: field, exact: true }))
   }
   await card.getByRole('button', { name: 'Done with milkshake 1' }).click()
   await page.getByRole('button', { name: 'Continue to pickup' }).click()
-  await page.getByLabel('Pickup restaurant').selectOption({ index: 1 })
+  await chooseFirstStableCard(page.getByRole('group', { name: 'Pickup restaurant', exact: true }))
   const time = page.getByLabel('Pickup date and time')
   await time.fill((await time.getAttribute('max')) ?? '')
   await page.getByRole('button', { name: 'Review order' }).click()
