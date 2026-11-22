@@ -3,8 +3,8 @@ using Milkshake.Domain.Common;
 namespace Milkshake.Domain.Settings;
 
 /// <summary>
-/// One frequent-customer discount tier (URS §3.4.5). The discount rate per tier is not in the URS
-/// (open question Q-01), so tiers are seeded inactive until confirmed.
+/// One frequent-customer discount tier (URS §3.4.5). The rate per tier is not in the URS; Q-01 was decided on
+/// 22 Nov 2026 (5 / 10 / 15 %). Tiers are seeded inactive; a manager activates them.
 /// </summary>
 public sealed class DiscountTier : IHasTimestamps, IHasRowVersion
 {

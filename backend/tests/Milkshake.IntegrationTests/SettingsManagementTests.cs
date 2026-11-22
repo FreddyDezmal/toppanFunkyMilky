@@ -38,7 +38,7 @@ public sealed class SettingsManagementTests(PostgresApiFactory factory)
         Assert.Equal(SettingKeys.MinDrinksPerOrder, settings[0].Key);
         Assert.Equal(SettingKeys.CurrencyCode, settings[^1].Key);
         Assert.False(settings.Single(s => s.Key == SettingKeys.CurrencyCode).IsEditable);
-        Assert.Contains("Q-02", settings.Single(s => s.Key == SettingKeys.MaxDiscountAmount).Hint, StringComparison.Ordinal);
+        Assert.Contains("the most one order can be discounted", settings.Single(s => s.Key == SettingKeys.MaxDiscountAmount).Hint, StringComparison.Ordinal);
     }
 
     [Fact]

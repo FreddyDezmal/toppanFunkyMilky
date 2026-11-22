@@ -240,8 +240,8 @@ deploy finished) → roll forward to v1.0.2; all three Healthy (`docs/testing/m1
 - Paystack test mode only; no real payments (D-1).
 - Email via Resend's test sender: without an own domain Resend delivers only to the Resend account's own address
   (E-1, amending D-5). Emails to anyone else are marked Suppressed and visible under Management → Emails.
-- Frequent-customer discounts switched off until the stakeholder supplies rates (Q-01–Q-04).
+- Frequent-customer discount rules (Q-01–Q-04) decided by the project owner, pending stakeholder confirmation; tiers stay inactive until a manager activates them.
 - No email confirmation or password reset for patrons (M4 follow-up).
 - No "Collected" order status (B5).
-- Personal data retention policy not decided (Q-14); the demonstration holds test data only.
+- Personal-data retention policy written (Q-14, `docs/policies/data-retention-policy.md`) but not automated; the demonstration holds test data only.
 - Code not reviewed by a second developer (D-9).

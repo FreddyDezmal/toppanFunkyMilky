@@ -80,6 +80,10 @@ public sealed class SettingRulesTests
     }
 
     [Fact]
-    public void DiscountActivation_IsBlockedUntilRulesAreConfirmed() =>
-        Assert.False(DiscountPolicy.RulesConfirmed);
+    public void DiscountActivation_IsAllowed_NowTheRulesAreDecided() =>
+        Assert.True(DiscountPolicy.RulesConfirmed);
+
+    [Fact]
+    public void MaxDiscountHint_DescribesACapPerOrder() =>
+        Assert.Contains("the most one order can be discounted", SettingRules.Hint(SettingKeys.MaxDiscountAmount), StringComparison.Ordinal);
 }

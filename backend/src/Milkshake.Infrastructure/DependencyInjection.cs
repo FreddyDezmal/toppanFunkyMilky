@@ -111,6 +111,7 @@ public static class DependencyInjection
         services.TryAddSingleton<WorkerHeartbeats>();
         services.AddHostedService<PaymentReconciliationWorker>();
         services.AddScoped<IDiscountConfigurationSource, DiscountConfigurationSource>();
+        services.AddScoped<IDiscountEligibilitySource, PaidOrderHistorySource>();
 
         // Email (M9, decision D3): Mailpit (local capture) or Resend, chosen by Email:Provider; "None" leaves emails queued.
         services.AddOptions<EmailOptions>().Bind(configuration.GetSection(EmailOptions.SectionName));
@@ -208,4 +209,4 @@ public static class DependencyInjection
 
         return builder.ConnectionString;
     }
-}
+}

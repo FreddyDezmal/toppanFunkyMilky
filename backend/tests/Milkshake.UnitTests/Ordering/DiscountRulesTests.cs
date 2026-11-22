@@ -6,7 +6,7 @@ using Milkshake.Domain.Pricing;
 
 namespace Milkshake.UnitTests.Ordering;
 
-/// <summary>The discount gate (decision P5) and the pure discount decision, with FICTIONAL rates.</summary>
+/// <summary>The discount gate (decision P5, opened 22 Nov 2026) and the pure discount decision.</summary>
 public sealed class DiscountRulesTests
 {
     private static readonly DiscountConfiguration Configuration = new(
@@ -47,26 +47,27 @@ public sealed class DiscountRulesTests
     }
 
     [Fact]
-    public void TheActivationGate_IsStillShut()
+    public void TheActivationGate_IsOpen()
     {
-        // Opening it is a deliberate code change once Q-01 to Q-04 are answered and order history exists (M7/M8).
-        Assert.False(DiscountPolicy.RulesConfirmed);
+        // Opened on 22 Nov 2026 once Q-01 to Q-04 were decided for the demonstration; tiers still need a manager to activate them.
+        Assert.True(DiscountPolicy.RulesConfirmed);
     }
 
     [Fact]
-    public async Task TheLiveResolver_ReadsNoConfigurationOrHistory_WhileTheGateIsShut()
+    public async Task TheLiveResolver_AppliesTheReachedTier_FromConfigurationAndHistory()
     {
-        var resolver = new DiscountResolver(new SignedInPatron(), new FailingConfiguration(), new FailingHistory());
+        var resolver = new DiscountResolver(new SignedInPatron(), new FixedConfiguration(Configuration), new FixedHistory(TenOrdersOfThree));
+
+        DiscountTerms terms = Assert.IsType<DiscountTerms>(await resolver.ResolveAsync(CancellationToken.None));
+        Assert.Equal((2, 0.10m, 50.00m), (terms.TierNumber, terms.Rate, terms.Cap.Amount));
+    }
+
+    [Fact]
+    public async Task TheLiveResolver_ReadsNothing_WhenNobodyIsSignedIn()
+    {
+        var resolver = new DiscountResolver(new Anonymous(), new FailingConfiguration(), new FailingHistory());
 
         Assert.Null(await resolver.ResolveAsync(CancellationToken.None));
-    }
-
-    [Fact]
-    public async Task UntilOrdersExist_EveryPatronHasNoHistory()
-    {
-        DiscountHistory history = await new NoOrderHistoryYet().GetHistoryAsync(Guid.NewGuid(), CancellationToken.None);
-
-        Assert.Empty(history.PreviousOrderDrinkCounts);
     }
 
     private sealed class SignedInPatron : ICurrentUser
@@ -76,15 +77,32 @@ public sealed class DiscountRulesTests
         public string? Email => "patron@example.test";
     }
 
+    private sealed class Anonymous : ICurrentUser
+    {
+        public Guid? UserId => null;
+
+        public string? Email => null;
+    }
+
+    private sealed class FixedConfiguration(DiscountConfiguration configuration) : IDiscountConfigurationSource
+    {
+        public Task<DiscountConfiguration> GetAsync(CancellationToken cancellationToken) => Task.FromResult(configuration);
+    }
+
+    private sealed class FixedHistory(DiscountHistory history) : IDiscountEligibilitySource
+    {
+        public Task<DiscountHistory> GetHistoryAsync(Guid patronId, CancellationToken cancellationToken) => Task.FromResult(history);
+    }
+
     private sealed class FailingConfiguration : IDiscountConfigurationSource
     {
         public Task<DiscountConfiguration> GetAsync(CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("The discount configuration must not be read while the gate is shut.");
+            throw new InvalidOperationException("The discount configuration must not be read without a signed-in patron.");
     }
 
     private sealed class FailingHistory : IDiscountEligibilitySource
     {
         public Task<DiscountHistory> GetHistoryAsync(Guid patronId, CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("Order history must not be read while the gate is shut.");
+            throw new InvalidOperationException("Order history must not be read without a signed-in patron.");
     }
 }

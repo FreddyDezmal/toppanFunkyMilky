@@ -86,6 +86,23 @@ internal sealed class DiscountTierManagementService(MilkshakeDbContext dbContext
         return await SaveAsync(tier, cancellationToken);
     }
 
+    public async Task<ManagementResult<DiscountTierSummary>> DeactivateAsync(int tierNumber, uint version, CancellationToken cancellationToken)
+    {
+        DiscountTier? tier = await dbContext.DiscountTiers.SingleOrDefaultAsync(t => t.TierNumber == tierNumber, cancellationToken);
+        if (tier is null)
+        {
+            return ManagementResult<DiscountTierSummary>.NotFound();
+        }
+
+        if (tier.Version != version)
+        {
+            return ManagementResult<DiscountTierSummary>.Conflict();
+        }
+
+        tier.Deactivate();
+        return await SaveAsync(tier, cancellationToken);
+    }
+
     private async Task<ManagementResult<DiscountTierSummary>> SaveAsync(DiscountTier tier, CancellationToken cancellationToken)
     {
         try

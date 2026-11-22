@@ -66,7 +66,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         // Idempotency (decision O5): the database, not a prior lookup, guarantees one order per patron and key.
         builder.HasIndex(o => new { o.PatronId, o.IdempotencyKey }).IsUnique();
 
-        // A patron's orders, newest first (order history), and by status (future discount eligibility, Q-03).
+        // A patron's orders, newest first (order history), and by status (discount eligibility, Q-03).
         builder.HasIndex(o => new { o.PatronId, o.CreatedAt });
         builder.HasIndex(o => new { o.PatronId, o.Status });
 

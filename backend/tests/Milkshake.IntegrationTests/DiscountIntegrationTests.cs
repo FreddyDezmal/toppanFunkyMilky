@@ -6,7 +6,7 @@ using Milkshake.IntegrationTests.Infrastructure;
 
 namespace Milkshake.IntegrationTests;
 
-/// <summary>M6 Step 6: discounts are deferred (decision P5) – configuration readable, live discount always 0.00.</summary>
+/// <summary>M6 Step 6: the discount configuration is readable, and with the seeded (inactive) tiers there is no discount.</summary>
 [Collection(PostgresTestGroup.Name)]
 public sealed class DiscountIntegrationTests(PostgresApiFactory factory)
 {
@@ -20,7 +20,7 @@ public sealed class DiscountIntegrationTests(PostgresApiFactory factory)
             .GetAsync(CancellationToken.None);
 
         Assert.Equal([1, 2, 3], configuration.Tiers.Select(tier => tier.TierNumber));
-        Assert.All(configuration.Tiers, tier => Assert.False(tier.IsActive));   // activation is blocked (M10 D9)
+        Assert.All(configuration.Tiers, tier => Assert.False(tier.IsActive));   // seeded inactive; tests that activate a tier restore it
         Assert.Equal("ZAR", configuration.MaxDiscount.CurrencyCode);
     }
 
@@ -39,7 +39,7 @@ public sealed class DiscountIntegrationTests(PostgresApiFactory factory)
 
         DraftPricingResult result = await scope.ServiceProvider.GetRequiredService<IOrderPricingService>().PriceDraftAsync(draft, CancellationToken.None);
 
-        // 10 × 26.00 = 260.00; no discount; VAT 39.00; total 299.00.
+        // No patron is signed in and no tier is active: 10 × 26.00 = 260.00; no discount; VAT 39.00; total 299.00.
         PriceBreakdown price = Assert.IsType<PriceBreakdown>(result.Price);
         Assert.Equal((0.00m, (int?)null, false), (price.Discount.Amount.Amount, price.Discount.TierNumber, price.Discount.CapApplied));
         Assert.Equal((260.00m, 39.00m, 299.00m), (price.Subtotal.Amount, price.Vat.Amount, price.Total.Amount));

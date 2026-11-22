@@ -69,7 +69,7 @@ public static class SettingRules
         SettingKeys.MinDrinksPerOrder => "Whole number, at least 1 and no more than the maximum drinks per order. URS value: 1.",
         SettingKeys.MaxDrinksPerOrder => $"Whole number from the minimum drinks per order up to {MaxDrinksUpperLimit}. URS value: 10.",
         SettingKeys.VatRate => "Fraction from 0 to 1, e.g. 0.15 for 15%. URS value: 15%.",
-        SettingKeys.MaxDiscountAmount => "Amount in the pricing currency, 0 or more, at most two decimal places. Meaning pending confirmation (open question Q-02).",
+        SettingKeys.MaxDiscountAmount => "Amount in the pricing currency, 0 or more, at most two decimal places: the most one order can be discounted (decision Q-02, 22 Nov 2026).",
         SettingKeys.RefundFeeRate => $"Fraction from 0 to {Refund.MaxFeeRate.ToString(CultureInfo.InvariantCulture)} of the VAT-exclusive amount kept when a patron cancels a paid order, e.g. 0.10 for 10%. Provisional (B1.4).",
         SettingKeys.MinPickupLeadTimeMinutes => $"Whole number of minutes from 0 to {MaxLeadTimeMinutes}. Pickup rules pending confirmation (open question Q-06).",
         SettingKeys.PickupMaxAdvanceDays => $"Whole number of days from 0 (same day only) to {MaxAdvanceDaysLimit}. Provisional, pending confirmation (open question Q-18).",

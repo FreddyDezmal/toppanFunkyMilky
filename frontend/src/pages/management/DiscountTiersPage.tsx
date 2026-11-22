@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
-import { listDiscountTiers } from '../../features/management/api'
+import { useEffect, useRef, useState } from 'react'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { listDiscountTiers, setDiscountTierActive } from '../../features/management/api'
 import { DiscountTierForm } from '../../features/management/DiscountTierForm'
 import { useDisplayFormat } from '../../features/management/displayFormat'
-import { CONFLICT_MESSAGE } from '../../features/management/errors'
+import { CONFLICT_MESSAGE, isConflict } from '../../features/management/errors'
 import type { DiscountTier } from '../../features/management/types'
 import { describeError } from '../../lib/api/describeError'
 import { formatPercent } from '../../lib/format/money'
@@ -18,6 +19,9 @@ export function DiscountTiersPage() {
   const [editing, setEditing] = useState<DiscountTier | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState<{ tier: DiscountTier; active: boolean } | null>(null)
+  const [busyTier, setBusyTier] = useState<number | null>(null)
+  const busyRef = useRef(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -50,6 +54,31 @@ export function DiscountTiersPage() {
     setProblem(CONFLICT_MESSAGE)
   }
 
+  async function changeActive(tier: DiscountTier, active: boolean) {
+    if (busyRef.current) {
+      return
+    }
+    busyRef.current = true
+    setBusyTier(tier.tierNumber)
+    setNotice(null)
+    setProblem(null)
+    try {
+      const saved = await setDiscountTierActive(tier.tierNumber, active, tier.version)
+      setTiers((current) => current?.map((t) => (t.tierNumber === saved.tierNumber ? saved : t)) ?? null)
+      setNotice(
+        active
+          ? `Tier ${saved.tierNumber} is active. New orders from patrons who qualify get ${formatPercent(saved.discountRate, locale)} off.`
+          : `Tier ${saved.tierNumber} is inactive. Orders already placed keep their discount.`,
+      )
+    } catch (error) {
+      setProblem(isConflict(error) ? CONFLICT_MESSAGE : describeError(error))
+    } finally {
+      busyRef.current = false
+      setBusyTier(null)
+      setConfirming(null)
+    }
+  }
+
   const blockedReason = tiers?.find((tier) => tier.activationBlockedReason)?.activationBlockedReason ?? null
 
   return (
@@ -59,6 +88,8 @@ export function DiscountTiersPage() {
       </h1>
       <p className="mt-1 text-sm text-warm-grey">
         Frequent-customer discounts. Each tier needs a number of earlier paid orders and a number of drinks in the order.
+        Only paid orders that were not cancelled count. The discount comes off the whole order before VAT, up to the
+        maximum discount per order set in Settings. If a patron reaches more than one active tier, the highest applies.
       </p>
 
       {blockedReason && (
@@ -149,21 +180,32 @@ export function DiscountTiersPage() {
                         setNotice(null)
                         setEditing(tier)
                       }}
-                      disabled={editing !== null}
+                      disabled={editing !== null || busyTier !== null}
                       className="rounded-md px-2 py-1 font-medium text-raspberry-dark hover:bg-strawberry-wash disabled:opacity-40"
                     >
                       Edit
                     </button>
-                    {!tier.isActive && (
+                    {tier.isActive ? (
+                      <button
+                        type="button"
+                        aria-label={`Deactivate tier ${tier.tierNumber}`}
+                        onClick={() => setConfirming({ tier, active: false })}
+                        disabled={editing !== null || busyTier !== null}
+                        className="rounded-md px-2 py-1 font-medium text-danger hover:bg-danger-tint disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {busyTier === tier.tierNumber ? 'Deactivating…' : 'Deactivate'}
+                      </button>
+                    ) : (
                       <button
                         type="button"
                         aria-label={`Activate tier ${tier.tierNumber}`}
                         aria-describedby={tier.activationBlockedReason ? BLOCKED_NOTICE_ID : undefined}
-                        disabled={!tier.canActivate}
+                        onClick={() => setConfirming({ tier, active: true })}
+                        disabled={!tier.canActivate || editing !== null || busyTier !== null}
                         title={tier.activationBlockedReason ?? undefined}
                         className="rounded-md px-2 py-1 font-medium text-pistachio-deep hover:bg-pistachio-tint disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        Activate
+                        {busyTier === tier.tierNumber ? 'Activating…' : 'Activate'}
                       </button>
                     )}
                   </td>
@@ -173,6 +215,24 @@ export function DiscountTiersPage() {
           </table>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirming !== null}
+        title={confirming ? `${confirming.active ? 'Activate' : 'Deactivate'} tier ${confirming.tier.tierNumber}?` : ''}
+        message={
+          confirming?.active
+            ? `Patrons with at least ${confirming.tier.minPreviousOrders} earlier paid orders of ${confirming.tier.minDrinksPerOrder} or more drinks will get ${formatPercent(confirming.tier.discountRate, locale)} off new orders, up to the maximum discount per order.`
+            : 'New orders will no longer get this discount. Orders already placed keep theirs, and you can activate it again at any time.'
+        }
+        confirmLabel={confirming?.active ? 'Activate' : 'Deactivate'}
+        busy={busyTier !== null}
+        onConfirm={() => {
+          if (confirming) {
+            void changeActive(confirming.tier, confirming.active)
+          }
+        }}
+        onCancel={() => setConfirming(null)}
+      />
     </section>
   )
 }

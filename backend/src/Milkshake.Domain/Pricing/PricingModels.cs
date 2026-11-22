@@ -10,7 +10,7 @@ public sealed record DrinkToPrice(PriceComponent Flavour, PriceComponent Consist
 
 /// <summary>
 /// A frequent-customer discount to apply: a fraction of the subtotal, limited by a cap.
-/// Never supplied in M6 (decision P5: the discount stays 0.00 until Q-01 to Q-04 are answered and order history exists).
+/// Supplied when the patron has reached an active tier (Q-01 to Q-04 decided 22 Nov 2026); otherwise null and the discount is 0.00.
 /// </summary>
 public sealed record DiscountTerms(int TierNumber, decimal Rate, Money Cap);
 

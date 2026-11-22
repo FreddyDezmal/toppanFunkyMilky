@@ -7,8 +7,8 @@ using Milkshake.Application.Management;
 namespace Milkshake.Api.Controllers;
 
 /// <summary>
-/// Manager maintenance of the three frequent-customer discount tiers (URS §3.4.5). Thresholds and rates can be
-/// edited; activation is refused until the discount rules are confirmed (Q-01 to Q-04).
+/// Manager maintenance of the three frequent-customer discount tiers (URS §3.4.5): thresholds and rates can be
+/// edited, and each tier switched on or off (rules Q-01 to Q-04 decided 22 Nov 2026, see DiscountPolicy).
 /// </summary>
 [ApiController]
 [Route("api/manager/discount-tiers")]
@@ -49,7 +49,7 @@ public sealed class DiscountTierManagementController(IDiscountTierManagementServ
         return ToResponse(result);
     }
 
-    /// <summary>Activates a tier. Currently always refused (400) until the discount rules are confirmed.</summary>
+    /// <summary>Activates a tier (400 if activation is not allowed).</summary>
     [HttpPost("{tierNumber:int:range(1,3)}/activate")]
     [ProducesResponseType<DiscountTierResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -63,6 +63,25 @@ public sealed class DiscountTierManagementController(IDiscountTierManagementServ
         ArgumentNullException.ThrowIfNull(request);
 
         ManagementResult<DiscountTierSummary> result = await tiers.ActivateAsync(
+            tierNumber, request.Version.GetValueOrDefault(), cancellationToken);
+
+        return ToResponse(result);
+    }
+
+    /// <summary>Deactivates a tier: new prices no longer include its discount.</summary>
+    [HttpPost("{tierNumber:int:range(1,3)}/deactivate")]
+    [ProducesResponseType<DiscountTierResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<DiscountTierResponse>> Deactivate(
+        int tierNumber,
+        ChangeStatusRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        ManagementResult<DiscountTierSummary> result = await tiers.DeactivateAsync(
             tierNumber, request.Version.GetValueOrDefault(), cancellationToken);
 
         return ToResponse(result);

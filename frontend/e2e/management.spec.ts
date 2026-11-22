@@ -107,10 +107,11 @@ test.describe('manager journey', () => {
     await expect(page.getByText('Maximum drinks per order cannot be more than 50.')).toBeVisible()
     await page.getByRole('button', { name: 'Cancel', exact: true }).click()
 
-    // Discount tiers: editable, but activation is switched off until Q-01 to Q-04 are answered.
+    // Discount tiers: editable, and each tier can be switched on or off (Q-01 to Q-04 decided). Nothing is changed here.
     await section(page, 'Discount tiers').click()
-    await expect(page.getByText('Discounts are switched off for now')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Activate tier 1' })).toBeDisabled()
+    await expect(page.getByRole('heading', { name: 'Discount tiers' })).toBeVisible()
+    await expect(page.getByText('Discounts are switched off for now')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^(Activate|Deactivate) tier 1$/ })).toBeEnabled()
     await expectNoSeriousAccessibilityProblems(page, 'Discount tiers')
 
     // Emails (M9): delivery status with filters, read-only here (nothing is resent).

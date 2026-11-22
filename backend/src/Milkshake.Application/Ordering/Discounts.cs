@@ -7,7 +7,7 @@ namespace Milkshake.Application.Ordering;
 
 /// <summary>
 /// A patron's previous orders that count towards frequent-customer tiers, as their drink counts.
-/// Which orders count (paid, collected, all time…) is open question Q-03 and is decided by the source, not here.
+/// Which orders count is decided by the source (Q-03, decided 22 Nov 2026: paid orders that were not cancelled).
 /// </summary>
 public sealed record DiscountHistory(IReadOnlyList<int> PreviousOrderDrinkCounts)
 {
@@ -20,17 +20,6 @@ public interface IDiscountEligibilitySource
 {
     /// <summary>The patron's qualifying history.</summary>
     Task<DiscountHistory> GetHistoryAsync(Guid patronId, CancellationToken cancellationToken);
-}
-
-/// <summary>
-/// Until orders are stored (M7) and paid (M8) there is no trustworthy history, so every patron has none.
-/// Never fabricates history. M7/M8 replace this registration with a source that reads stored orders.
-/// </summary>
-public sealed class NoOrderHistoryYet : IDiscountEligibilitySource
-{
-    /// <inheritdoc />
-    public Task<DiscountHistory> GetHistoryAsync(Guid patronId, CancellationToken cancellationToken) =>
-        Task.FromResult(DiscountHistory.Empty);
 }
 
 /// <summary>The tier settings and the maximum discount, as configured by managers (M10).</summary>

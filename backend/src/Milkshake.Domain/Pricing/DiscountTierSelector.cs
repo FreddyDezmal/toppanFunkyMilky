@@ -4,10 +4,10 @@ namespace Milkshake.Domain.Pricing;
 public sealed record DiscountTierRule(int TierNumber, int MinPreviousOrders, int MinDrinksPerOrder, decimal Rate, bool IsActive);
 
 /// <summary>
-/// PROVISIONAL tier selection (roadmap AC-6.3; open question Q-03). A previous order qualifies for a tier when it had at
+/// Tier selection (roadmap AC-6.3; Q-03 decided 22 Nov 2026: only paid, not-cancelled orders are passed in). A previous order qualifies for a tier when it had at
 /// least that tier's <c>MinDrinksPerOrder</c> drinks; a patron reaches the tier with at least <c>MinPreviousOrders</c>
 /// qualifying orders. Of the active tiers reached, the highest tier number wins; tiers never combine.
-/// Not used live until the rules are confirmed and order history exists (decision P5).
+/// Applies live once a manager activates a tier (the code gate, DiscountPolicy.RulesConfirmed, is open).
 /// </summary>
 public static class DiscountTierSelector
 {

@@ -56,8 +56,10 @@ on.
 ## 5. Discount tiers
 
 Three tiers, each with **Paid orders needed**, **Drinks per order** and **Discount**, plus the maximum discount amount
-in Settings. **Discounts are currently switched off**: you can prepare the values, but every patron sees R 0,00 until
-the business approves the rates and they are switched on.
+in Settings (the most any one order can be discounted). Use **Activate** and **Deactivate** to switch each tier on or
+off; you are asked to confirm. Only paid orders that were not cancelled count, the discount comes off the whole order
+before VAT, and when a patron reaches more than one active tier the highest applies. Orders already placed keep their
+price. All tiers start inactive.
 
 ## 6. Orders
 

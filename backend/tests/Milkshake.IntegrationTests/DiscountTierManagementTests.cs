@@ -15,7 +15,7 @@ public sealed class DiscountTierManagementTests(PostgresApiFactory factory)
     private const string TiersPath = "/api/manager/discount-tiers";
 
     [Fact]
-    public async Task List_ReturnsThreeTiers_WithActivationBlocked()
+    public async Task List_ReturnsThreeInactiveTiers_ThatCanBeActivated()
     {
         using ManagerSession manager = await factory.CreateManagerSessionAsync();
 
@@ -24,8 +24,9 @@ public sealed class DiscountTierManagementTests(PostgresApiFactory factory)
         Assert.Equal([1, 2, 3], tiers.Select(t => t.TierNumber));
         Assert.All(tiers, t =>
         {
-            Assert.False(t.CanActivate);
-            Assert.Contains("Q-01 to Q-04", t.ActivationBlockedReason, StringComparison.Ordinal);
+            Assert.False(t.IsActive);
+            Assert.True(t.CanActivate);
+            Assert.Null(t.ActivationBlockedReason);
         });
     }
 
@@ -74,17 +75,69 @@ public sealed class DiscountTierManagementTests(PostgresApiFactory factory)
     }
 
     [Fact]
-    public async Task Activate_IsRefused_AndTierStaysInactive()
+    public async Task ActivateThenDeactivate_SwitchesTheTier_AndIsAudited()
     {
         using ManagerSession manager = await factory.CreateManagerSessionAsync();
         DiscountTierResponse tier = await GetAsync(manager, 1);
 
-        using HttpResponseMessage response = await manager.Client.SendWithCsrfAsync(
-            HttpMethod.Post, $"{TiersPath}/1/activate", new { version = tier.Version });
+        try
+        {
+            using HttpResponseMessage activate = await manager.Client.SendWithCsrfAsync(
+                HttpMethod.Post, $"{TiersPath}/1/activate", new { version = tier.Version });
+            Assert.Equal(HttpStatusCode.OK, activate.StatusCode);
+            DiscountTierResponse active = await activate.ReadJsonAsync<DiscountTierResponse>();
+            Assert.True(active.IsActive);
+            Assert.False(active.CanActivate);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("isActive", (await response.ReadJsonAsync<ValidationErrorBody>()).Errors.Keys);
-        Assert.False((await GetAsync(manager, 1)).IsActive);
+            using HttpResponseMessage deactivate = await manager.Client.SendWithCsrfAsync(
+                HttpMethod.Post, $"{TiersPath}/1/deactivate", new { version = active.Version });
+            Assert.Equal(HttpStatusCode.OK, deactivate.StatusCode);
+            DiscountTierResponse inactive = await deactivate.ReadJsonAsync<DiscountTierResponse>();
+            Assert.False(inactive.IsActive);
+            Assert.True(inactive.CanActivate);
+
+            using IServiceScope scope = factory.Services.CreateScope();
+            MilkshakeDbContext db = scope.ServiceProvider.GetRequiredService<MilkshakeDbContext>();
+            int tierId = await db.DiscountTiers.Where(t => t.TierNumber == 1).Select(t => t.Id).SingleAsync();
+            string recordId = tierId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            Assert.True(await db.AuditLogs.CountAsync(a =>
+                a.TableName == "discount_tiers" && a.RecordId == recordId && a.Action == AuditAction.Update && a.UserEmail == manager.Email) >= 2);
+        }
+        finally
+        {
+            await EnsureTierInactiveAsync(1);
+        }
+    }
+
+    [Fact]
+    public async Task Activate_WithStaleVersion_Returns409_AndTierStaysInactive()
+    {
+        using ManagerSession manager = await factory.CreateManagerSessionAsync();
+        DiscountTierResponse tier = await GetAsync(manager, 2);
+
+        try
+        {
+            using HttpResponseMessage response = await manager.Client.SendWithCsrfAsync(
+                HttpMethod.Post, $"{TiersPath}/2/activate", new { version = tier.Version + 1 });
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            Assert.False((await GetAsync(manager, 2)).IsActive);
+        }
+        finally
+        {
+            await EnsureTierInactiveAsync(2);
+        }
+    }
+
+    [Fact]
+    public async Task Deactivate_UnknownTier_Returns404()
+    {
+        using ManagerSession manager = await factory.CreateManagerSessionAsync();
+
+        using HttpResponseMessage response = await manager.Client.SendWithCsrfAsync(
+            HttpMethod.Post, $"{TiersPath}/4/deactivate", new { version = 1u });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -117,6 +170,19 @@ public sealed class DiscountTierManagementTests(PostgresApiFactory factory)
         });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    /// <summary>Leaves the tier switched off for the rest of the suite, even if an assertion failed half-way.</summary>
+    private async Task EnsureTierInactiveAsync(int tierNumber)
+    {
+        using IServiceScope scope = factory.Services.CreateScope();
+        MilkshakeDbContext db = scope.ServiceProvider.GetRequiredService<MilkshakeDbContext>();
+        Milkshake.Domain.Settings.DiscountTier tier = await db.DiscountTiers.SingleAsync(t => t.TierNumber == tierNumber);
+        if (tier.IsActive)
+        {
+            tier.Deactivate();
+            await db.SaveChangesAsync();
+        }
     }
 
     private static async Task<List<DiscountTierResponse>> ListAsync(ManagerSession manager) =>

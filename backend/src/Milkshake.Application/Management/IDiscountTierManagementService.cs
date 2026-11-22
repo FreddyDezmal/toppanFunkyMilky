@@ -1,14 +1,16 @@
 namespace Milkshake.Application.Management;
 
 /// <summary>
-/// Whether frequent-customer discounts may be switched on. False until stakeholders answer Q-01 to Q-04
-/// (rate per tier, meaning of the maximum, which orders count, before or after VAT) and the discount engine (M6)
-/// implements the answers. Deliberately code, not configuration, so it cannot be switched on early by accident.
+/// Whether frequent-customer discounts may be switched on. Opened on 22 Nov 2026 when the project owner decided
+/// Q-01 to Q-04 for the demonstration (to be confirmed by the stakeholder): rates 5 / 10 / 15 %, the maximum discount
+/// is a currency cap per order, only paid orders that were not cancelled count, and the discount comes off the whole
+/// order before VAT. Deliberately code, not configuration, so it cannot be switched on or off by accident; tiers are
+/// still inactive until a manager activates them.
 /// </summary>
 public static class DiscountPolicy
 {
     /// <summary>Whether tiers may be activated.</summary>
-    public static bool RulesConfirmed { get; } = false;
+    public static bool RulesConfirmed { get; } = true;
 
     /// <summary>Shown when activation is refused.</summary>
     public const string ActivationBlockedMessage =
@@ -26,6 +28,9 @@ public interface IDiscountTierManagementService
 
     /// <summary>Activates a tier. Refused while <see cref="DiscountPolicy.RulesConfirmed"/> is false.</summary>
     Task<ManagementResult<DiscountTierSummary>> ActivateAsync(int tierNumber, uint version, CancellationToken cancellationToken);
+
+    /// <summary>Deactivates a tier: from now on it gives no discount (orders already placed keep theirs).</summary>
+    Task<ManagementResult<DiscountTierSummary>> DeactivateAsync(int tierNumber, uint version, CancellationToken cancellationToken);
 }
 
 /// <summary>New thresholds and rate for a tier, based on the version the manager saw.</summary>

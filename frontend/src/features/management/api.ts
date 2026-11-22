@@ -101,6 +101,10 @@ export function updateDiscountTier(
 ): Promise<DiscountTier> {
   return putJson<DiscountTier>(`${MANAGER}/discount-tiers/${tierNumber}`, input)
 }
+
+export function setDiscountTierActive(tierNumber: number, active: boolean, version: number): Promise<DiscountTier> {
+  return postJson<DiscountTier>(`${MANAGER}/discount-tiers/${tierNumber}/${active ? 'activate' : 'deactivate'}`, { version })
+}
 /** One order by its reference (as typed; the server tolerates case and spaces). */
 export function getManagerOrder(reference: string, signal?: AbortSignal): Promise<ManagerOrder> {
   return getJson<ManagerOrder>(`${MANAGER}/orders/${encodeURIComponent(reference.trim())}`, { signal })

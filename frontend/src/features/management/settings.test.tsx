@@ -18,7 +18,7 @@ const allSettings: Setting[] = [
   setting('Orders.MinDrinksPerOrder', '1', 'WholeNumber', true, 'Whole number, at least 1.'),
   setting(MAX_DRINKS, '10', 'WholeNumber', true, 'Whole number up to 50.'),
   setting('Tax.VatRate', '0.15', 'DecimalNumber', true, 'Fraction from 0 to 1.'),
-  setting('Discounts.MaxDiscountAmount', '50.00', 'DecimalNumber', true, 'Meaning pending confirmation (open question Q-02).'),
+  setting('Discounts.MaxDiscountAmount', '50.00', 'DecimalNumber', true, 'Amount in the pricing currency, 0 or more, at most two decimal places: the most one order can be discounted (decision Q-02, 22 Nov 2026).'),
   setting(LEAD_TIME, '15', 'WholeNumber', true, 'Whole number of minutes from 0 to 240.'),
   setting('Pricing.DisplayLocale', 'en-ZA', 'Text', true, 'Locale used to format prices, e.g. en-ZA.'),
   setting('Pricing.CurrencyCode', 'ZAR', 'Text', false, 'Read-only.'),
@@ -43,7 +43,7 @@ describe('settings management', () => {
     expect(screen.getByRole('button', { name: 'Edit VAT rate' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit Currency' })).not.toBeInTheDocument()
     expect(screen.getByText('Read-only')).toBeInTheDocument()
-    expect(screen.getByText('Meaning pending confirmation (open question Q-02).')).toBeInTheDocument()
+    expect(screen.getByText('Amount in the pricing currency, 0 or more, at most two decimal places: the most one order can be discounted (decision Q-02, 22 Nov 2026).')).toBeInTheDocument()
   })
 
   it('saves a setting and shows the values returned by the server', async () => {

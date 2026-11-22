@@ -33,15 +33,18 @@ listed on the UAT sign-off form. Nothing here records a stakeholder decision tha
 
 ## Stakeholder decisions still open (carried from earlier milestones)
 
-| Ref | Decision needed | As built |
+On 22 Nov 2026 the project owner decided each of these for the demonstration (see
+`2026-11-22_owner-decisions.md`). They remain open until the stakeholder confirms them.
+
+| Ref | Decision needed | Owner's decision (22 Nov 2026), pending stakeholder confirmation |
 | --- | --- | --- |
-| Q-01 – Q-04 / B2 | Frequent-customer discount rates | Engine built; switched off (R 0,00 for everyone) |
+| Q-01 – Q-04 / B2 | Frequent-customer discount rates | 5 / 10 / 15 %; cap R 50,00 per order; paid, not-cancelled orders count; before VAT. Tiers can be activated by a manager (all inactive until then) |
 | Q-07 / AC-6.6 | VAT exclusive of fees, 15 %, rounding; sign `m6-calculation-sign-off.csv` | As built |
 | B1.1 – B1.4, I4, I8 | Patron cancellation with 10 % fee; restaurant-requested cancellation with full refund; wrong-amount payments refunded by hand; managers see patron contact | As built |
 | Q-08 / D1 | One combined confirmation and receipt email | As built |
-| Q-14 / B6 | Personal-data retention and anonymisation (POPIA) | Kept; masked in audit views; the demonstration holds test data only |
-| B5 / R7 | "Collected" status after pickup | Not built (outside the URS) |
-| M4 follow-up | Email confirmation and password reset | Not built |
-| Q-15 | Performance and availability targets | 2 s at 50 users measured locally (M13); live site checked only lightly |
+| Q-14 / B6 | Personal-data retention and anonymisation (POPIA) | Policy written (`docs/policies/data-retention-policy.md`): 5 years after the last order, then personal details removed; applied by hand, automation later |
+| B5 / R7 | "Collected" status after pickup | Not now (future work) |
+| M4 follow-up | Email confirmation and password reset | Future work |
+| Q-15 | Performance and availability targets | Target: 2 s at 50 concurrent users (met locally in M13); live site checked only lightly |
 | M12 R1–R13 | Reporting choices (two-tone trends, columns, labels, one audit table at a time, CSV with 10,000-row cap, further charts) | As built |
 | – | Outstanding milestone sign-offs: M1, M2, M6 (AC-6.6), M10, M12 | Not yet signed |

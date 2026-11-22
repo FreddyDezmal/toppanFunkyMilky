@@ -108,7 +108,7 @@ public sealed class PriceCalculatorTests
         Assert.Equal((0.00m, (int?)null, (decimal?)null, false), (discount.Amount.Amount, discount.TierNumber, discount.Rate, discount.CapApplied));
     }
 
-    // Discount maths with FICTIONAL rates (decision P5): the live discount stays 0.00 until Q-01 to Q-04 are answered.
+    // Discount maths (Q-04, decided 22 Nov 2026): taken from the whole order before VAT, capped per order (Q-02).
 
     [Fact]
     public void ADiscount_IsTakenBeforeVat()
