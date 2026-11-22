@@ -120,7 +120,7 @@ describe('Management → Emails', () => {
       },
     })
 
-    await userEvent.click(await screen.findByRole('button', { name: `Send the refund not completed email for order ${REF} again` }))
+    await userEvent.click(await screen.findByRole('button', { name: `Send again: the refund not completed email for order ${REF}` }))
 
     expect(await screen.findByRole('status')).toHaveTextContent(`The refund not completed email for order ${REF} will be sent again shortly.`)
     const item = await screen.findByRole('listitem', { name: `Refund not completed for order ${REF}` })
@@ -138,7 +138,7 @@ describe('Management → Emails', () => {
         jsonResponse({ status: 409, title: 'Only a sent or failed email can be sent again.' }, 409),
     })
 
-    await userEvent.click(await screen.findByRole('button', { name: `Send the order confirmation and receipt email for order ${REF} again` }))
+    await userEvent.click(await screen.findByRole('button', { name: `Send again: the order confirmation and receipt email for order ${REF}` }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Only a sent or failed email can be sent again.')
   })
@@ -149,7 +149,7 @@ describe('Management → Emails', () => {
       'POST /api/manager/emails/41/resend': () => jsonResponse({ status: 429, title: 'Too Many Requests' }, 429),
     })
 
-    await userEvent.click(await screen.findByRole('button', { name: `Send the order confirmation and receipt email for order ${REF} again` }))
+    await userEvent.click(await screen.findByRole('button', { name: `Send again: the order confirmation and receipt email for order ${REF}` }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Please wait a minute and try again.')
   })

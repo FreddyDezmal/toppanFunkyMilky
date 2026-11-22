@@ -29,20 +29,20 @@ const BADGE_CLASS: Record<OrderReportRow['paymentStatus'], string> = {
 
 const COPY_HEADINGS = ['Date', 'Time', 'Order', 'Milkshake', 'Flavour', 'Topping', 'Consistency', 'Pickup', 'Payment status']
 
-const INPUT_CLASS = 'mt-1 rounded-lg border border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:outline-none'
-const BUTTON_CLASS = 'rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50'
+const INPUT_CLASS = 'mt-1 rounded-lg border border-line-strong px-3 py-2 text-sm focus:border-raspberry focus:outline-none'
+const BUTTON_CLASS = 'rounded-lg bg-raspberry px-4 py-2 text-sm font-medium text-white hover:bg-raspberry-dark disabled:opacity-50'
 const SECONDARY_CLASS =
   'rounded-lg px-4 py-2 text-sm font-medium text-chocolate ring-1 ring-line-strong hover:bg-strawberry-wash disabled:cursor-not-allowed disabled:opacity-50'
 
 function toggleClass(active: boolean) {
   return `rounded-full px-3 py-1 text-sm font-medium ring-1 ${
-    active ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-chocolate ring-line-strong hover:bg-brand-50'
+    active ? 'bg-raspberry text-white ring-raspberry' : 'bg-white text-chocolate ring-line-strong hover:bg-strawberry-wash'
   }`
 }
 
 function tabClass(active: boolean) {
   return `-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
-    active ? 'border-brand-600 text-brand-700' : 'border-transparent text-warm-grey hover:text-brand-700'
+    active ? 'border-raspberry text-raspberry-dark' : 'border-transparent text-warm-grey hover:text-raspberry-dark'
   }`
 }
 
@@ -123,7 +123,7 @@ export function ReportsPage() {
               type="date"
               value={shownFrom}
               onChange={(event) => update(rangeMode ? { from: event.target.value, page: null } : { from: event.target.value, to: null, page: null })}
-              className={`${INPUT_CLASS} block`}
+              className={`${INPUT_CLASS} block w-full min-w-0`}
             />
           </label>
           {rangeMode && (
@@ -293,8 +293,8 @@ function OrdersPanel({ from, to, q, status, page, update }: OrdersPanelProps) {
             </span>
           )}
         </h2>
-        <form role="search" onSubmit={onSearch} noValidate className="flex items-end gap-2">
-          <label className="text-sm font-medium text-chocolate">
+        <form role="search" onSubmit={onSearch} noValidate className="flex max-w-full min-w-0 items-end gap-2">
+          <label className="min-w-0 flex-1 text-sm font-medium text-chocolate">
             Search
             <input
               type="search"
@@ -302,7 +302,7 @@ function OrdersPanel({ from, to, q, status, page, update }: OrdersPanelProps) {
               maxLength={100}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Flavour, topping, reference…"
-              className={`${INPUT_CLASS} block`}
+              className={`${INPUT_CLASS} block w-full min-w-0`}
             />
           </label>
           <button type="submit" className={BUTTON_CLASS}>
@@ -381,10 +381,10 @@ function OrdersPanel({ from, to, q, status, page, update }: OrdersPanelProps) {
                     <td data-label="Date" className="px-2 py-2 tabular-nums">{slashed(row.date)}</td>
                     <td data-label="Time" className="px-2 py-2 tabular-nums">{row.time}</td>
                     <td data-label="Order" className="px-2 py-2">
-                      <Link to={`/manager/orders?reference=${encodeURIComponent(row.reference)}`} className="text-brand-700 underline">
+                      <Link to={`/manager/orders?reference=${encodeURIComponent(row.reference)}`} className="text-raspberry-dark underline">
                         {row.reference}
                       </Link>
-                      {row.drinkNumber > 1 && <span className="ml-1 text-xs text-warm-grey">(milkshake {row.drinkNumber})</span>}
+                      {row.drinkNumber > 1 && <span className="ml-1 text-sm text-warm-grey">(milkshake {row.drinkNumber})</span>}
                     </td>
                     <td data-label="Flavour" className="px-2 py-2">{row.flavour}</td>
                     <td data-label="Topping" className="px-2 py-2">{row.topping}</td>
@@ -393,7 +393,7 @@ function OrdersPanel({ from, to, q, status, page, update }: OrdersPanelProps) {
                     <td data-label="Payment status" className="px-2 py-2">
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${BADGE_CLASS[row.paymentStatus]}`}>{row.paymentStatus}</span>
                       {row.paymentStatus === 'Cancelled' && (
-                        <span className="ml-1 text-xs text-warm-grey">{paymentText({ paymentStatus: 'Cancelled', refundStatus: row.refundStatus })}</span>
+                        <span className="ml-1 text-sm text-warm-grey">{paymentText({ paymentStatus: 'Cancelled', refundStatus: row.refundStatus })}</span>
                       )}
                     </td>
                   </tr>
@@ -421,7 +421,7 @@ function OrdersPanel({ from, to, q, status, page, update }: OrdersPanelProps) {
                         aria-current={number === report.page ? 'page' : undefined}
                         onClick={() => update({ page: number === 1 ? null : String(number) })}
                         className={`min-w-8 rounded-md px-2 py-1 text-sm tabular-nums ${
-                          number === report.page ? 'bg-brand-600 text-white' : 'text-chocolate hover:bg-brand-50'
+                          number === report.page ? 'bg-raspberry text-white' : 'text-chocolate hover:bg-strawberry-wash'
                         }`}
                       >
                         {number}

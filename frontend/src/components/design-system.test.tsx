@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router'
@@ -9,6 +9,7 @@ import { clearCsrfToken } from '../lib/api/httpClient'
 import { jsonResponse, mockApi } from '../test/mockApi'
 import { ChoiceCardGroup } from './forms/ChoiceCardGroup'
 import { QuantityStepper } from './forms/QuantityStepper'
+import { routeTitle } from '../app/routeTitle'
 import { AppLayout } from './layout/AppLayout'
 import { Alert } from './ui/Alert'
 import { Badge } from './ui/Badge'
@@ -198,5 +199,28 @@ describe('AppLayout', () => {
     await userEvent.click(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'My orders' }))
     expect(await screen.findByRole('heading', { name: 'Orders page' })).toBeInTheDocument()
     expect(menu).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('names each page in the tab title and moves focus to the new heading after navigating', async () => {
+    renderLayout()
+    await screen.findByRole('button', { name: /Log out/ })
+    expect(document.title).toBe('Build your milkshake – Milky Shaky')
+
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'My orders' }))
+
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Orders page' })
+    await waitFor(() => expect(heading).toHaveFocus())
+    expect(document.title).toBe('My orders – Milky Shaky')
+  })
+})
+
+describe('routeTitle', () => {
+  it('describes every kind of page', () => {
+    expect(routeTitle('/order/drinks')).toBe('Choose your milkshakes – Order – Milky Shaky')
+    expect(routeTitle('/orders/MS-7KQ2-X9TD')).toBe('Order MS-7KQ2-X9TD – Milky Shaky')
+    expect(routeTitle('/manager/catalog/toppings')).toBe('Toppings – Management – Milky Shaky')
+    expect(routeTitle('/manager/catalog/flavours/3/prices')).toBe('Prices – Flavours – Management – Milky Shaky')
+    expect(routeTitle('/manager/reports/')).toBe('Reports – Management – Milky Shaky')
+    expect(routeTitle('/nowhere')).toBe('Page not found – Milky Shaky')
   })
 })

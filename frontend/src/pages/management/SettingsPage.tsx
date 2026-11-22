@@ -110,7 +110,7 @@ export function SettingsPage() {
                   <div>
                     <h2 className="font-medium text-chocolate">{label}</h2>
                     <p className="mt-0.5 text-sm text-chocolate">{displayValue(setting, locale, currencyCode)}</p>
-                    {!isEditing && setting.hint && <p className="mt-1 text-xs text-warm-grey">{setting.hint}</p>}
+                    {!isEditing && setting.hint && <p className="mt-1 text-sm text-warm-grey">{setting.hint}</p>}
                   </div>
                   {setting.isEditable ? (
                     !isEditing && (
@@ -122,7 +122,7 @@ export function SettingsPage() {
                           setEditingKey(setting.key)
                         }}
                         disabled={editingKey !== null}
-                        className="rounded-md px-2 py-1 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40"
+                        className="rounded-md px-2 py-1 text-sm font-medium text-raspberry-dark hover:bg-strawberry-wash disabled:opacity-40"
                       >
                         Edit
                       </button>

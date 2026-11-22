@@ -8,13 +8,13 @@ import type { AuditChange, AuditPage, SecurityEvent, SecurityEventType } from '.
 
 type View = 'lookups' | 'changes' | 'security'
 
-const INPUT_CLASS = 'mt-1 block rounded-lg border border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:outline-none'
-const BUTTON_CLASS = 'rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50'
+const INPUT_CLASS = 'mt-1 block rounded-lg border border-line-strong px-3 py-2 text-sm focus:border-raspberry focus:outline-none'
+const BUTTON_CLASS = 'rounded-lg bg-raspberry px-4 py-2 text-sm font-medium text-white hover:bg-raspberry-dark disabled:opacity-50'
 const SECONDARY_CLASS = 'rounded-lg px-4 py-2 text-sm font-medium text-chocolate ring-1 ring-line-strong hover:bg-strawberry-wash disabled:opacity-50'
 
 function toggleClass(active: boolean) {
   return `rounded-full px-3 py-1 text-sm font-medium ring-1 ${
-    active ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-chocolate ring-line-strong hover:bg-brand-50'
+    active ? 'bg-raspberry text-white ring-raspberry' : 'bg-white text-chocolate ring-line-strong hover:bg-strawberry-wash'
   }`
 }
 

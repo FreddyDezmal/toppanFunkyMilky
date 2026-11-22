@@ -30,7 +30,7 @@ export function SystemStatusCard() {
           type="button"
           onClick={refresh}
           disabled={state.kind === 'loading'}
-          className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-raspberry px-3 py-1.5 text-sm font-medium text-white hover:bg-raspberry-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           {state.kind === 'loading' ? 'Checking…' : 'Refresh'}
         </button>
@@ -58,7 +58,7 @@ export function SystemStatusCard() {
               <div key={check.name} className="flex items-center justify-between gap-4 py-3">
                 <dt className="text-sm">
                   <span className="font-medium capitalize text-chocolate">{check.name}</span>
-                  {check.description && <span className="block text-xs text-warm-grey">{check.description}</span>}
+                  {check.description && <span className="block text-sm text-warm-grey">{check.description}</span>}
                 </dt>
                 <dd className="flex items-center gap-3">
                   <span className="text-xs tabular-nums text-warm-grey">{Math.round(check.durationMs)} ms</span>
@@ -67,7 +67,7 @@ export function SystemStatusCard() {
               </div>
             ))}
           </dl>
-          <p className="mt-4 text-xs text-warm-grey">
+          <p className="mt-4 text-sm text-warm-grey">
             Connected to {describeApiTarget()} · checked {new Date(state.data.checkedAtUtc).toLocaleString()}
           </p>
         </>

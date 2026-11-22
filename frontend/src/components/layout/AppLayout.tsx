@@ -1,5 +1,6 @@
-import { useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
+import { routeTitle } from '../../app/routeTitle'
 import { hasRole, useAuth } from '../../features/auth/authContext'
 import { ROLES } from '../../features/auth/types'
 import { Alert } from '../ui/Alert'
@@ -25,6 +26,37 @@ export function AppLayout() {
   // The menu belongs to the page it was opened on: navigating anywhere closes it without an effect.
   const [menuOpenOn, setMenuOpenOn] = useState<string | null>(null)
   const menuOpen = menuOpenOn === location.pathname
+
+  // Every page has its own tab title (WCAG 2.4.2).
+  useEffect(() => {
+    document.title = routeTitle(location.pathname)
+  }, [location.pathname])
+
+  // After moving to another page (not on the first load), focus goes to the new page's heading, so keyboard and
+  // screen-reader users start at the new content instead of the link they used (or the top of the document).
+  const firstPath = useRef(location.pathname)
+  useEffect(() => {
+    if (firstPath.current === location.pathname) {
+      return undefined
+    }
+    firstPath.current = ''
+    const frame = requestAnimationFrame(() => {
+      const main = document.getElementById('main')
+      const heading = main?.querySelector<HTMLElement>('h1')
+      if (main?.contains(document.activeElement) && document.activeElement !== main) {
+        return // the page already placed focus itself (for example on an error)
+      }
+      if (heading) {
+        if (!heading.hasAttribute('tabindex')) {
+          heading.setAttribute('tabindex', '-1')
+        }
+        heading.focus()
+      } else {
+        main?.focus()
+      }
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [location.pathname])
 
   async function handleLogout() {
     setSigningOut(true)

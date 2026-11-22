@@ -150,7 +150,7 @@ export function DiscountTiersPage() {
                         setEditing(tier)
                       }}
                       disabled={editing !== null}
-                      className="rounded-md px-2 py-1 font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40"
+                      className="rounded-md px-2 py-1 font-medium text-raspberry-dark hover:bg-strawberry-wash disabled:opacity-40"
                     >
                       Edit
                     </button>

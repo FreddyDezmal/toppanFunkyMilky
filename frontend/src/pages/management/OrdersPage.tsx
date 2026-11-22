@@ -34,8 +34,8 @@ const REFUND_STATUS: Record<ManagerRefund['status'], string> = {
   Failed: 'Failed – refund by hand at Paystack',
 }
 
-const INPUT_CLASS = 'mt-1 w-full rounded-lg border border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:outline-none'
-const BUTTON_CLASS = 'rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50'
+const INPUT_CLASS = 'mt-1 w-full rounded-lg border border-line-strong px-3 py-2 text-sm focus:border-raspberry focus:outline-none'
+const BUTTON_CLASS = 'rounded-lg bg-raspberry px-4 py-2 text-sm font-medium text-white hover:bg-raspberry-dark disabled:opacity-50'
 
 function formatDateTime(iso: string, locale?: string, timeZone?: string): string {
   try {
@@ -176,7 +176,7 @@ export function OrdersPage() {
                     setReference(refund.orderReference)
                     void find(refund.orderReference)
                   }}
-                  className="font-medium text-brand-700 underline"
+                  className="font-medium text-raspberry-dark underline"
                 >
                   Open order {refund.orderReference}
                 </button>
@@ -210,7 +210,7 @@ function OrderCard({ order, locale, onChanged }: { order: ManagerOrder; locale: 
         <dd className="font-medium">{order.isPaid ? 'Paid' : 'Not paid'}</dd>
         <dt className="text-warm-grey">Patron</dt>
         <dd>
-          {order.patronFirstName} · <a href={`mailto:${order.patronEmail}`} className="text-brand-700 underline">{order.patronEmail}</a>
+          {order.patronFirstName} · <a href={`mailto:${order.patronEmail}`} className="text-raspberry-dark underline">{order.patronEmail}</a>
         </dd>
         <dt className="text-warm-grey">Pickup</dt>
         <dd>
@@ -311,7 +311,7 @@ function RequestForm({ order, onRequested }: { order: ManagerOrder; onRequested:
   return (
     <form onSubmit={(event) => void onSubmit(event)} noValidate className="mt-5 max-w-xl">
       <h3 className="font-semibold">Ask the patron to cancel</h3>
-      <p id={hintId} className="text-xs text-warm-grey">
+      <p id={hintId} className="text-sm text-warm-grey">
         The patron sees this reason and decides. If the order was paid and they accept, they get everything back.
       </p>
       <label className="mt-2 block text-sm font-medium text-chocolate">
@@ -325,7 +325,7 @@ function RequestForm({ order, onRequested }: { order: ManagerOrder; onRequested:
           className={INPUT_CLASS}
         />
       </label>
-      <p className="mt-1 text-xs text-warm-grey">
+      <p className="mt-1 text-sm text-warm-grey">
         {reason.length}/{REASON_MAX_LENGTH} characters
       </p>
       {error && (

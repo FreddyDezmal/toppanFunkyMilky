@@ -48,7 +48,7 @@ export function TrendChart({ title, description, points, label }: TrendChartProp
   const totalPaid = points.reduce((sum, point) => sum + point.paidOrders, 0)
 
   return (
-    <section aria-labelledby={headingId} className="rounded-xl p-4 ring-1 ring-line">
+    <section aria-labelledby={headingId} className="min-w-0 rounded-xl p-4 ring-1 ring-line">
       <p className="text-xs font-medium uppercase tracking-wide text-warm-grey">Orders</p>
       <h3 id={headingId} className="text-lg font-semibold">
         {title}
@@ -69,7 +69,9 @@ export function TrendChart({ title, description, points, label }: TrendChartProp
       {points.length === 0 ? (
         <p className="mt-3 text-sm text-warm-grey">No orders in this period.</p>
       ) : (
-        <div className="mt-2 overflow-x-auto">
+        // On narrow screens the chart scrolls sideways inside this box; it can take keyboard focus so it can be scrolled
+        // without a mouse (WCAG 2.1.1), and is named after the chart.
+        <div className="mt-2 overflow-x-auto" tabIndex={0} role="region" aria-label={`${title} chart`}>
           <svg
             role="img"
             aria-label={`${title}: ${description}. ${totalOrders} orders, ${totalPaid} paid. The numbers are also in the table below.`}
@@ -107,7 +109,7 @@ export function TrendChart({ title, description, points, label }: TrendChartProp
 
       {points.length > 0 && (
         <details className="mt-2 text-sm">
-          <summary className="cursor-pointer text-brand-700 underline">Show the numbers</summary>
+          <summary className="cursor-pointer text-raspberry-dark underline">Show the numbers</summary>
           <table className="mt-2 w-full text-left text-sm">
             <caption className="sr-only">{`${title}: ${description}`}</caption>
             <thead>

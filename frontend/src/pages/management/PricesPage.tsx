@@ -112,7 +112,7 @@ function PriceManager({ kind, itemId }: { kind: CatalogKind; itemId: number }) {
 
   return (
     <section aria-labelledby="prices-heading" className="rounded-card border border-line bg-surface p-5 shadow-soft sm:p-6">
-      <Link to={`/manager/catalog/${kind}`} className="text-sm font-medium text-brand-700 hover:underline">
+      <Link to={`/manager/catalog/${kind}`} className="text-sm font-medium text-raspberry-dark hover:underline">
         ← Back to {title.toLowerCase()}
       </Link>
       <h1 id="prices-heading" className="mt-2 text-2xl font-semibold text-chocolate">

@@ -85,7 +85,7 @@ export function RestaurantForm({ restaurant, onSaved, onCancel, onConflict }: Re
       noValidate
       aria-labelledby="restaurant-form-title"
       onSubmit={(event) => void handleSubmit(event)}
-      className="space-y-4 rounded-xl border border-brand-100 bg-brand-50/50 p-5"
+      className="space-y-4 rounded-xl border border-line bg-strawberry-wash/60 p-5"
     >
       <h2 id="restaurant-form-title" className="text-lg font-semibold">
         {restaurant === undefined ? 'Add a restaurant' : `Edit ${restaurant.name}`}
@@ -120,7 +120,7 @@ export function RestaurantForm({ restaurant, onSaved, onCancel, onConflict }: Re
         <button
           type="submit"
           disabled={saving}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-raspberry px-4 py-2 text-sm font-medium text-white hover:bg-raspberry-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>

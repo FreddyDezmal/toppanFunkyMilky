@@ -133,7 +133,7 @@ function CatalogManager({ kind }: { kind: CatalogKind }) {
                 setLoadError(null)
                 setStatus(event.target.value as StatusFilter)
               }}
-              className="mt-1 rounded-lg border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="mt-1 rounded-lg border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-raspberry"
             >
               <option value="all">All</option>
               <option value="active">Active only</option>
@@ -147,7 +147,7 @@ function CatalogManager({ kind }: { kind: CatalogKind }) {
               setEditing('new')
             }}
             disabled={actionsLocked}
-            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+            className="rounded-lg bg-raspberry px-4 py-2 text-sm font-medium text-white hover:bg-raspberry-dark disabled:opacity-50"
           >
             Add {singular}
           </button>
@@ -234,7 +234,7 @@ function CatalogManager({ kind }: { kind: CatalogKind }) {
                                         <Link
                       to={`/manager/catalog/${kind}/${item.id}/prices`}
                       aria-label={`Prices for ${item.name}`}
-                      className="rounded-md px-2 py-1 font-medium text-brand-700 hover:bg-brand-50"
+                      className="rounded-md px-2 py-1 font-medium text-raspberry-dark hover:bg-strawberry-wash"
                     >
                       Prices
                     </Link>
@@ -246,7 +246,7 @@ function CatalogManager({ kind }: { kind: CatalogKind }) {
                         setEditing(item)
                       }}
                       disabled={actionsLocked}
-                      className="rounded-md px-2 py-1 font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40"
+                      className="rounded-md px-2 py-1 font-medium text-raspberry-dark hover:bg-strawberry-wash disabled:opacity-40"
                     >
                       Edit
                     </button>
