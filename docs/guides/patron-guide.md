@@ -10,32 +10,38 @@ How to order milkshakes online and collect them at a Milky Shaky restaurant.
 > The site runs on free hosting: if nobody has used it for 15 minutes it sleeps, and the first page then takes about a
 > minute to appear. After that it is quick.
 
+On a phone, the links (Home, Order, My orders, My account, Log out) are behind the **Menu** button at the top.
+
 ## 1. Create an account
 
 1. Open the site and choose **Register**.
 2. Enter your first name, email address and mobile number (e.g. `+27 82 123 4567`), choose a password and type it
    again.
-3. Choose **Register**. You are signed in straight away.
+3. Choose **Create account**. You are signed in straight away.
 
 Your details are under **My account**. To sign in later, choose **Log in** and enter your email and password. After
 several wrong passwords in a row your account is locked for a short time; wait and try again.
 
 ## 2. Order milkshakes
 
-1. Choose **Order** and enter how many milkshakes you want (1 to 10), then continue.
-2. Each milkshake has its own section. For each one choose a **Flavour**, a **Consistency** (how thick) and a
-   **Topping**, then choose **Done**. **Done** works only when all three are chosen; you can **Edit** a milkshake
-   afterwards.
-3. Each milkshake shows its price. The estimate below shows the **Subtotal**, your **Frequent-customer discount**
-   (R 0,00 if none applies), **VAT** and the **Total**. You cannot change these amounts; they come from the
-   restaurant's current prices.
+1. Choose **Build Your Milkshake** on the home page (or **Order** at the top). Set how many milkshakes you want
+   (1 to 10) with the **−** and **+** buttons, or type the number, then choose **Continue**.
+2. Each milkshake has its own card. For each one choose a **Flavour**, a **Consistency** (how thick) and a
+   **Topping** by choosing a card in each group (the card shows its current price, or **Included**), then choose
+   **Done**. **Done** works only when all three are chosen; you can **Edit** a milkshake afterwards. With a keyboard,
+   Tab moves to the next group and the arrow keys choose within it.
+3. Each milkshake shows its price. The **Your order** summary beside the milkshakes shows each milkshake and the
+   estimate: **Subtotal**, your **Frequent-customer discount** (R 0,00 if none applies), **VAT** and the
+   **Estimated total**. On a phone the summary is below the milkshakes, and a bar at the bottom of the screen shows the
+   total. You cannot change these amounts; they come from the restaurant's current prices.
 4. Choose **Continue to pickup**.
 
 ## 3. Choose where and when to collect
 
-1. Choose the **Pickup restaurant**.
+1. Choose a **Pickup restaurant** card.
 2. Choose the **Pickup date and time**: at least 15 minutes from now and at most 7 days ahead (South African time).
-3. Continue to the review page, check everything and choose **Place order**, then confirm the total.
+3. Choose **Review order**, check everything and choose **Place order**, then confirm the total. You pay on the next
+   page.
 
 Your order now has a reference such as `MS-ABCD-1234`. It is **not confirmed until you pay**.
 
@@ -57,8 +63,9 @@ and a link to your order. Check your spam folder if it has not arrived within a 
 
 ## 6. Your orders
 
-**My orders** lists all your orders, newest first. Open one to see its details, payment status, and any
-cancellation or refund. Only you can see your orders.
+**My orders** lists all your orders, newest first, each with its order status and payment status (for example
+*Confirmed* and *Paid*). Open one to see its details, payment, and any cancellation or refund. Only you can see your
+orders.
 
 ## 7. Cancelling an order
 
@@ -75,7 +82,7 @@ cancellation or refund. Only you can see your orders.
 
 | Problem | What to do |
 | --- | --- |
-| "Done" does nothing | Choose a flavour, consistency and topping for that milkshake |
+| "Done" does nothing | Choose a flavour, consistency and topping card for that milkshake; the missing choice is named in red |
 | A pickup time is refused | Choose a time at least 15 minutes from now and within the next 7 days |
 | The order still shows unpaid after paying | Wait a few seconds and refresh the order; if it stays unpaid, contact the restaurant with the order reference – do not pay twice |
 | No email | Check spam; the order page always has the same details |

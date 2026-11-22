@@ -7,7 +7,8 @@ managers maintain prices, lookups and discounts, and review reports and audit hi
 > Roadmap: [`docs/`](docs/).
 
 **Live demonstration:** https://milkyshaky.onrender.com (release v1.0.2; Paystack **test mode**, no real money; free
-hosting sleeps after 15 minutes idle, so the first page can take about a minute).
+hosting sleeps after 15 minutes idle, so the first page can take about a minute). The UI/UX redesign is on `main` and
+prepared as release v1.1.0 ([release notes](docs/releases/v1.1.0.md)); it is not deployed yet.
 
 ## Documentation
 
@@ -17,6 +18,7 @@ hosting sleeps after 15 minutes idle, so the first page can take about a minute)
 | Running the deployment | [`docs/guides/operations-guide.md`](docs/guides/operations-guide.md), [`docs/deployment/configuration-reference.md`](docs/deployment/configuration-reference.md) |
 | UAT | [`docs/uat/`](docs/uat/) – start with the tester pack |
 | What is in a release | [`docs/releases/`](docs/releases/) |
+| UI/UX redesign: audit, approved design, decisions and stage log | [`docs/redesign/`](docs/redesign/) |
 | Decisions | [`docs/decisions/`](docs/decisions/) |
 | Progress and evidence | [`docs/progress/`](docs/progress/), [`docs/testing/`](docs/testing/) |
 

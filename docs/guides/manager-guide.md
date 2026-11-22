@@ -16,9 +16,13 @@ for that.
 
 ## 2. The management sections
 
+On a computer the sections are in the sidebar on the left, grouped as *Menu*, *Operations*, *Insights* and *Setup*. On
+a phone, choose the **Sections** button at the top of any management page. On a phone, lists such as the menu and
+reports show one card per row, with every value and action (Prices, Edit, Deactivate) visible.
+
 | Section | What it is for |
 | --- | --- |
-| **Overview** | Landing page; confirms you are signed in as a manager |
+| **Overview** | Today's orders and milkshakes, refunds needing attention, email counts (failed, waiting, sent) and the system status, each with a link to its section |
 | **Flavours, Consistencies, Toppings** | The menu: add, rename, reorder, take off sale, and set prices |
 | **Restaurants** | Pickup restaurants: add, edit name and address, take off or put back on the list |
 | **Orders** | Orders and their payment, cancellation requests, refunds that need attention |
@@ -85,5 +89,5 @@ choose to send it again if the patron did not receive it.
 ## 9. Good practice
 
 - Change prices with a start date rather than editing history; never "fix" an old order's price.
-- Check **Orders → Refunds** and **Emails** daily for anything that needs attention.
+- Check the **Overview** daily: it shows refunds needing attention and failed emails at a glance.
 - Do not share manager accounts: the audit trail records who made each change.
