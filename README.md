@@ -6,9 +6,8 @@ managers maintain prices, lookups and discounts, and review reports and audit hi
 > Requirements: *Order Milkshake for Pickup – User Requirement Specification v1.1* (confidential; not stored in this repository).
 > Roadmap: [`docs/`](docs/).
 
-**Live demonstration:** https://milkyshaky.onrender.com (release v1.0.2; Paystack **test mode**, no real money; free
-hosting sleeps after 15 minutes idle, so the first page can take about a minute). The UI/UX redesign is on `main` and
-prepared as release v1.1.0 ([release notes](docs/releases/v1.1.0.md)); it is not deployed yet.
+**Live demonstration:** https://milkyshaky.onrender.com (release v1.1.0, the UI/UX redesign – [release notes](docs/releases/v1.1.0.md); Paystack **test mode**, no real money;
+free hosting sleeps after 15 minutes idle, so the first page can take about a minute).
 
 ## Documentation
 
