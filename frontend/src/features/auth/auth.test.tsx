@@ -58,6 +58,7 @@ describe('route protection', () => {
     mockApi({
       'GET /api/auth/me': () => jsonResponse(manager),
       'GET /api/manager/ping': () => jsonResponse({ message: 'Manager access confirmed.' }),
+      'GET /api/health': () => jsonResponse({ status: 'Healthy', checks: [] }),
     })
 
     renderAt('/manager')

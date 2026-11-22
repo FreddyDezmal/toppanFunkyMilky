@@ -81,6 +81,18 @@
   --shadow-raised: 0 2px 4px rgb(88 53 46 / 0.08), 0 12px 32px rgb(88 53 46 / 0.12);
 
   --container-page: 72rem;
+
+  --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
 }
 
 @layer base {

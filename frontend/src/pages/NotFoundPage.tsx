@@ -1,12 +1,17 @@
 import { Link } from 'react-router'
+import { MilkshakeIllustration } from '../components/illustrations/MilkshakeIllustration'
+import { buttonClasses } from '../components/ui/buttonClasses'
+import { Card } from '../components/ui/Card'
 
 export function NotFoundPage() {
   return (
-    <section className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
-      <h1 className="text-2xl font-bold tracking-tight">Page not found</h1>
-      <Link to="/" className="mt-4 inline-block font-medium text-brand-700 hover:underline">
+    <Card as="section" className="mx-auto max-w-xl text-center">
+      <MilkshakeIllustration className="mx-auto w-36" animated={false} />
+      <h1 className="mt-6 text-3xl font-semibold text-chocolate">Page not found</h1>
+      <p className="mt-2 text-warm-grey">This page doesn’t exist or has moved.</p>
+      <Link to="/" className={buttonClasses({ className: 'mt-6' })}>
         Back to the home page
       </Link>
-    </section>
+    </Card>
   )
 }

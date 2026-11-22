@@ -77,7 +77,7 @@ test('a patron builds a draft: quantity, milkshakes, pickup and a server-checked
   const email = await registerPatron(page)
 
   await page.goto('/')
-  await page.getByRole('link', { name: 'Start an order' }).click()
+  await page.getByRole('link', { name: 'Build Your Milkshake' }).click()
 
   // Quantity: within the configured limits.
   await expect(page.getByRole('heading', { name: 'How many milkshakes?' })).toBeVisible()

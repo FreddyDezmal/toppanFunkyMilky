@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchManagerPing } from '../features/manager/api'
+import { SystemStatusCard } from '../features/system-status/SystemStatusCard'
 import { describeError } from '../lib/api/describeError'
 
 type PingState = { kind: 'loading' } | { kind: 'ok'; message: string } | { kind: 'error'; message: string }
@@ -21,12 +22,16 @@ export function ManagerPage() {
   }, [])
 
   return (
-    <section className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
-      <h1 className="text-2xl font-bold tracking-tight">Management</h1>
-      <p className="mt-1 text-slate-600">Choose a section above to manage the menu, find orders or see reports.</p>
-      <p className="mt-6 text-sm" role="status">
-        {state.kind === 'loading' ? 'Checking manager access…' : state.message}
-      </p>
-    </section>
+    <div className="space-y-6">
+      <section className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
+        <h1 className="text-2xl font-bold tracking-tight">Management</h1>
+        <p className="mt-1 text-slate-600">Choose a section above to manage the menu, find orders or see reports.</p>
+        <p className="mt-6 text-sm" role="status">
+          {state.kind === 'loading' ? 'Checking manager access…' : state.message}
+        </p>
+      </section>
+      {/* Moved from the public home page (redesign D-R7); the manager overview is redesigned in Stage 6. */}
+      <SystemStatusCard />
+    </div>
   )
 }

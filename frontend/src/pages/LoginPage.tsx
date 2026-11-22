@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation } from 'react-router'
 import { TextField } from '../components/forms/TextField'
+import { AuthLayout } from '../components/layout/AuthLayout'
+import { Alert } from '../components/ui/Alert'
+import { Button } from '../components/ui/Button'
 import { focusFirstError } from '../components/forms/focusFirstError'
 import { useAuth } from '../features/auth/authContext'
 import type { LoginInput } from '../features/auth/types'
@@ -44,17 +47,25 @@ export function LoginPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
-      <h1 className="text-2xl font-bold tracking-tight">Log in to your account</h1>
-      <p className="mt-1 text-sm text-slate-600">Welcome back! Please enter your details.</p>
-
+    <AuthLayout
+      title="Log in to your account"
+      description="Welcome back! Please enter your details."
+      footer={
+        <>
+          {"Don't have an account? "}
+          <Link to="/register" className="font-semibold text-raspberry underline-offset-4 hover:underline">
+            Sign up
+          </Link>
+        </>
+      }
+    >
       {formError && (
-        <div role="alert" className="mt-6 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">
+        <Alert tone="danger" role="alert" className="mt-6">
           {formError}
-        </div>
+        </Alert>
       )}
 
-      <form noValidate onSubmit={(event) => void handleSubmit(event)} className="mt-6 space-y-4">
+      <form noValidate onSubmit={(event) => void handleSubmit(event)} className="mt-6 space-y-5">
         <TextField
           id="email"
           label="Email address"
@@ -73,21 +84,10 @@ export function LoginPage() {
           error={errors.password}
           onChange={(password) => setValues((current) => ({ ...current, password }))}
         />
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
+        <Button type="submit" size="lg" fullWidth disabled={submitting}>
           {submitting ? 'Signing in…' : 'Log in'}
-        </button>
+        </Button>
       </form>
-
-      <p className="mt-6 text-center text-sm text-slate-600">
-        {"Don't have an account? "}
-        <Link to="/register" className="font-medium text-brand-700 hover:underline">
-          Sign up
-        </Link>
-      </p>
-    </div>
+    </AuthLayout>
   )
 }

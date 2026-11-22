@@ -32,10 +32,10 @@ afterEach(() => {
 })
 
 describe('starting an order', () => {
-  it('offers patrons an Order link and a Start an order button', async () => {
+  it('offers patrons an Order link and a Build Your Milkshake button', async () => {
     renderOrderingAt('/')
 
-    await userEvent.click(await screen.findByRole('link', { name: 'Start an order' }))
+    await userEvent.click(await screen.findByRole('link', { name: 'Build Your Milkshake' }))
 
     expect(await screen.findByRole('heading', { name: 'How many milkshakes?' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Main' })).toHaveTextContent('Order')

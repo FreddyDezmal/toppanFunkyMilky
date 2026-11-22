@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router'
 import { TextField } from '../components/forms/TextField'
+import { AuthLayout } from '../components/layout/AuthLayout'
+import { Alert } from '../components/ui/Alert'
+import { Button } from '../components/ui/Button'
 import { focusFirstError } from '../components/forms/focusFirstError'
 import { useAuth } from '../features/auth/authContext'
 import type { RegisterInput } from '../features/auth/types'
@@ -62,37 +65,34 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
-      <h1 className="text-2xl font-bold tracking-tight">Create your account</h1>
-      <p className="mt-1 text-sm text-slate-600">Order ahead and collect your milkshake without the queue.</p>
-
+    <AuthLayout
+      title="Create your account"
+      description="Order ahead and collect your milkshake without the queue."
+      footer={
+        <>
+          Already have an account?{' '}
+          <Link to="/login" className="font-semibold text-raspberry underline-offset-4 hover:underline">
+            Log in
+          </Link>
+        </>
+      }
+    >
       {formError && (
-        <div role="alert" className="mt-6 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">
+        <Alert tone="danger" role="alert" className="mt-6">
           {formError}
-        </div>
+        </Alert>
       )}
 
-      <form noValidate onSubmit={(event) => void handleSubmit(event)} className="mt-6 space-y-4">
+      <form noValidate onSubmit={(event) => void handleSubmit(event)} className="mt-6 space-y-5">
         <TextField id="firstName" label="First name" autoComplete="given-name" value={values.firstName} error={errors.firstName} onChange={update('firstName')} />
         <TextField id="email" label="Email address" type="email" autoComplete="email" value={values.email} error={errors.email} onChange={update('email')} />
         <TextField id="mobileNumber" label="Mobile number" type="tel" autoComplete="tel" hint={MOBILE_RULE} value={values.mobileNumber} error={errors.mobileNumber} onChange={update('mobileNumber')} />
         <TextField id="password" label="Password" type="password" autoComplete="new-password" hint={PASSWORD_RULE} value={values.password} error={errors.password} onChange={update('password')} />
         <TextField id="confirmPassword" label="Confirm password" type="password" autoComplete="new-password" value={values.confirmPassword} error={errors.confirmPassword} onChange={update('confirmPassword')} />
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
+        <Button type="submit" size="lg" fullWidth disabled={submitting}>
           {submitting ? 'Creating account…' : 'Create account'}
-        </button>
+        </Button>
       </form>
-
-      <p className="mt-6 text-center text-sm text-slate-600">
-        Already have an account?{' '}
-        <Link to="/login" className="font-medium text-brand-700 hover:underline">
-          Log in
-        </Link>
-      </p>
-    </div>
+    </AuthLayout>
   )
 }
