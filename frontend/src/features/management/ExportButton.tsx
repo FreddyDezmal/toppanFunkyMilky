@@ -3,7 +3,7 @@ import type { DownloadedFile } from '../../lib/api/httpClient'
 import { saveFile } from '../../lib/download'
 import { describeReportError } from './reports'
 
-const BUTTON_CLASS = 'rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:opacity-50'
+const BUTTON_CLASS = 'rounded-lg px-3 py-1.5 text-sm font-medium text-chocolate ring-1 ring-line-strong hover:bg-strawberry-wash disabled:opacity-50'
 
 interface ExportButtonProps {
   /** Downloads the CSV for what is on screen (all pages, at most 10,000 records). */
@@ -46,7 +46,7 @@ export function ExportButton({ run, fallbackName, label }: ExportButtonProps) {
         {busy ? 'Exporting…' : 'Export'}
       </button>
       {message && (
-        <span role={message.isError ? 'alert' : 'status'} className={`text-sm ${message.isError ? 'text-rose-700' : 'text-emerald-800'}`}>
+        <span role={message.isError ? 'alert' : 'status'} className={`text-sm ${message.isError ? 'text-danger' : 'text-pistachio-deep'}`}>
           {message.text}
         </span>
       )}

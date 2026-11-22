@@ -48,14 +48,14 @@ export function TrendChart({ title, description, points, label }: TrendChartProp
   const totalPaid = points.reduce((sum, point) => sum + point.paidOrders, 0)
 
   return (
-    <section aria-labelledby={headingId} className="rounded-xl p-4 ring-1 ring-slate-200">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Orders</p>
+    <section aria-labelledby={headingId} className="rounded-xl p-4 ring-1 ring-line">
+      <p className="text-xs font-medium uppercase tracking-wide text-warm-grey">Orders</p>
       <h3 id={headingId} className="text-lg font-semibold">
         {title}
       </h3>
-      <p className="text-sm text-slate-600">{description}</p>
+      <p className="text-sm text-warm-grey">{description}</p>
 
-      <ul className="mt-2 flex flex-wrap gap-4 text-xs text-slate-700" aria-label={`${title} legend`}>
+      <ul className="mt-2 flex flex-wrap gap-4 text-xs text-chocolate" aria-label={`${title} legend`}>
         <li className="flex items-center gap-1.5">
           <span aria-hidden="true" className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: ALL_FILL }} />
           All orders ({totalOrders})
@@ -67,7 +67,7 @@ export function TrendChart({ title, description, points, label }: TrendChartProp
       </ul>
 
       {points.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-600">No orders in this period.</p>
+        <p className="mt-3 text-sm text-warm-grey">No orders in this period.</p>
       ) : (
         <div className="mt-2 overflow-x-auto">
           <svg
@@ -76,7 +76,7 @@ export function TrendChart({ title, description, points, label }: TrendChartProp
             viewBox={`0 0 ${width} ${HEIGHT}`}
             width={width}
             height={HEIGHT}
-            className="max-w-none text-slate-600"
+            className="max-w-none text-warm-grey"
           >
             {ticks.map((tick) => (
               <g key={tick}>
@@ -111,7 +111,7 @@ export function TrendChart({ title, description, points, label }: TrendChartProp
           <table className="mt-2 w-full text-left text-sm">
             <caption className="sr-only">{`${title}: ${description}`}</caption>
             <thead>
-              <tr className="text-slate-600">
+              <tr className="text-warm-grey">
                 <th scope="col" className="py-1 font-medium">
                   Period
                 </th>
@@ -125,7 +125,7 @@ export function TrendChart({ title, description, points, label }: TrendChartProp
             </thead>
             <tbody>
               {points.map((point, index) => (
-                <tr key={point.label} className="border-t border-slate-100">
+                <tr key={point.label} className="border-t border-line">
                   <th scope="row" className="py-1 font-normal">
                     {label(point, index)}
                   </th>

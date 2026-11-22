@@ -95,7 +95,7 @@ export function PriceForm({ kind, history, onScheduled, onConflict }: PriceFormP
       </h2>
 
       {formError && (
-        <div role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">
+        <div role="alert" className="rounded-lg bg-danger-tint p-3 text-sm text-danger">
           {formError}
         </div>
       )}
@@ -112,7 +112,7 @@ export function PriceForm({ kind, history, onScheduled, onConflict }: PriceFormP
       />
 
       <fieldset disabled={saving}>
-        <legend className="text-sm font-medium text-slate-700">When should it start?</legend>
+        <legend className="text-sm font-medium text-chocolate">When should it start?</legend>
         <div className="mt-2 space-y-2">
           <label className="flex items-center gap-2 text-sm">
             <input

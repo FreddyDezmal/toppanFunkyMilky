@@ -53,16 +53,16 @@ export function DiscountTiersPage() {
   const blockedReason = tiers?.find((tier) => tier.activationBlockedReason)?.activationBlockedReason ?? null
 
   return (
-    <section aria-labelledby="tiers-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <h1 id="tiers-heading" className="text-2xl font-bold tracking-tight">
+    <section aria-labelledby="tiers-heading" className="rounded-card border border-line bg-surface p-5 shadow-soft sm:p-6">
+      <h1 id="tiers-heading" className="text-2xl font-semibold text-chocolate">
         Discount tiers
       </h1>
-      <p className="mt-1 text-sm text-slate-600">
+      <p className="mt-1 text-sm text-warm-grey">
         Frequent-customer discounts. Each tier needs a number of earlier paid orders and a number of drinks in the order.
       </p>
 
       {blockedReason && (
-        <div id={BLOCKED_NOTICE_ID} className="mt-4 rounded-lg bg-sky-50 p-4 text-sm text-sky-900">
+        <div id={BLOCKED_NOTICE_ID} className="mt-4 rounded-lg bg-strawberry-wash p-4 text-sm text-chocolate">
           <p className="font-medium">Discounts are switched off for now</p>
           <p className="mt-1">{blockedReason}</p>
           <p className="mt-1">You can prepare the thresholds and rates below; they have no effect until activation is allowed.</p>
@@ -70,17 +70,17 @@ export function DiscountTiersPage() {
       )}
 
       {notice && (
-        <p role="status" className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
+        <p role="status" className="mt-4 rounded-lg bg-pistachio-tint p-3 text-sm text-pistachio-deep">
           {notice}
         </p>
       )}
       {problem && (
-        <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+        <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-warning-tint p-3 text-sm text-warning">
           <span>{problem}</span>
           <button
             type="button"
             onClick={reload}
-            className="rounded-md border border-amber-300 bg-white px-3 py-1.5 font-medium hover:bg-amber-100"
+            className="rounded-md border border-warning/30 bg-white px-3 py-1.5 font-medium hover:bg-warning-tint"
           >
             Reload
           </button>
@@ -101,17 +101,17 @@ export function DiscountTiersPage() {
 
       <div className="mt-6 overflow-x-auto">
         {loadError ? (
-          <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">
+          <p role="alert" className="rounded-lg bg-danger-tint p-3 text-sm text-danger">
             {loadError}
           </p>
         ) : tiers === null ? (
-          <p role="status" className="text-sm text-slate-600">
+          <p role="status" className="text-sm text-warm-grey">
             Loading discount tiers…
           </p>
         ) : (
-          <table className="min-w-full text-left text-sm">
+          <table className="stack-table min-w-full text-left text-sm">
             <caption className="sr-only">Discount tiers</caption>
-            <thead className="text-xs uppercase tracking-wide text-slate-600">
+            <thead className="text-xs uppercase tracking-wide text-warm-grey">
               <tr>
                 <th scope="col" className="py-2 pr-4">Tier</th>
                 <th scope="col" className="py-2 pr-4">Paid orders needed</th>
@@ -125,17 +125,17 @@ export function DiscountTiersPage() {
             </thead>
             <tbody>
               {tiers.map((tier) => (
-                <tr key={tier.tierNumber} className="border-t border-slate-100">
-                  <th scope="row" className="py-2 pr-4 font-medium text-slate-900">
+                <tr key={tier.tierNumber} className="border-t border-line">
+                  <th scope="row" data-label="Tier" className="py-2 pr-4 font-medium text-chocolate">
                     Tier {tier.tierNumber}
                   </th>
-                  <td className="py-2 pr-4">{tier.minPreviousOrders}</td>
-                  <td className="py-2 pr-4">{tier.minDrinksPerOrder}</td>
-                  <td className="py-2 pr-4">{formatPercent(tier.discountRate, locale)}</td>
-                  <td className="py-2 pr-4">
+                  <td data-label="Paid orders needed" className="py-2 pr-4">{tier.minPreviousOrders}</td>
+                  <td data-label="Drinks per order" className="py-2 pr-4">{tier.minDrinksPerOrder}</td>
+                  <td data-label="Discount" className="py-2 pr-4">{formatPercent(tier.discountRate, locale)}</td>
+                  <td data-label="Status" className="py-2 pr-4">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        tier.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                        tier.isActive ? 'bg-pistachio-tint text-pistachio-deep' : 'bg-line text-chocolate'
                       }`}
                     >
                       {tier.isActive ? 'Active' : 'Inactive'}
@@ -161,7 +161,7 @@ export function DiscountTiersPage() {
                         aria-describedby={tier.activationBlockedReason ? BLOCKED_NOTICE_ID : undefined}
                         disabled={!tier.canActivate}
                         title={tier.activationBlockedReason ?? undefined}
-                        className="rounded-md px-2 py-1 font-medium text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="rounded-md px-2 py-1 font-medium text-pistachio-deep hover:bg-pistachio-tint disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         Activate
                       </button>
@@ -175,4 +175,4 @@ export function DiscountTiersPage() {
       </div>
     </section>
   )
-}
+}

@@ -30,9 +30,9 @@ export function PricesPage() {
 type Problem = { message: string; canReload: boolean }
 
 const STATUS_STYLES: Record<PricePeriod['status'], string> = {
-  Past: 'bg-slate-200 text-slate-700',
-  Current: 'bg-emerald-100 text-emerald-800',
-  Scheduled: 'bg-sky-100 text-sky-800',
+  Past: 'bg-line text-chocolate',
+  Current: 'bg-pistachio-tint text-pistachio-deep',
+  Scheduled: 'bg-strawberry-tint text-chocolate',
 }
 
 function PriceManager({ kind, itemId }: { kind: CatalogKind; itemId: number }) {
@@ -111,31 +111,31 @@ function PriceManager({ kind, itemId }: { kind: CatalogKind; itemId: number }) {
   }
 
   return (
-    <section aria-labelledby="prices-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+    <section aria-labelledby="prices-heading" className="rounded-card border border-line bg-surface p-5 shadow-soft sm:p-6">
       <Link to={`/manager/catalog/${kind}`} className="text-sm font-medium text-brand-700 hover:underline">
         ← Back to {title.toLowerCase()}
       </Link>
-      <h1 id="prices-heading" className="mt-2 text-2xl font-bold tracking-tight">
+      <h1 id="prices-heading" className="mt-2 text-2xl font-semibold text-chocolate">
         {history ? `Prices: ${history.item.name}` : 'Prices'}
       </h1>
-      <p className="mt-1 text-sm text-slate-600">
+      <p className="mt-1 text-sm text-warm-grey">
         Prices that have taken effect cannot be changed, so every order keeps the price it was placed at. A new price can
         start now or later, and a future price can be cancelled before it starts.
       </p>
 
       {notice && (
-        <p role="status" className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
+        <p role="status" className="mt-4 rounded-lg bg-pistachio-tint p-3 text-sm text-pistachio-deep">
           {notice}
         </p>
       )}
       {problem && (
-        <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+        <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-warning-tint p-3 text-sm text-warning">
           <span>{problem.message}</span>
           {problem.canReload && (
             <button
               type="button"
               onClick={reload}
-              className="rounded-md border border-amber-300 bg-white px-3 py-1.5 font-medium hover:bg-amber-100"
+              className="rounded-md border border-warning/30 bg-white px-3 py-1.5 font-medium hover:bg-warning-tint"
             >
               Reload
             </button>
@@ -144,11 +144,11 @@ function PriceManager({ kind, itemId }: { kind: CatalogKind; itemId: number }) {
       )}
 
       {loadError ? (
-        <p role="alert" className="mt-6 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">
+        <p role="alert" className="mt-6 rounded-lg bg-danger-tint p-3 text-sm text-danger">
           {loadError}
         </p>
       ) : history === null ? (
-        <p role="status" className="mt-6 text-sm text-slate-600">
+        <p role="status" className="mt-6 text-sm text-warm-grey">
           Loading prices…
         </p>
       ) : (
@@ -165,9 +165,9 @@ function PriceManager({ kind, itemId }: { kind: CatalogKind; itemId: number }) {
           </div>
 
           <div className="mt-6 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <caption className="mb-2 text-left text-base font-semibold text-slate-900">Price history, newest first</caption>
-              <thead className="text-xs uppercase tracking-wide text-slate-600">
+            <table className="stack-table min-w-full text-left text-sm">
+              <caption className="mb-2 text-left text-base font-semibold text-chocolate">Price history, newest first</caption>
+              <thead className="text-xs uppercase tracking-wide text-warm-grey">
                 <tr>
                   <th scope="col" className="py-2 pr-4">Price</th>
                   <th scope="col" className="py-2 pr-4">From</th>
@@ -180,11 +180,11 @@ function PriceManager({ kind, itemId }: { kind: CatalogKind; itemId: number }) {
               </thead>
               <tbody>
                 {history.prices.map((period) => (
-                  <tr key={period.id} className="border-t border-slate-100">
-                    <td className="py-2 pr-4 font-medium">{money(period.amount, period.currencyCode)}</td>
-                    <td className="py-2 pr-4">{formatDateTime(period.effectiveFrom, locale)}</td>
-                    <td className="py-2 pr-4">{period.effectiveTo ? formatDateTime(period.effectiveTo, locale) : '—'}</td>
-                    <td className="py-2 pr-4">
+                  <tr key={period.id} className="border-t border-line">
+                    <td data-label="Price" className="py-2 pr-4 font-medium">{money(period.amount, period.currencyCode)}</td>
+                    <td data-label="From" className="py-2 pr-4">{formatDateTime(period.effectiveFrom, locale)}</td>
+                    <td data-label="Until" className="py-2 pr-4">{period.effectiveTo ? formatDateTime(period.effectiveTo, locale) : '—'}</td>
+                    <td data-label="Status" className="py-2 pr-4">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[period.status]}`}>
                         {period.status}
                       </span>
@@ -196,7 +196,7 @@ function PriceManager({ kind, itemId }: { kind: CatalogKind; itemId: number }) {
                           aria-label={`Cancel the scheduled price of ${money(period.amount, period.currencyCode)}`}
                           onClick={() => setConfirming(period)}
                           disabled={cancelling}
-                          className="rounded-md px-2 py-1 font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-40"
+                          className="rounded-md px-2 py-1 font-medium text-danger hover:bg-danger-tint disabled:opacity-40"
                         >
                           Cancel
                         </button>
@@ -230,4 +230,4 @@ function PriceManager({ kind, itemId }: { kind: CatalogKind; itemId: number }) {
       />
     </section>
   )
-}
+}

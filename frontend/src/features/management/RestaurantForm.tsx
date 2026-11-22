@@ -92,7 +92,7 @@ export function RestaurantForm({ restaurant, onSaved, onCancel, onConflict }: Re
       </h2>
 
       {formError && (
-        <div role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">
+        <div role="alert" className="rounded-lg bg-danger-tint p-3 text-sm text-danger">
           {formError}
         </div>
       )}
@@ -128,7 +128,7 @@ export function RestaurantForm({ restaurant, onSaved, onCancel, onConflict }: Re
           type="button"
           onClick={onCancel}
           disabled={saving}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-lg border border-line-strong px-4 py-2 text-sm font-medium text-chocolate hover:bg-strawberry-wash disabled:opacity-50"
         >
           Cancel
         </button>

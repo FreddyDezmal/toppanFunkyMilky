@@ -65,26 +65,26 @@ export function SettingsPage() {
   }
 
   return (
-    <section aria-labelledby="settings-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <h1 id="settings-heading" className="text-2xl font-bold tracking-tight">
+    <section aria-labelledby="settings-heading" className="rounded-card border border-line bg-surface p-5 shadow-soft sm:p-6">
+      <h1 id="settings-heading" className="text-2xl font-semibold text-chocolate">
         Settings
       </h1>
-      <p className="mt-1 text-sm text-slate-600">
+      <p className="mt-1 text-sm text-warm-grey">
         Changes apply to orders placed after you save. Existing orders keep the values they were placed with.
       </p>
 
       {notice && (
-        <p role="status" className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
+        <p role="status" className="mt-4 rounded-lg bg-pistachio-tint p-3 text-sm text-pistachio-deep">
           {notice}
         </p>
       )}
       {problem && (
-        <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+        <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-warning-tint p-3 text-sm text-warning">
           <span>{problem}</span>
           <button
             type="button"
             onClick={reload}
-            className="rounded-md border border-amber-300 bg-white px-3 py-1.5 font-medium hover:bg-amber-100"
+            className="rounded-md border border-warning/30 bg-white px-3 py-1.5 font-medium hover:bg-warning-tint"
           >
             Reload
           </button>
@@ -92,15 +92,15 @@ export function SettingsPage() {
       )}
 
       {loadError ? (
-        <p role="alert" className="mt-6 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">
+        <p role="alert" className="mt-6 rounded-lg bg-danger-tint p-3 text-sm text-danger">
           {loadError}
         </p>
       ) : settings === null ? (
-        <p role="status" className="mt-6 text-sm text-slate-600">
+        <p role="status" className="mt-6 text-sm text-warm-grey">
           Loading settings…
         </p>
       ) : (
-        <ul className="mt-6 divide-y divide-slate-100">
+        <ul className="mt-6 divide-y divide-line">
           {settings.map((setting) => {
             const label = settingLabel(setting.key)
             const isEditing = editingKey === setting.key
@@ -108,9 +108,9 @@ export function SettingsPage() {
               <li key={setting.key} className="py-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h2 className="font-medium text-slate-900">{label}</h2>
-                    <p className="mt-0.5 text-sm text-slate-700">{displayValue(setting, locale, currencyCode)}</p>
-                    {!isEditing && setting.hint && <p className="mt-1 text-xs text-slate-600">{setting.hint}</p>}
+                    <h2 className="font-medium text-chocolate">{label}</h2>
+                    <p className="mt-0.5 text-sm text-chocolate">{displayValue(setting, locale, currencyCode)}</p>
+                    {!isEditing && setting.hint && <p className="mt-1 text-xs text-warm-grey">{setting.hint}</p>}
                   </div>
                   {setting.isEditable ? (
                     !isEditing && (
@@ -128,7 +128,7 @@ export function SettingsPage() {
                       </button>
                     )
                   ) : (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Read-only</span>
+                    <span className="rounded-full bg-cream px-2 py-0.5 text-xs font-medium text-warm-grey">Read-only</span>
                   )}
                 </div>
                 {isEditing && (
@@ -147,4 +147,4 @@ export function SettingsPage() {
       )}
     </section>
   )
-}
+}

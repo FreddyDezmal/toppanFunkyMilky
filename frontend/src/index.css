@@ -139,3 +139,73 @@
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Data tables on phones (redesign A7): below 40rem each row becomes a small card and each cell shows its column name,
+ * so every value and every action stays visible without sideways scrolling. Wider screens keep the normal table.
+ * Cells keep their table roles; the visible column names are drawn with CSS and given empty alternative text, so
+ * screen readers announce the real column header once, not twice.
+ */
+@media (width < 40rem) {
+  .stack-table,
+  .stack-table tbody,
+  .stack-table tr,
+  .stack-table th,
+  .stack-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .stack-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .stack-table tbody tr {
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface);
+    padding: 0.5rem 1rem;
+  }
+
+  .stack-table tbody th,
+  .stack-table tbody td {
+    padding: 0.375rem 0;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .stack-table [data-label] {
+    display: grid;
+    grid-template-columns: minmax(0, 8rem) minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  /* Values keep their own width (a status pill stays a pill). */
+  .stack-table [data-label] > * {
+    justify-self: start;
+  }
+
+  .stack-table [data-label]::before {
+    content: attr(data-label);
+    content: attr(data-label) / "";
+    color: var(--color-warm-grey);
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  /* The actions cell has no label: its buttons sit together under the values. */
+  .stack-table tbody td:not([data-label]) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    border-top: 1px solid var(--color-line);
+    margin-top: 0.25rem;
+    padding-top: 0.625rem;
+  }
+}

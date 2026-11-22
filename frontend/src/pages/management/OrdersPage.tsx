@@ -34,7 +34,7 @@ const REFUND_STATUS: Record<ManagerRefund['status'], string> = {
   Failed: 'Failed – refund by hand at Paystack',
 }
 
-const INPUT_CLASS = 'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none'
+const INPUT_CLASS = 'mt-1 w-full rounded-lg border border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:outline-none'
 const BUTTON_CLASS = 'rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50'
 
 function formatDateTime(iso: string, locale?: string, timeZone?: string): string {
@@ -127,12 +127,12 @@ export function OrdersPage() {
 
   return (
     <div className="space-y-6">
-      <section aria-labelledby="find-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-        <h1 id="find-heading" className="text-2xl font-bold tracking-tight">
+      <section aria-labelledby="find-heading" className="rounded-card border border-line bg-surface p-5 shadow-soft sm:p-6">
+        <h1 id="find-heading" className="text-2xl font-semibold text-chocolate">
           Orders
         </h1>
         <form onSubmit={onSubmit} noValidate className="mt-4 flex max-w-md flex-wrap items-end gap-2">
-          <label className="grow text-sm font-medium text-slate-700">
+          <label className="grow text-sm font-medium text-chocolate">
             Order reference
             <input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="MS-XXXX-XXXX" className={INPUT_CLASS} />
           </label>
@@ -141,7 +141,7 @@ export function OrdersPage() {
           </button>
         </form>
         {findError && (
-          <p role="alert" className="mt-3 text-sm text-rose-700">
+          <p role="alert" className="mt-3 text-sm text-danger">
             {findError}
           </p>
         )}
@@ -149,21 +149,21 @@ export function OrdersPage() {
 
       {order && <OrderCard key={order.reference} order={order} locale={locale} onChanged={setOrder} />}
 
-      <section aria-labelledby="attention-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <section aria-labelledby="attention-heading" className="rounded-card border border-line bg-surface p-5 shadow-soft sm:p-6">
         <h2 id="attention-heading" className="text-lg font-semibold">
           Refunds needing attention
         </h2>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-warm-grey">
           Paystack could not complete these refunds, or needs the patron&rsquo;s bank details. Handle them in the Paystack dashboard and contact the patron.
         </p>
         {attentionError && (
-          <p role="alert" className="mt-3 text-sm text-rose-700">
+          <p role="alert" className="mt-3 text-sm text-danger">
             {attentionError}
           </p>
         )}
-        {attention && attention.length === 0 && <p className="mt-3 text-sm text-slate-600">No refunds need attention.</p>}
+        {attention && attention.length === 0 && <p className="mt-3 text-sm text-warm-grey">No refunds need attention.</p>}
         {attention && attention.length > 0 && (
-          <ul className="mt-3 divide-y divide-slate-100 text-sm">
+          <ul className="mt-3 divide-y divide-line text-sm">
             {attention.map((refund) => (
               <li key={refund.refundReference} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <span>
@@ -199,24 +199,24 @@ function OrderCard({ order, locale, onChanged }: { order: ManagerOrder; locale: 
   }, [])
 
   return (
-    <section aria-labelledby="order-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+    <section aria-labelledby="order-heading" className="rounded-card border border-line bg-surface p-5 shadow-soft sm:p-6">
       <h2 id="order-heading" ref={heading} tabIndex={-1} className="text-xl font-semibold focus:outline-none">
         Order {order.reference}
       </h2>
       <dl className="mt-3 grid max-w-xl grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-slate-600">Order status</dt>
+        <dt className="text-warm-grey">Order status</dt>
         <dd className="font-medium">{ORDER_STATUS[order.status]}</dd>
-        <dt className="text-slate-600">Payment</dt>
+        <dt className="text-warm-grey">Payment</dt>
         <dd className="font-medium">{order.isPaid ? 'Paid' : 'Not paid'}</dd>
-        <dt className="text-slate-600">Patron</dt>
+        <dt className="text-warm-grey">Patron</dt>
         <dd>
           {order.patronFirstName} · <a href={`mailto:${order.patronEmail}`} className="text-brand-700 underline">{order.patronEmail}</a>
         </dd>
-        <dt className="text-slate-600">Pickup</dt>
+        <dt className="text-warm-grey">Pickup</dt>
         <dd>
           {order.restaurantName}, {formatDateTime(order.pickupAtUtc, locale, order.pickupTimeZone)}
         </dd>
-        <dt className="text-slate-600">Total</dt>
+        <dt className="text-warm-grey">Total</dt>
         <dd>{money(order.total)}</dd>
       </dl>
 
@@ -247,7 +247,7 @@ function OrderCard({ order, locale, onChanged }: { order: ManagerOrder; locale: 
       )}
 
       {sent && (
-        <p role="status" className="mt-5 text-sm text-emerald-800">
+        <p role="status" className="mt-5 text-sm text-pistachio-deep">
           Request sent. The order changes only if the patron accepts; unanswered requests lapse at the pickup time.
         </p>
       )}
@@ -260,7 +260,7 @@ function OrderCard({ order, locale, onChanged }: { order: ManagerOrder; locale: 
           }}
         />
       ) : (
-        <p className="mt-5 text-sm text-slate-600">
+        <p className="mt-5 text-sm text-warm-grey">
           {order.requests.some((request) => request.isOpen)
             ? 'A cancellation request is waiting for the patron’s answer.'
             : 'This order can no longer be cancelled: it is cancelled or its pickup time has passed.'}
@@ -311,10 +311,10 @@ function RequestForm({ order, onRequested }: { order: ManagerOrder; onRequested:
   return (
     <form onSubmit={(event) => void onSubmit(event)} noValidate className="mt-5 max-w-xl">
       <h3 className="font-semibold">Ask the patron to cancel</h3>
-      <p id={hintId} className="text-xs text-slate-600">
+      <p id={hintId} className="text-xs text-warm-grey">
         The patron sees this reason and decides. If the order was paid and they accept, they get everything back.
       </p>
-      <label className="mt-2 block text-sm font-medium text-slate-700">
+      <label className="mt-2 block text-sm font-medium text-chocolate">
         Reason
         <input
           value={reason}
@@ -325,11 +325,11 @@ function RequestForm({ order, onRequested }: { order: ManagerOrder; onRequested:
           className={INPUT_CLASS}
         />
       </label>
-      <p className="mt-1 text-xs text-slate-600">
+      <p className="mt-1 text-xs text-warm-grey">
         {reason.length}/{REASON_MAX_LENGTH} characters
       </p>
       {error && (
-        <p id={errorId} role="alert" className="mt-1 text-sm text-rose-700">
+        <p id={errorId} role="alert" className="mt-1 text-sm text-danger">
           {error}
         </p>
       )}

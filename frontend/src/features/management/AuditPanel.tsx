@@ -8,13 +8,13 @@ import type { AuditChange, AuditPage, SecurityEvent, SecurityEventType } from '.
 
 type View = 'lookups' | 'changes' | 'security'
 
-const INPUT_CLASS = 'mt-1 block rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none'
+const INPUT_CLASS = 'mt-1 block rounded-lg border border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:outline-none'
 const BUTTON_CLASS = 'rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50'
-const SECONDARY_CLASS = 'rounded-lg px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:opacity-50'
+const SECONDARY_CLASS = 'rounded-lg px-4 py-2 text-sm font-medium text-chocolate ring-1 ring-line-strong hover:bg-strawberry-wash disabled:opacity-50'
 
 function toggleClass(active: boolean) {
   return `rounded-full px-3 py-1 text-sm font-medium ring-1 ${
-    active ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-slate-700 ring-slate-300 hover:bg-brand-50'
+    active ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-chocolate ring-line-strong hover:bg-brand-50'
   }`
 }
 
@@ -43,7 +43,7 @@ export function AuditPanel({ from, to }: AuditPanelProps) {
   return (
     <>
       <h2 className="text-lg font-semibold">Audit history</h2>
-      <p className="mt-1 max-w-2xl text-sm text-slate-600">
+      <p className="mt-1 max-w-2xl text-sm text-warm-grey">
         Every change is recorded with who made it, the old and new values, and when. Personal details are hidden. The date filter above
         applies here too.
       </p>
@@ -150,7 +150,7 @@ function Changes({ lookupsOnly, from, to }: { lookupsOnly: boolean; from: string
   return (
     <>
       <form onSubmit={onSubmit} noValidate aria-label={lookupsOnly ? 'Filter lookup changes' : 'Filter all changes'} className="mt-4 flex flex-wrap items-end gap-3">
-        <label className="text-sm font-medium text-slate-700">
+        <label className="text-sm font-medium text-chocolate">
           {lookupsOnly ? 'Lookup table' : 'Table'}
           <select value={draft.entity ?? ''} onChange={(event) => setDraft({ ...draft, entity: event.target.value || undefined })} className={INPUT_CLASS}>
             {!lookupsOnly && <option value="">All tables</option>}
@@ -163,7 +163,7 @@ function Changes({ lookupsOnly, from, to }: { lookupsOnly: boolean; from: string
         </label>
         {!lookupsOnly && (
           <>
-            <label className="text-sm font-medium text-slate-700">
+            <label className="text-sm font-medium text-chocolate">
               Action
               <select
                 value={draft.action ?? ''}
@@ -178,7 +178,7 @@ function Changes({ lookupsOnly, from, to }: { lookupsOnly: boolean; from: string
                 ))}
               </select>
             </label>
-            <label className="text-sm font-medium text-slate-700">
+            <label className="text-sm font-medium text-chocolate">
               Made by
               <select value={draft.actor ?? ''} onChange={(event) => setDraft({ ...draft, actor: event.target.value || undefined })} className={INPUT_CLASS}>
                 <option value="">Anyone</option>
@@ -191,7 +191,7 @@ function Changes({ lookupsOnly, from, to }: { lookupsOnly: boolean; from: string
             </label>
           </>
         )}
-        <label className="text-sm font-medium text-slate-700">
+        <label className="text-sm font-medium text-chocolate">
           User email
           <input
             type="email"
@@ -201,7 +201,7 @@ function Changes({ lookupsOnly, from, to }: { lookupsOnly: boolean; from: string
             className={INPUT_CLASS}
           />
         </label>
-        <label className="text-sm font-medium text-slate-700">
+        <label className="text-sm font-medium text-chocolate">
           Search changes
           <input
             type="search"
@@ -225,31 +225,31 @@ function Changes({ lookupsOnly, from, to }: { lookupsOnly: boolean; from: string
       </div>
 
       {error && (
-        <p role="alert" className="mt-4 text-sm text-rose-700">
+        <p role="alert" className="mt-4 text-sm text-danger">
           {error}
         </p>
       )}
       {!items && !error && (
-        <p role="status" className="mt-4 text-sm text-slate-600">
+        <p role="status" className="mt-4 text-sm text-warm-grey">
           Loading changes…
         </p>
       )}
-      {items && items.length === 0 && <p className="mt-4 text-sm text-slate-600">No changes match.</p>}
+      {items && items.length === 0 && <p className="mt-4 text-sm text-warm-grey">No changes match.</p>}
       {items && items.length > 0 && (
-        <ol aria-label={lookupsOnly ? 'Lookup changes' : 'Changes'} className="mt-4 divide-y divide-slate-100">
+        <ol aria-label={lookupsOnly ? 'Lookup changes' : 'Changes'} className="mt-4 divide-y divide-line">
           {items.map((change) => (
             <li key={change.id} className="py-3 text-sm">
               <p className="font-medium">
                 {ACTION_LABELS[change.action]} · {describeRecord(change)}
               </p>
-              <p className="text-slate-600">
+              <p className="text-warm-grey">
                 {formatWhen(change.occurredAt, locale, timeZone)} · by {describeActor(change)}
               </p>
               {change.changes.length > 0 && (
                 <table className="mt-2 w-full max-w-3xl text-left text-sm">
                   <caption className="sr-only">Fields changed</caption>
                   <thead>
-                    <tr className="text-slate-600">
+                    <tr className="text-warm-grey">
                       <th scope="col" className="py-1 pr-3 font-medium">
                         Field
                       </th>
@@ -263,8 +263,8 @@ function Changes({ lookupsOnly, from, to }: { lookupsOnly: boolean; from: string
                   </thead>
                   <tbody>
                     {change.changes.map((field) => (
-                      <tr key={field.field} className="border-t border-slate-100 align-top">
-                        <th scope="row" className="py-1 pr-3 font-normal text-slate-700">
+                      <tr key={field.field} className="border-t border-line align-top">
+                        <th scope="row" className="py-1 pr-3 font-normal text-chocolate">
                           {field.field}
                         </th>
                         <td className="break-all py-1 pr-3">{describeValue(field.old)}</td>
@@ -303,7 +303,7 @@ function SecurityEvents({ from, to }: { from: string; to: string }) {
   return (
     <>
       <form onSubmit={onSubmit} noValidate aria-label="Filter sign-in events" className="mt-4 flex flex-wrap items-end gap-3">
-        <label className="text-sm font-medium text-slate-700">
+        <label className="text-sm font-medium text-chocolate">
           Event
           <select
             value={draft.eventType ?? ''}
@@ -318,7 +318,7 @@ function SecurityEvents({ from, to }: { from: string; to: string }) {
             ))}
           </select>
         </label>
-        <label className="text-sm font-medium text-slate-700">
+        <label className="text-sm font-medium text-chocolate">
           User email
           <input
             type="email"
@@ -337,22 +337,22 @@ function SecurityEvents({ from, to }: { from: string; to: string }) {
       </div>
 
       {error && (
-        <p role="alert" className="mt-4 text-sm text-rose-700">
+        <p role="alert" className="mt-4 text-sm text-danger">
           {error}
         </p>
       )}
       {!items && !error && (
-        <p role="status" className="mt-4 text-sm text-slate-600">
+        <p role="status" className="mt-4 text-sm text-warm-grey">
           Loading sign-in events…
         </p>
       )}
-      {items && items.length === 0 && <p className="mt-4 text-sm text-slate-600">No sign-in events match.</p>}
+      {items && items.length === 0 && <p className="mt-4 text-sm text-warm-grey">No sign-in events match.</p>}
       {items && items.length > 0 && (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="stack-table w-full text-left text-sm">
             <caption className="sr-only">Sign-in events, newest first</caption>
             <thead>
-              <tr className="text-slate-600">
+              <tr className="text-warm-grey">
                 {['When', 'Event', 'User', 'Address'].map((heading) => (
                   <th key={heading} scope="col" className="px-2 py-2 font-medium">
                     {heading}
@@ -362,11 +362,11 @@ function SecurityEvents({ from, to }: { from: string; to: string }) {
             </thead>
             <tbody>
               {items.map((event) => (
-                <tr key={event.id} className="border-t border-slate-100">
-                  <td className="px-2 py-2">{formatWhen(event.occurredAt, locale, timeZone)}</td>
-                  <td className="px-2 py-2">{EVENT_LABELS[event.eventType]}</td>
-                  <td className="break-all px-2 py-2">{event.user ?? 'Unknown'}</td>
-                  <td className="px-2 py-2 tabular-nums">{event.ipAddress ?? 'Not recorded'}</td>
+                <tr key={event.id} className="border-t border-line">
+                  <td data-label="When" className="px-2 py-2">{formatWhen(event.occurredAt, locale, timeZone)}</td>
+                  <td data-label="Event" className="px-2 py-2">{EVENT_LABELS[event.eventType]}</td>
+                  <td data-label="User" className="break-all px-2 py-2">{event.user ?? 'Unknown'}</td>
+                  <td data-label="Address" className="px-2 py-2 tabular-nums">{event.ipAddress ?? 'Not recorded'}</td>
                 </tr>
               ))}
             </tbody>

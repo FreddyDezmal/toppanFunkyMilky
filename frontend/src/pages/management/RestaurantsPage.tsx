@@ -80,17 +80,17 @@ export function RestaurantsPage() {
   const actionsLocked = editing !== null || busyId !== null
 
   return (
-    <section aria-labelledby="restaurants-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+    <section aria-labelledby="restaurants-heading" className="rounded-card border border-line bg-surface p-5 shadow-soft sm:p-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 id="restaurants-heading" className="text-2xl font-bold tracking-tight">
+          <h1 id="restaurants-heading" className="text-2xl font-semibold text-chocolate">
             Restaurants
           </h1>
-          <p className="mt-1 text-sm text-slate-600">Inactive restaurants cannot be chosen for new orders but are kept for history.</p>
+          <p className="mt-1 text-sm text-warm-grey">Inactive restaurants cannot be chosen for new orders but are kept for history.</p>
         </div>
         <div className="flex items-end gap-3">
           <div>
-            <label htmlFor="restaurant-status-filter" className="block text-sm font-medium text-slate-700">
+            <label htmlFor="restaurant-status-filter" className="block text-sm font-medium text-chocolate">
               Show
             </label>
             <select
@@ -100,7 +100,7 @@ export function RestaurantsPage() {
                 setLoadError(null)
                 setStatus(event.target.value as StatusFilter)
               }}
-              className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="mt-1 rounded-lg border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               <option value="all">All</option>
               <option value="active">Active only</option>
@@ -122,18 +122,18 @@ export function RestaurantsPage() {
       </div>
 
       {notice && (
-        <p role="status" className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
+        <p role="status" className="mt-4 rounded-lg bg-pistachio-tint p-3 text-sm text-pistachio-deep">
           {notice}
         </p>
       )}
       {problem && (
-        <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+        <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-warning-tint p-3 text-sm text-warning">
           <span>{problem.message}</span>
           {problem.canReload && (
             <button
               type="button"
               onClick={reload}
-              className="rounded-md border border-amber-300 bg-white px-3 py-1.5 font-medium hover:bg-amber-100"
+              className="rounded-md border border-warning/30 bg-white px-3 py-1.5 font-medium hover:bg-warning-tint"
             >
               Reload
             </button>
@@ -154,19 +154,19 @@ export function RestaurantsPage() {
 
       <div className="mt-6 overflow-x-auto">
         {loadError ? (
-          <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">
+          <p role="alert" className="rounded-lg bg-danger-tint p-3 text-sm text-danger">
             {loadError}
           </p>
         ) : restaurants === null ? (
-          <p role="status" className="text-sm text-slate-600">
+          <p role="status" className="text-sm text-warm-grey">
             Loading restaurants…
           </p>
         ) : restaurants.length === 0 ? (
-          <p className="text-sm text-slate-600">No restaurants to show.</p>
+          <p className="text-sm text-warm-grey">No restaurants to show.</p>
         ) : (
-          <table className="min-w-full text-left text-sm">
+          <table className="stack-table min-w-full text-left text-sm">
             <caption className="sr-only">Restaurants</caption>
-            <thead className="text-xs uppercase tracking-wide text-slate-600">
+            <thead className="text-xs uppercase tracking-wide text-warm-grey">
               <tr>
                 <th scope="col" className="py-2 pr-4">Name</th>
                 <th scope="col" className="py-2 pr-4">Address</th>
@@ -178,15 +178,15 @@ export function RestaurantsPage() {
             </thead>
             <tbody>
               {restaurants.map((restaurant) => (
-                <tr key={restaurant.id} className="border-t border-slate-100">
-                  <th scope="row" className="py-2 pr-4 font-medium text-slate-900">
+                <tr key={restaurant.id} className="border-t border-line">
+                  <th scope="row" data-label="Name" className="py-2 pr-4 font-medium text-chocolate">
                     {restaurant.name}
                   </th>
-                  <td className="py-2 pr-4 text-slate-600">{restaurant.address ?? '—'}</td>
-                  <td className="py-2 pr-4">
+                  <td data-label="Address" className="py-2 pr-4 text-warm-grey">{restaurant.address ?? '—'}</td>
+                  <td data-label="Status" className="py-2 pr-4">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        restaurant.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                        restaurant.isActive ? 'bg-pistachio-tint text-pistachio-deep' : 'bg-line text-chocolate'
                       }`}
                     >
                       {restaurant.isActive ? 'Active' : 'Inactive'}
@@ -211,7 +211,7 @@ export function RestaurantsPage() {
                         aria-label={`Deactivate ${restaurant.name}`}
                         onClick={() => setConfirming(restaurant)}
                         disabled={actionsLocked}
-                        className="rounded-md px-2 py-1 font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-40"
+                        className="rounded-md px-2 py-1 font-medium text-danger hover:bg-danger-tint disabled:opacity-40"
                       >
                         Deactivate
                       </button>
@@ -221,7 +221,7 @@ export function RestaurantsPage() {
                         aria-label={`Activate ${restaurant.name}`}
                         onClick={() => void changeActive(restaurant, true)}
                         disabled={actionsLocked}
-                        className="rounded-md px-2 py-1 font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-40"
+                        className="rounded-md px-2 py-1 font-medium text-pistachio-deep hover:bg-pistachio-tint disabled:opacity-40"
                       >
                         {busyId === restaurant.id ? 'Activating…' : 'Activate'}
                       </button>
@@ -249,4 +249,4 @@ export function RestaurantsPage() {
       />
     </section>
   )
-}
+}

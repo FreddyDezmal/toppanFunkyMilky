@@ -37,16 +37,16 @@ const ERROR: Record<NonNullable<EmailDelivery['lastError']>, string> = {
 }
 
 const STATUS_CLASS: Record<EmailStatus, string> = {
-  Pending: 'bg-amber-50 text-amber-800 ring-amber-200',
-  Sending: 'bg-sky-50 text-sky-800 ring-sky-200',
-  Sent: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-  Failed: 'bg-rose-50 text-rose-800 ring-rose-200',
-  Suppressed: 'bg-slate-100 text-slate-700 ring-slate-200',
+  Pending: 'bg-warning-tint text-warning ring-warning/30',
+  Sending: 'bg-strawberry-wash text-chocolate ring-line',
+  Sent: 'bg-pistachio-tint text-pistachio-deep ring-pistachio',
+  Failed: 'bg-danger-tint text-danger ring-danger/30',
+  Suppressed: 'bg-cream text-chocolate ring-line',
 }
 
-const INPUT_CLASS = 'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none'
+const INPUT_CLASS = 'mt-1 w-full rounded-lg border border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:outline-none'
 const BUTTON_CLASS = 'rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50'
-const SECONDARY_CLASS = 'rounded-lg px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50'
+const SECONDARY_CLASS = 'rounded-lg px-4 py-2 text-sm font-medium text-chocolate ring-1 ring-line-strong hover:bg-strawberry-wash'
 
 function formatDateTime(iso: string, locale?: string): string {
   try {
@@ -58,7 +58,7 @@ function formatDateTime(iso: string, locale?: string): string {
 
 function filterClass(active: boolean) {
   return `rounded-full px-3 py-1 text-sm font-medium ring-1 ${
-    active ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-slate-700 ring-slate-300 hover:bg-brand-50'
+    active ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-chocolate ring-line-strong hover:bg-brand-50'
   }`
 }
 
@@ -122,11 +122,11 @@ export function EmailsPage() {
 
   return (
     <div className="space-y-6">
-      <section aria-labelledby="emails-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-        <h1 id="emails-heading" className="text-2xl font-bold tracking-tight">
+      <section aria-labelledby="emails-heading" className="rounded-card border border-line bg-surface p-5 shadow-soft sm:p-6">
+        <h1 id="emails-heading" className="text-2xl font-semibold text-chocolate">
           Emails
         </h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-600">
+        <p className="mt-1 max-w-2xl text-sm text-warm-grey">
           Order and refund emails are sent automatically. If the email service is unavailable they are retried for a few hours, and
           payments, cancellations and refunds are never affected. You can send a sent or failed email again.
         </p>
@@ -144,7 +144,7 @@ export function EmailsPage() {
         </div>
 
         <form onSubmit={onFilter} noValidate className="mt-4 flex max-w-md flex-wrap items-end gap-2">
-          <label className="grow text-sm font-medium text-slate-700">
+          <label className="grow text-sm font-medium text-chocolate">
             Order reference
             <input value={orderInput} onChange={(event) => setOrderInput(event.target.value)} placeholder="MS-XXXX-XXXX" className={INPUT_CLASS} />
           </label>
@@ -166,32 +166,32 @@ export function EmailsPage() {
         </form>
       </section>
 
-      <section aria-labelledby="list-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <section aria-labelledby="list-heading" className="rounded-card border border-line bg-surface p-5 shadow-soft sm:p-6">
         <h2 id="list-heading" className="text-lg font-semibold">
           {order ? `Emails for order ${order.toUpperCase()}` : 'Latest emails'}
         </h2>
         {message && (
-          <p role={message.isError ? 'alert' : 'status'} className={`mt-3 text-sm ${message.isError ? 'text-rose-700' : 'text-emerald-800'}`}>
+          <p role={message.isError ? 'alert' : 'status'} className={`mt-3 text-sm ${message.isError ? 'text-danger' : 'text-pistachio-deep'}`}>
             {message.text}
           </p>
         )}
         {loadError && (
-          <p role="alert" className="mt-3 text-sm text-rose-700">
+          <p role="alert" className="mt-3 text-sm text-danger">
             {loadError}
           </p>
         )}
-        {!list && !loadError && <p className="mt-3 text-sm text-slate-600">Loading emails…</p>}
-        {list && list.items.length === 0 && <p className="mt-3 text-sm text-slate-600">No emails match.</p>}
+        {!list && !loadError && <p className="mt-3 text-sm text-warm-grey">Loading emails…</p>}
+        {list && list.items.length === 0 && <p className="mt-3 text-sm text-warm-grey">No emails match.</p>}
         {list && list.items.length > 0 && (
-          <ul className="mt-3 divide-y divide-slate-100">
+          <ul className="mt-3 divide-y divide-line">
             {list.items.map((email) => (
               <li key={email.id} aria-label={`${KIND[email.kind]} for order ${email.orderReference}`} className="flex flex-wrap items-start justify-between gap-3 py-3 text-sm">
                 <div className="min-w-0 space-y-0.5">
                   <p className="font-medium">
                     {KIND[email.kind]} · Order {email.orderReference}
                   </p>
-                  <p className="break-all text-slate-600">To {email.recipientEmail}</p>
-                  <p className="text-slate-600">
+                  <p className="break-all text-warm-grey">To {email.recipientEmail}</p>
+                  <p className="text-warm-grey">
                     {describeDelivery(email, locale)}
                   </p>
                 </div>
