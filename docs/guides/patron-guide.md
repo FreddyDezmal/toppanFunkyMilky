@@ -2,8 +2,13 @@
 
 How to order milkshakes online and collect them at a Milky Shaky restaurant.
 
+**Site:** https://milkyshaky.onrender.com
+
 > **Demonstration site.** Payments run in Paystack **test mode**: no real money is taken, and you pay with a test card
-> that the facilitator gives you. Emails go only to addresses approved for the demonstration.
+> that the facilitator gives you. Emails go only to the address approved for the demonstration.
+>
+> The site runs on free hosting: if nobody has used it for 15 minutes it sleeps, and the first page then takes about a
+> minute to appear. After that it is quick.
 
 ## 1. Create an account
 

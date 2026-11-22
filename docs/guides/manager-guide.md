@@ -2,7 +2,11 @@
 
 How managers run the online shop: prices, menu, restaurants, settings, orders, emails, reports and the audit trail.
 
-> **Demonstration site.** Paystack runs in test mode (no real money). Emails go only to approved addresses.
+**Site:** https://milkyshaky.onrender.com (Management is in the menu after signing in)
+
+> **Demonstration site.** Paystack runs in test mode (no real money). Emails go only to the approved address; others
+> are listed under Emails as *Suppressed*. After 15 minutes without visitors the site sleeps and the first page takes
+> about a minute; background work (sending emails, checking payments) resumes as soon as it wakes.
 
 ## 1. Signing in
 

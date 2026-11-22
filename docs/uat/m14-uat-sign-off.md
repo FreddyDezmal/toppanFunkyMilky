@@ -1,7 +1,7 @@
 # M14 UAT sign-off form
 
 **Project:** Order Milkshake for Pickup (Milky Shaky Custom Drinks) · **Milestone:** M14 · **Release:** `<version / commit, filled in at UAT>`
-**Site tested:** `https://<filled in at UAT>`
+**Site tested:** `https://milkyshaky.onrender.com`
 
 Completed and signed by the stakeholders only. The developer prepares the results summary but does not sign for,
 or on behalf of, anyone.
@@ -59,9 +59,13 @@ AC-14.2 requires **0 open Critical and 0 open High** defects.
 
 ## 6. Signatures
 
-| Role | Name | Signature | Date |
-| --- | --- | --- | --- |
-| Business owner / sign-off authority | | | |
-| Patron tester | | | |
-| Manager tester | | | |
-| Developer (prepared the results; not an approval) | | | |
+Testers are listed by the aliases used in the project records. Each tester writes their own name, signature and date.
+
+| Tester (alias) | Role in UAT | Name | Signature | Date |
+| --- | --- | --- | --- | --- |
+| ToppanTester1 | | | | |
+| ToppanTester2 | | | | |
+| ToppanTester3 | | | | |
+| Developer (prepared the results; not an approval) | Facilitator | | | |
+
+The business owner / sign-off authority is: ______________ (alias).

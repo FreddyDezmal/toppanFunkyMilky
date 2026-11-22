@@ -6,6 +6,20 @@ managers maintain prices, lookups and discounts, and review reports and audit hi
 > Requirements: *Order Milkshake for Pickup – User Requirement Specification v1.1* (confidential; not stored in this repository).
 > Roadmap: [`docs/`](docs/).
 
+**Live demonstration:** https://milkyshaky.onrender.com (release v1.0.2; Paystack **test mode**, no real money; free
+hosting sleeps after 15 minutes idle, so the first page can take about a minute).
+
+## Documentation
+
+| For | Read |
+| --- | --- |
+| Patrons and managers | [`docs/guides/patron-guide.md`](docs/guides/patron-guide.md), [`docs/guides/manager-guide.md`](docs/guides/manager-guide.md) |
+| Running the deployment | [`docs/guides/operations-guide.md`](docs/guides/operations-guide.md), [`docs/deployment/configuration-reference.md`](docs/deployment/configuration-reference.md) |
+| UAT | [`docs/uat/`](docs/uat/) – start with the tester pack |
+| What is in a release | [`docs/releases/`](docs/releases/) |
+| Decisions | [`docs/decisions/`](docs/decisions/) |
+| Progress and evidence | [`docs/progress/`](docs/progress/), [`docs/testing/`](docs/testing/) |
+
 ## Stack
 
 | Layer | Technology |
@@ -105,6 +119,20 @@ Remove-Item Env:E2E_MANAGER_EMAIL, Env:E2E_MANAGER_PASSWORD; Remove-Variable sec
 ```
 
 Each manager run adds one deactivated `E2E Flavour <timestamp>` to the development database (nothing is deleted).
+
+**Self-contained end-to-end stack** (Docker; disposable database, mail capture and Paystack simulator; nothing
+external is touched):
+
+```powershell
+cd frontend
+npm run test:e2e:local                               # API + vite preview
+npm run test:e2e:local -- --container                # the production image behind a local TLS edge proxy
+npm run test:e2e:local -- --container --backup-drill # then back up and restore-test the run's database
+npm run test:e2e:local -- --perf --zap               # k6 load test and ZAP scans against the local stack
+```
+
+CI (`.github/workflows/ci.yml`) runs the backend and frontend suites, vulnerability audits, a secret scan of the whole
+history and an image content check on every push to `main`.
 
 ## Repository layout
 
@@ -305,6 +333,14 @@ value, new value, action and when – in the same transaction as the change. Sig
 - Docs: [`docs/reports/reporting-architecture.md`](docs/reports/reporting-architecture.md), decisions
   `docs/decisions/2026-11-21_m12-reporting-decisions.md`, report
   `docs/progress/2026-11-21_milestone-12-reporting-report.md`.
+
+## Deployment (Milestone 14)
+
+Production is one Docker container (`Dockerfile`) serving the site and the API on one origin, on a Render free web
+service in Frankfurt, with Supabase PostgreSQL in Ireland. Deployments happen only by hand: tag a commit on `main`
+whose CI run passed, then **Actions → Deploy** with the tag. Migrations are reviewed and applied separately with
+`tools/deploy/database.mjs`; backups (**Database backup**) and health checks (**Monitor**) run on schedules. Full
+procedures, including first deployment, rollback and incidents: [operations guide](docs/guides/operations-guide.md).
 
 ## Security notes
 

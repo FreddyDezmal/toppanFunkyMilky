@@ -10,10 +10,10 @@ here as `UAT-DEF-nn`.
 | --- | --- | --- | --- | --- | --- |
 | DEF-04 | 21 Nov 2026 (M13) | Milkshakes page | Low (layout) | The live estimate pushed "Continue to pickup" down about 110 px as it appeared | Closed (retest `2026-11-21T08-51-33-655Z`) |
 | DEF-07 | 21 Nov 2026 (M14 baseline) | Vitest `ordering-screens.test.tsx` | Low (test only) | "order page › shows the order as stored…" failed once: focus checked before the page's focus effect ran | Closed (Vitest 207 of 207, 21 Nov 2026 10:49) |
-| DEF-08 | 21 Nov 2026 (first CI run) | Payment confirmation (webhook, return, reconciliation) | Medium | Two requests confirming the same payment at the same moment: the later one failed with HTTP 500 instead of "retry" | Fixed; local retest passed; CI retest pending |
-| DEF-09 | 21 Nov 2026 (first CI run) | Vitest `my-orders.test.tsx` | Low (test only) | Expected "placed" time built with the machine's locale; the page uses the store's (en-ZA) | Fixed, awaiting CI retest |
+| DEF-08 | 21 Nov 2026 (first CI run) | Payment confirmation (webhook, return, reconciliation) | Medium | Two requests confirming the same payment at the same moment: the later one failed with HTTP 500 instead of "retry" | Closed (local 30/30; CI green on `0995f99` and later) |
+| DEF-09 | 21 Nov 2026 (first CI run) | Vitest `my-orders.test.tsx` | Low (test only) | Expected "placed" time built with the machine's locale; the page uses the store's (en-ZA) | Closed (CI Vitest green on `0995f99` and later) |
 | DEF-10 | 21 Nov 2026 (E2E `2026-11-21T10-25-58-944Z`) | Whole site (grey secondary text) | Low (accessibility) | `text-slate-500` on the pink page background is 4.36:1, under WCAG AA 4.5:1 (seen on "Checking your session…") | Closed (E2E `2026-11-21T10-42-51-261Z` 19 of 19) |
-| DEF-11 | 21 Nov 2026 (CI image check) | Production image | Low (configuration) | `appsettings.Development.json` (development seed data and localhost CORS origin; no secrets) was published into the image | Fixed; CI retest pending |
+| DEF-11 | 21 Nov 2026 (CI image check) | Production image | Low (configuration) | `appsettings.Development.json` (development seed data and localhost CORS origin; no secrets) was published into the image | Closed (CI image check green on `0995f99`; `/app` verified locally) |
 
 ## DEF-04 – The live estimate moved the Continue button (carried over from M13)
 
@@ -112,3 +112,5 @@ recurrence will name the test. **Status: not reproduced.**
 - **Retest:** the check's pattern was run against the failing listing (matches only the settings file) and a clean
   listing (no matches); local image rebuild and the next CI run pending.
 
+**Status 22 November 2026:** DEF-08, DEF-09 and DEF-11 closed – the first CI run after the fixes (`0995f99`) and every
+later run were green. No M14 defect is open. UAT defects are logged in `docs/uat/m14-uat-defect-log.md`.

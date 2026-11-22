@@ -34,21 +34,26 @@ domain for email (decision D-5).
 
 ## 3. People
 
-| Role | Name | Responsibility |
+The testers are the people who set the assignment. In the project records they are referred to by **aliases** chosen
+by the developer: **ToppanTester1**, **ToppanTester2** and **ToppanTester3**. Each alias is also the name of that
+tester's manager account. Who takes which role is agreed at the start of the session and written below by the
+testers; real names, signatures and dates are written only by the testers themselves, on the sign-off form.
+
+| Role | Tester (alias) | Responsibility |
 | --- | --- | --- |
 | Business owner / sign-off authority | | Accepts or rejects the release; signs `m14-uat-sign-off.md` |
 | Patron tester(s) | | Run the patron scripts (P-xx) and X-01, X-03 |
 | Manager tester(s) | | Run the manager scripts (M-xx) and X-02 |
-| UAT facilitator (developer) | | Prepares the environment and accounts, answers questions, logs defects as reported, never records a result on a tester's behalf |
+| UAT facilitator (developer) | the developer | Prepares the environment and accounts, answers questions, logs defects as reported, never records a result on a tester's behalf |
 
 ## 4. Environment and test data
 
 | Item | Value |
 | --- | --- |
-| Site | The deployed demonstration site, `https://<to be confirmed in Step 8>` |
+| Site | **https://milkyshaky.onrender.com** (release v1.0.2). Free hosting: after 15 minutes without visitors the site sleeps, and the first page then takes **about a minute** to appear – open it a few minutes before the session |
 | Data | Fresh demonstration data (decision D-4): 7 flavours, 4 consistencies, 6 toppings, 2 sample restaurants, VAT 15 %, frequent-customer discounts switched off |
 | Patron accounts | Each patron tester registers their own account during script P-01 |
-| Manager accounts | One per manager tester, created by the facilitator before the session; the password is given to the tester in person and changed by nobody else |
+| Manager accounts | One per tester, created by the facilitator before the session: `toppantester1@milkyshaky.test`, `toppantester2@milkyshaky.test`, `toppantester3@milkyshaky.test` (sign-in names only; these addresses receive no email). Each password is given to its tester in person |
 | Payments | **Paystack test mode.** No real card and no real money. Use the test card on Paystack's "Test Payments" documentation page; the facilitator hands it out in the session |
 | Email | **Decision E-1:** the demonstration has no own email domain, so the email service delivers only to one address: the facilitator's. Emails to any other patron are recorded and shown as *Suppressed* under Management → Emails. The email scripts (P-18 to P-20) are therefore run with the facilitator's patron account, with the testers watching and reading the received email on the facilitator's screen; every other patron script uses the testers' own accounts |
 | Browsers | Any current Chrome, Edge, Firefox or Safari; at least one tester also uses a phone |
