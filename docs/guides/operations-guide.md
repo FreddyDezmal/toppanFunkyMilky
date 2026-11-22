@@ -188,12 +188,39 @@ restore drill: 27 tables, integrity 18 × 0, audit change refused (`docs/testing
 | `workers` | each worker ran recently; nothing waiting for a manager | a worker has not run for three intervals; emails failed in the last 24 h; refunds failed or needing attention | – |
 
 The health response contains counts and times only, never personal data.
-*To complete in Step 9:* the scheduled GitHub Actions health check, how it alerts, and the record of one alert test.
+
+**Scheduled check:** `.github/workflows/monitor.yml` runs every 6 hours (00:41, 06:41, 12:41, 18:41 UTC) and on
+demand. It fails unless the health is **Healthy** (it waits up to about two minutes for a sleeping service to wake),
+and GitHub then emails a "Run failed" notice to the user who created the schedule. Each run's summary lists every
+check with its status. Monitoring is periodic: a problem can go unnoticed for up to 6 hours (D-13).
+
+- Turn on GitHub → Settings → Notifications → Actions → email, failed workflows only.
+- **Gmail files GitHub notices under the *Updates* tab** – check there, or add a filter for
+  `notifications@github.com` so alerts land in the inbox.
+- **Alert test:** Actions → Monitor → Run workflow with *simulate_failure* ticked; the run fails on purpose after the
+  real check. Tested 22 November 2026: notice received (`docs/testing/m14-step9-verification.md`).
+- **On an alert:** open the failed run's summary to see which check failed, then §10.
+
+`tools/deploy/verify-production.mjs https://milkyshaky.onrender.com` repeats the outside checks (HTTPS, HSTS, headers,
+cookies, CSRF, CORS, no API description, response times) at any time; it only reads.
 
 ## 9. Rollback
 
-*To complete in Step 9:* redeploying the previous image, the conditions for rolling back, and the record of one
-rehearsal. See §5: the database is never rolled back by an application rollback.
+**When:** a release causes a Critical or High problem that cannot be fixed forward within the hour, and the previous
+release is known to be good.
+
+**How:** Actions → **Deploy** → Run workflow with the **previous release tag** (e.g. `v1.0.1`). The workflow builds
+and deploys exactly that commit and checks health; nothing else is needed. Then roll forward with a fixed release
+when ready.
+
+**Rules:**
+- The database is **not** rolled back. If the release being undone added a migration, check that the previous code
+  still works with the newer schema (migrations are additive and backward-compatible, §5) before rolling back; never
+  run a down-migration on live data.
+- Record the rollback (run link, reason) in the release notes.
+
+**Rehearsed 22 November 2026:** v1.0.2 → rollback to v1.0.1 (live and Healthy about 1 min 24 s after the previous
+deploy finished) → roll forward to v1.0.2; all three Healthy (`docs/testing/m14-step9-verification.md`).
 
 ## 10. Incidents
 
