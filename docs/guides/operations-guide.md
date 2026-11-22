@@ -1,7 +1,7 @@
 # Milky Shaky Custom Drinks – Technical and operations guide
 
-For whoever runs the demonstration deployment. **Draft (M14 Step 5).** Sections marked *To complete in Step N* are
-filled in from evidence when that step is done; nothing here is claimed before it has been tested.
+For whoever runs the demonstration deployment. **Version 1.0 (M14, 22 November 2026).** Every procedure here was
+carried out at least once; the evidence is in `docs/testing/m14-step7-…`, `m14-step8-…` and `m14-step9-…`.
 
 ## 1. Architecture
 
