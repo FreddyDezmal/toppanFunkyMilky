@@ -37,7 +37,7 @@ test('a patron cannot open the management screens', async ({ page }) => {
   await page.getByLabel('Email address').fill(`e2e-patron-${Date.now()}@example.test`)
   await page.getByLabel('Mobile number').fill('+27 82 123 4567')
   await page.getByLabel('Password', { exact: true }).fill(password)
-  await page.getByLabel('Confirm password').fill(password)
+  await page.getByLabel('Confirm password', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Create account' }).click()
   await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible()
 
@@ -58,7 +58,7 @@ test.describe('manager journey', () => {
     // Sign in and open the flavours list.
     await page.goto('/login')
     await page.getByLabel('Email address').fill(managerEmail)
-    await page.getByLabel('Password').fill(managerPassword)
+    await page.getByLabel('Password', { exact: true }).fill(managerPassword)
     await page.getByRole('button', { name: 'Log in' }).click()
     await page.getByRole('link', { name: 'Management', exact: true }).click()
     await section(page, 'Flavours').click()

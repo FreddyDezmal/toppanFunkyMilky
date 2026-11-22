@@ -9,6 +9,7 @@ import { clearCsrfToken } from '../lib/api/httpClient'
 import { jsonResponse, mockApi } from '../test/mockApi'
 import { ChoiceCardGroup } from './forms/ChoiceCardGroup'
 import { QuantityStepper } from './forms/QuantityStepper'
+import { TextField } from './forms/TextField'
 import { routeTitle } from '../app/routeTitle'
 import { AppLayout } from './layout/AppLayout'
 import { Alert } from './ui/Alert'
@@ -222,5 +223,50 @@ describe('routeTitle', () => {
     expect(routeTitle('/manager/catalog/flavours/3/prices')).toBe('Prices – Flavours – Management – Milky Shaky')
     expect(routeTitle('/manager/reports/')).toBe('Reports – Management – Milky Shaky')
     expect(routeTitle('/nowhere')).toBe('Page not found – Milky Shaky')
+  })
+})
+
+describe('password fields', () => {
+  function PasswordHarness({ onSubmit }: { onSubmit?: () => void }) {
+    const [value, setValue] = useState('')
+    return (
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          onSubmit?.()
+        }}
+      >
+        <TextField id="password" label="Password" type="password" value={value} onChange={setValue} />
+        <button type="submit">Log in</button>
+      </form>
+    )
+  }
+
+  it('can show and hide what was typed, and hides it again on submit', async () => {
+    const submitted = vi.fn()
+    render(<PasswordHarness onSubmit={submitted} />)
+    const field = screen.getByLabelText('Password')
+    await userEvent.type(field, 'Milkshake1Test')
+    expect(field).toHaveAttribute('type', 'password')
+
+    const toggle = screen.getByRole('button', { name: 'Show password' })
+    expect(toggle).toHaveAttribute('aria-controls', 'password')
+    await userEvent.click(toggle)
+    expect(field).toHaveAttribute('type', 'text')
+    expect(field).toHaveValue('Milkshake1Test')
+    expect(screen.getByRole('button', { name: 'Hide password' })).toHaveTextContent('Hide')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
+    expect(submitted).toHaveBeenCalledTimes(1)
+    expect(field).toHaveAttribute('type', 'password')
+    expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
+  })
+
+  it('never submits the form itself', async () => {
+    const submitted = vi.fn()
+    render(<PasswordHarness onSubmit={submitted} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Show password' }))
+    expect(submitted).not.toHaveBeenCalled()
   })
 })

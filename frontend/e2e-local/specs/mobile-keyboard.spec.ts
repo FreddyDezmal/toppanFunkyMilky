@@ -72,7 +72,7 @@ test.describe('on a phone-sized screen', () => {
     await page.getByLabel('Email address').fill(email)
     await page.getByLabel('Mobile number').fill('+27 82 123 4567')
     await page.getByLabel('Password', { exact: true }).fill(PATRON_PASSWORD)
-    await page.getByLabel('Confirm password').fill(PATRON_PASSWORD)
+    await page.getByLabel('Confirm password', { exact: true }).fill(PATRON_PASSWORD)
     await page.getByRole('button', { name: 'Create account' }).tap()
     await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible()
     await checkPage(page, 'My account (phone)')
@@ -124,7 +124,7 @@ test('E2E-14 a patron registers, orders and pays using only the keyboard', async
   await typeInto(page, page.getByLabel('Email address'), email)
   await typeInto(page, page.getByLabel('Mobile number'), '+27 82 123 4567')
   await typeInto(page, page.getByLabel('Password', { exact: true }), PATRON_PASSWORD)
-  await typeInto(page, page.getByLabel('Confirm password'), PATRON_PASSWORD)
+  await typeInto(page, page.getByLabel('Confirm password', { exact: true }), PATRON_PASSWORD)
   await press(page, page.getByRole('button', { name: 'Create account' }))
   await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible()
 

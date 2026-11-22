@@ -20,7 +20,7 @@ async function registerPatron(page: Page): Promise<string> {
   await page.getByLabel('Email address').fill(email)
   await page.getByLabel('Mobile number').fill('+27 82 123 4567')
   await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
-  await page.getByLabel('Confirm password').fill(PASSWORD)
+  await page.getByLabel('Confirm password', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Create account' }).click()
   await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible()
   return email
@@ -162,7 +162,7 @@ test('a patron builds a draft: quantity, milkshakes, pickup and a server-checked
   expect(await storedDrafts(page)).toEqual([])
 
   await page.getByLabel('Email address').fill(email)
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Log in' }).click()
   await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible()
   await page.goto('/order/review')
@@ -249,7 +249,7 @@ test.describe('manager', () => {
   test('cannot open the ordering screens (patron-only, open question Q-19)', async ({ page }) => {
     await page.goto('/login')
     await page.getByLabel('Email address').fill(managerEmail)
-    await page.getByLabel('Password').fill(managerPassword)
+    await page.getByLabel('Password', { exact: true }).fill(managerPassword)
     await page.getByRole('button', { name: 'Log in' }).click()
     await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible()
 

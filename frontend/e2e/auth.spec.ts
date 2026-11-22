@@ -9,7 +9,7 @@ test('a patron can register, is kept out of manager pages, signs out and signs b
   await page.getByLabel('Email address').fill(email)
   await page.getByLabel('Mobile number').fill('+27 82 123 4567')
   await page.getByLabel('Password', { exact: true }).fill(password)
-  await page.getByLabel('Confirm password').fill(password)
+  await page.getByLabel('Confirm password', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Create account' }).click()
 
   await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible()
@@ -24,7 +24,7 @@ test('a patron can register, is kept out of manager pages, signs out and signs b
   await expect(page.getByRole('heading', { name: 'Log in to your account' })).toBeVisible()
 
   await page.getByLabel('Email address').fill(email)
-  await page.getByLabel('Password').fill(password)
+  await page.getByLabel('Password', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Log in' }).click()
   await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible()
 })

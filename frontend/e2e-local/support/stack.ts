@@ -27,7 +27,7 @@ export async function registerPatron(page: Page): Promise<string> {
   await page.getByLabel('Email address').fill(email)
   await page.getByLabel('Mobile number').fill('+27 82 123 4567')
   await page.getByLabel('Password', { exact: true }).fill(PATRON_PASSWORD)
-  await page.getByLabel('Confirm password').fill(PATRON_PASSWORD)
+  await page.getByLabel('Confirm password', { exact: true }).fill(PATRON_PASSWORD)
   await page.getByRole('button', { name: 'Create account' }).click()
   await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible()
   return email
