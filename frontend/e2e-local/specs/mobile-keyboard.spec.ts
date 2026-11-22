@@ -104,6 +104,7 @@ test.describe('on a phone-sized screen', () => {
     await expect(page.getByText('Paid', { exact: true })).toBeVisible()
     await checkPage(page, 'Order page – paid (phone)')
 
+    await page.getByRole('button', { name: 'Menu' }).tap()
     await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'My orders' }).tap()
     await expect(page.getByRole('link', { name: `Order ${reference}` })).toBeVisible()
     await checkPage(page, 'My orders (phone)')

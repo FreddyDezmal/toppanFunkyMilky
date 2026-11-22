@@ -1,6 +1,6 @@
 import { expect, test, type Browser, type Page } from '@playwright/test'
 import { countMailAfterQuietPeriod, mailMessage, payOrder, paystack, useTestCheckout, waitForMail, type SimulatedTransaction } from '../support/providers'
-import { centsOf, expectNoSeriousAccessibilityProblems, managerPage, placeOrder, registerPatron, type PlacedOrder } from '../support/stack'
+import { centsOf, expectNoSeriousAccessibilityProblems, mainNavLink, managerPage, placeOrder, registerPatron, type PlacedOrder } from '../support/stack'
 
 /**
  * M13 E2E-06 and E2E-07 (MR-05, MR-06, MR-09, MR-10) on the local E2E stack. A paid order is cancelled by the patron
@@ -32,7 +32,7 @@ async function paidOrder(page: Page): Promise<{ email: string; order: PlacedOrde
 
 /** The patron's My orders row for this order. */
 async function historyRow(page: Page, reference: string) {
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'My orders' }).click()
+  await (await mainNavLink(page, 'My orders')).click()
   return page.getByRole('link', { name: `Order ${reference}` }).locator('xpath=ancestor::li[1]')
 }
 

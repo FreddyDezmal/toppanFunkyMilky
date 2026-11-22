@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { countMailAfterQuietPeriod, mailMessage, paystack, useTestCheckout, waitForMail } from '../support/providers'
-import { centsOf, expectNoSeriousAccessibilityProblems, managerPage, placeOrder, registerPatron } from '../support/stack'
+import { centsOf, expectNoSeriousAccessibilityProblems, mainNavLink, managerPage, placeOrder, registerPatron } from '../support/stack'
 
 /**
  * M13 E2E-03, E2E-04, E2E-05 (MR-05, MR-06, MR-08, MR-09, MR-10; FR-06, FR-07) on the local E2E stack: real browser →
@@ -58,7 +58,7 @@ test('@all-browsers a paid order is confirmed only after server verification, wi
   expect(content.HTML + content.Text).not.toMatch(/sk_test|sk_live|card|cvv/i)
 
   // Patron history.
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'My orders' }).click()
+  await (await mainNavLink(page, 'My orders')).click()
   const row = page.getByRole('link', { name: `Order ${order.reference}` }).locator('xpath=ancestor::li[1]')
   await expect(row).toContainText('Confirmed · Paid')
 

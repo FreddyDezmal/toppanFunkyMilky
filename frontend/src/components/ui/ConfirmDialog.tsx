@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type KeyboardEvent } from 'react'
+import { Button } from './Button'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -71,39 +72,28 @@ export function ConfirmDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-chocolate-dark/50 p-4">
       <div
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={messageId}
         onKeyDown={handleKeyDown}
-        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+        className="w-full max-w-md rounded-card bg-surface p-6 shadow-raised"
       >
-        <h2 id={titleId} className="text-lg font-semibold text-slate-900">
+        <h2 id={titleId} className="text-xl font-semibold text-chocolate">
           {title}
         </h2>
-        <p id={messageId} className="mt-2 text-sm text-slate-600">
+        <p id={messageId} className="mt-2 text-sm text-warm-grey">
           {message}
         </p>
-        <div className="mt-6 flex justify-end gap-2">
-          <button
-            ref={cancelRef}
-            type="button"
-            onClick={onCancel}
-            disabled={busy}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          >
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button ref={cancelRef} variant="secondary" onClick={onCancel} disabled={busy}>
             {cancelLabel}
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={busy}
-            className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="danger" onClick={onConfirm} disabled={busy}>
             {busy ? 'Working…' : confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

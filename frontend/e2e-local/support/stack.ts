@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext, type Browser, type Locator, type Page } from '@playwright/test'
 
 /** Addresses and credentials passed in memory by e2e-local/run.mjs. */
 export const stack = {
@@ -48,6 +48,18 @@ export async function managerPage(browser: Browser): Promise<Page> {
   const page = await context.newPage()
   await signIn(page, stack.managerEmail, stack.managerPassword)
   return page
+}
+
+/**
+ * A link in the main navigation. On phone-sized screens the navigation is folded behind the "Menu" button (UI/UX
+ * redesign), so the menu is opened first when that button is showing.
+ */
+export async function mainNavLink(page: Page, name: string): Promise<Locator> {
+  const menu = page.getByRole('button', { name: 'Menu' })
+  if ((await menu.isVisible()) && (await menu.getAttribute('aria-expanded')) !== 'true') {
+    await menu.click()
+  }
+  return page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name, exact: true })
 }
 
 export interface PlacedOrder {

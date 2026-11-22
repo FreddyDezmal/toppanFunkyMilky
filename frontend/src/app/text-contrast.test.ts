@@ -8,6 +8,9 @@ const sources = import.meta.glob(['../**/*.tsx', '!../**/*.test.tsx'], { query: 
   string
 >
 const tooLight = /\btext-(?:slate|gray|zinc|neutral|stone)-(?:50|100|200|300|400|500)\b/g
+// Redesign tokens that are decoration only: strawberry 1.8:1 and pistachio 1.5:1 on cream, line-strong 3.7:1 (enough
+// for a border, not for text).
+const decorationOnly = /\btext-(?:strawberry(?:-tint|-wash)?|pistachio(?:-tint)?|line(?:-strong)?|cream)(?![\w-])/g
 
 describe('text contrast (DEF-10)', () => {
   it('reads the component sources', () => {
@@ -16,6 +19,13 @@ describe('text contrast (DEF-10)', () => {
 
   it('uses no grey text lighter than slate-600', () => {
     const found = Object.entries(sources).flatMap(([file, text]) => (text.match(tooLight) ?? []).map((cls) => `${file}: ${cls}`))
+    expect(found).toEqual([])
+  })
+
+  it('uses no decoration-only colour for text', () => {
+    const found = Object.entries(sources).flatMap(([file, text]) =>
+      (text.match(decorationOnly) ?? []).map((cls) => `${file}: ${cls}`),
+    )
     expect(found).toEqual([])
   })
 })
