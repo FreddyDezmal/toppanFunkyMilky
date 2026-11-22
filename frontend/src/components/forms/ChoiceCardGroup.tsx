@@ -93,13 +93,12 @@ export function ChoiceCardGroup({
                 </span>
               )}
               <span className="min-w-0">
-                <span className="block leading-snug font-semibold text-chocolate">{option.label}</span>
-                {option.detail && (
-                  <span className="block text-sm text-warm-grey">
-                    <span className="sr-only">, </span>
-                    {option.detail}
-                  </span>
-                )}
+                <span className="block leading-snug font-semibold text-chocolate">
+                  {option.label}
+                  {/* Read as "Strawberry, R 32,00": the comma sits with the name, before the detail's own block. */}
+                  {option.detail && <span className="sr-only">,</span>}
+                </span>
+                {option.detail && <span className="block text-sm text-warm-grey">{option.detail}</span>}
               </span>
               <span
                 aria-hidden="true"

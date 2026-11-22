@@ -88,7 +88,7 @@ test('E2E-08 and E2E-09 a manager changes a flavour price and renames it: only n
     await setQuantity(page, 1)
     await page.getByRole('button', { name: 'Continue' }).click()
     const flavours = page.getByRole('listitem', { name: 'Milkshake 1', exact: true }).getByRole('group', { name: 'Flavour', exact: true })
-    await expect(flavours.getByRole('radio', { name: new RegExp(`^${escape(name)},\\s?${amount(20)}$`) })).toHaveCount(1)
+    await expect(flavours.getByRole('radio', { name: new RegExp(`^${escape(name)}\\s*,\\s*${amount(20)}$`) })).toHaveCount(1)
     const newTotal = await reviewOrder(page, { flavour: name })
     expect(centsOf(newTotal)).toBeGreaterThan(centsOf(order.totalText))
   })

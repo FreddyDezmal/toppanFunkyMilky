@@ -61,7 +61,8 @@ async function chooseFirstStableCard(group: Locator) {
 
 /** Picks a card whose fee differs from the chosen one (cards read "Name, + R 12,00"), so the total must change. */
 async function chooseDifferentlyPricedCard(group: Locator) {
-  const fee = (label: string | null) => label?.split(', ').at(-1)?.trim()
+  // Everything after the hidden comma that follows the name (the fee itself contains a decimal comma).
+  const fee = (label: string | null) => (label === null ? undefined : label.slice(label.indexOf(',') + 1).trim())
   const current = await group.locator('label:has(input:checked)').textContent()
   const labels = await group.locator('label').allTextContents()
   const other = labels.findIndex((label) => !label.trimStart().startsWith('E2E ') && fee(label) !== fee(current))

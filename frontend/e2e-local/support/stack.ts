@@ -70,14 +70,15 @@ function escapeRegExp(text: string): string {
 /**
  * Chooses a card in a group of choice cards (UI/UX redesign: radio cards replaced the drop-downs) by clicking its
  * card, as a patron would. `option` is the start of the option's name, or its position in the group (0 = first).
- * Each radio's accessible name is the option's name, a comma and its fee (or the restaurant's address).
+ * Each radio's accessible name is the option's name, a comma and its fee (or the restaurant's address); browsers may
+ * put a space before the comma, because the name and the fee are separate blocks on the card.
  */
 export async function chooseCard(scope: Page | Locator, group: string, option: string | number = 0): Promise<void> {
   const fieldset = scope.getByRole('group', { name: group, exact: true })
   const radio =
     typeof option === 'number'
       ? fieldset.getByRole('radio').nth(option)
-      : fieldset.getByRole('radio', { name: new RegExp(`^${escapeRegExp(option)},`) })
+      : fieldset.getByRole('radio', { name: new RegExp(`^${escapeRegExp(option)}\\s*,`) })
   await radio.locator('xpath=ancestor::label[1]').click()
   await expect(radio).toBeChecked()
 }

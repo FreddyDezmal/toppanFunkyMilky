@@ -2,6 +2,12 @@ import { formatMoney, formatPercent } from '../../lib/format/money'
 import type { OrderTotals } from './types'
 
 /**
+ * Both summaries use the same fixed amount column, so a label wraps the same way whether amounts or dashes are shown
+ * and the height never changes when the estimate arrives (DEF-04, rechecked for the redesigned narrow summary).
+ */
+const GRID = 'grid grid-cols-[minmax(0,1fr)_8.5rem] gap-y-1.5'
+
+/**
  * Server-calculated totals (M6): subtotal, frequent-customer discount (0 when none, as the URS requires), VAT with
  * its rate, and the estimated total. Formatting only – every amount comes from the API.
  */
@@ -19,18 +25,18 @@ export function PriceSummary({
   const { discount } = totals
 
   return (
-    <dl className="grid grid-cols-[1fr_auto] gap-y-1.5 text-sm tabular-nums">
+    <dl className={`${GRID} text-sm tabular-nums`}>
       <dt className="text-warm-grey">Subtotal</dt>
-      <dd className="pl-4 text-right">{money(totals.subtotal)}</dd>
+      <dd className="pl-4 text-right whitespace-nowrap">{money(totals.subtotal)}</dd>
 
       <dt className="text-warm-grey">Frequent-customer discount</dt>
-      <dd className="pl-4 text-right">{discount.tierNumber === null ? `${money(discount.amount)} (none)` : `−${money(discount.amount)}`}</dd>
+      <dd className="pl-4 text-right whitespace-nowrap">{discount.tierNumber === null ? `${money(discount.amount)} (none)` : `−${money(discount.amount)}`}</dd>
 
       <dt className="text-warm-grey">VAT ({formatPercent(totals.vatRate, locale)})</dt>
-      <dd className="pl-4 text-right">{money(totals.vat)}</dd>
+      <dd className="pl-4 text-right whitespace-nowrap">{money(totals.vat)}</dd>
 
       <dt className="border-t border-line pt-2 text-base font-semibold text-chocolate">{totalLabel}</dt>
-      <dd className="border-t pl-4 border-line pt-2 text-right text-base font-semibold text-chocolate">{money(totals.total)}</dd>
+      <dd className="border-t border-line pt-2 pl-4 text-right whitespace-nowrap text-base font-semibold text-chocolate">{money(totals.total)}</dd>
     </dl>
   )
 }
@@ -42,18 +48,18 @@ export function PriceSummary({
  */
 export function PriceSummaryPlaceholder({ totalLabel = 'Estimated total' }: { totalLabel?: string }) {
   return (
-    <dl aria-hidden="true" data-testid="price-summary-placeholder" className="grid grid-cols-[1fr_auto] gap-y-1.5 text-sm text-warm-grey">
+    <dl aria-hidden="true" data-testid="price-summary-placeholder" className={`${GRID} text-sm text-warm-grey`}>
       <dt className="text-warm-grey">Subtotal</dt>
-      <dd className="pl-4 text-right">—</dd>
+      <dd className="pl-4 text-right whitespace-nowrap">—</dd>
 
       <dt className="text-warm-grey">Frequent-customer discount</dt>
-      <dd className="pl-4 text-right">—</dd>
+      <dd className="pl-4 text-right whitespace-nowrap">—</dd>
 
       <dt className="text-warm-grey">VAT</dt>
-      <dd className="pl-4 text-right">—</dd>
+      <dd className="pl-4 text-right whitespace-nowrap">—</dd>
 
       <dt className="border-t border-line pt-2 text-base font-semibold text-chocolate">{totalLabel}</dt>
-      <dd className="border-t pl-4 border-line pt-2 text-right text-base font-semibold">—</dd>
+      <dd className="border-t border-line pt-2 pl-4 text-right whitespace-nowrap text-base font-semibold">—</dd>
     </dl>
   )
 }

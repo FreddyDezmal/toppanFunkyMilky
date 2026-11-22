@@ -53,6 +53,11 @@ async function askToCancel(browser: Browser, reference: string, reason: string):
   await manager.context().close()
 }
 
+/** The lines of the order page's refund list (one per refund). */
+function refundLines(page: Page) {
+  return page.getByRole('region', { name: /^Refunds?$/ }).getByRole('listitem')
+}
+
 test('E2E-06 a patron cancels a paid order: the fee is kept, the rest is refunded once Paystack confirms, with emails and history', async ({
   page,
   browser,
@@ -81,7 +86,9 @@ test('E2E-06 a patron cancels a paid order: the fee is kept, the rest is refunde
   expect(settled.statuses).toEqual([200])
 
   await page.reload()
-  await expect(page.getByText(/– completed( on .+)?\. A cancellation fee of .+ was kept\./)).toBeVisible()
+  // Read from the refund list itself: since the redesign the footer text also ends with a full stop, so a pattern
+  // ending in "\.$" would match the whole page as well.
+  await expect(refundLines(page)).toHaveText([/– completed( on .+)?\. A cancellation fee of .+ was kept\.$/])
   await expectNoSeriousAccessibilityProblems(page, 'Cancelled order')
 
   // One cancellation email and one refund email.
@@ -125,7 +132,7 @@ test('E2E-07 the restaurant asks to cancel a paid order and the patron accepts: 
   expect(settled.refunds.map((r) => r.amount)).toEqual([tx.amount])
   expect(settled.statuses).toEqual([200])
   await page.reload()
-  await expect(page.getByText(/– completed( on .+)?\.$/)).toBeVisible()
+  await expect(refundLines(page)).toHaveText([/– completed( on .+)?\.$/])
   await expect(page.getByText(/cancellation fee .* was kept/)).toHaveCount(0)
 
   await waitForMail(email, subjects.cancelled(order.reference))
