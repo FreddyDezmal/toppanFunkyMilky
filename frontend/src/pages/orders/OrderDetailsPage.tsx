@@ -7,6 +7,14 @@ import { formatLocalTime, timeZoneLabel } from '../../features/ordering/format'
 import { RETURN_PARAM } from '../../features/ordering/payment'
 import { PaymentPanel } from '../../features/ordering/PaymentPanel'
 import { STATUS_LABELS } from '../../features/ordering/placement'
+import { Alert } from '../../components/ui/Alert'
+import { Badge } from '../../components/ui/Badge'
+import { Button } from '../../components/ui/Button'
+import { buttonClasses } from '../../components/ui/buttonClasses'
+import { Card } from '../../components/ui/Card'
+import { EmptyState } from '../../components/ui/EmptyState'
+import { Icon } from '../../components/ui/Icon'
+import { Skeleton } from '../../components/ui/Skeleton'
 import { PriceSummary } from '../../features/ordering/PriceSummary'
 import type { PlacedOrder } from '../../features/ordering/types'
 import { ApiError } from '../../lib/api/httpClient'
@@ -17,8 +25,6 @@ type PageState =
   | { kind: 'loaded'; order: PlacedOrder; locale: string | undefined }
   | { kind: 'notFound' }
   | { kind: 'error'; message: string }
-
-const LINK_CLASS = 'rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50'
 
 /**
  * /orders/:reference — one of the patron's own orders, exactly as stored when it was placed (names, fees, VAT and
@@ -73,116 +79,168 @@ export function OrderDetailsPage() {
 
   if (state.kind === 'loading') {
     return (
-      <p role="status" className="text-sm text-slate-600">
-        Loading your order…
-      </p>
+      <div className="mx-auto max-w-5xl">
+        <p role="status" className="sr-only">
+          Loading your order…
+        </p>
+        <Skeleton className="h-10 w-72 max-w-full" />
+        <Card className="mt-6 space-y-3">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-2/3" />
+        </Card>
+      </div>
     )
   }
 
   if (state.kind === 'notFound') {
     return (
-      <section aria-labelledby="order-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-        <h1 id="order-heading" className="text-2xl font-bold tracking-tight">
+      <section aria-labelledby="order-heading" className="mx-auto max-w-2xl">
+        <h1 id="order-heading" className="text-3xl font-semibold text-chocolate">
           Order not found
         </h1>
-        <p className="mt-2 text-slate-600">We could not find this order in your account.</p>
-        <Link to="/order" className={`${LINK_CLASS} mt-4 inline-block`}>
-          Start an order
-        </Link>
+        <div className="mt-6">
+          <EmptyState
+            title="Nothing to show"
+            icon="receipt"
+            action={
+              <Link to="/order" className={buttonClasses()}>
+                Start an order
+              </Link>
+            }
+          >
+            We could not find this order in your account.
+          </EmptyState>
+        </div>
       </section>
     )
   }
 
   if (state.kind === 'error') {
     return (
-      <div role="alert" className="rounded-lg bg-rose-50 p-4 text-sm text-rose-800">
+      <Alert tone="danger" role="alert" className="mx-auto max-w-2xl">
         <p>{state.message}</p>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => {
             setState({ kind: 'loading' })
             setAttempt((count) => count + 1)
           }}
-          className={`${LINK_CLASS} mt-3 bg-white`}
+          className="mt-3"
         >
           Try again
-        </button>
-      </div>
+        </Button>
+      </Alert>
     )
   }
 
   const { order, locale } = state
   const money = (amount: number) => formatMoney(amount, order.totals.currencyCode, locale)
+  const paid = order.isPaid
 
   return (
-    <section aria-labelledby="order-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <h1 id="order-heading" ref={heading} tabIndex={-1} className="text-2xl font-bold tracking-tight focus:outline-none">
+    <section aria-labelledby="order-heading" className="mx-auto max-w-5xl">
+      <Link to="/orders" className="inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-raspberry hover:underline">
+        <Icon name="chevron-left" className="size-4" />
+        All my orders
+      </Link>
+      <h1 id="order-heading" ref={heading} tabIndex={-1} className="mt-2 text-3xl font-semibold text-chocolate focus:outline-none sm:text-4xl">
         Order {order.reference}
       </h1>
 
-      <dl className="mt-4 grid max-w-md grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-slate-600">Order status</dt>
-        <dd className="font-medium">{STATUS_LABELS[order.status]}</dd>
-        <dt className="text-slate-600">Payment</dt>
-        <dd className="font-medium">{order.isPaid ? 'Paid' : 'Not paid'}</dd>
+      <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+        <div className="flex items-center gap-2">
+          <dt className="text-warm-grey">Order status</dt>
+          <dd>
+            <Badge tone={order.status === 'Confirmed' ? 'success' : order.status === 'PaymentFailed' ? 'danger' : order.status === 'Cancelled' ? 'neutral' : 'warning'}>
+              {STATUS_LABELS[order.status]}
+            </Badge>
+          </dd>
+        </div>
+        <div className="flex items-center gap-2">
+          <dt className="text-warm-grey">Payment</dt>
+          <dd>
+            <Badge tone={paid ? 'success' : order.status === 'Cancelled' ? 'neutral' : 'warning'}>{paid ? 'Paid' : 'Not paid'}</Badge>
+          </dd>
+        </div>
       </dl>
 
-      {order.note && <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-900">{order.note}</p>}
+      {order.note && (
+        <Alert tone="warning" className="mt-4">
+          <span className="font-semibold">{order.note}</span>
+        </Alert>
+      )}
 
-      <div className="mt-6 grid gap-6 sm:grid-cols-2">
-        <div>
-          <h2 className="text-lg font-semibold">Pickup</h2>
-          <p className="mt-1 font-medium">{order.restaurant.name}</p>
-          {order.restaurant.address && <p className="text-sm text-slate-600">{order.restaurant.address}</p>}
-          <p className="mt-2">{formatLocalTime(order.pickup.local, locale)}</p>
-          <p className="text-xs text-slate-600">{timeZoneLabel(order.pickup.timeZone, locale)}</p>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="min-w-0 space-y-6">
+          <Card as="section" aria-labelledby="order-pickup-heading" padding="md">
+            <h2 id="order-pickup-heading" className="flex items-center gap-2 font-display text-xl font-semibold text-chocolate">
+              <Icon name="store" className="size-5 text-raspberry" />
+              Pickup
+            </h2>
+            <p className="mt-3 font-semibold text-chocolate">{order.restaurant.name}</p>
+            {order.restaurant.address && <p className="text-sm text-warm-grey">{order.restaurant.address}</p>}
+            <p className="mt-3 flex items-center gap-2 text-chocolate">
+              <Icon name="clock" className="size-5 text-raspberry" />
+              {formatLocalTime(order.pickup.local, locale)}
+            </p>
+            <p className="mt-1 text-sm text-warm-grey">{timeZoneLabel(order.pickup.timeZone, locale)}</p>
+          </Card>
+
+          <Card as="section" aria-labelledby="order-drinks-heading" padding="md">
+            <h2 id="order-drinks-heading" className="font-display text-xl font-semibold text-chocolate">
+              {order.drinks.length === 1 ? '1 milkshake' : `${order.drinks.length} milkshakes`}
+            </h2>
+            <ol className="mt-3 divide-y divide-line">
+              {order.drinks.map((drink) => (
+                <li key={drink.number} className="py-3">
+                  <h3 className="flex justify-between gap-4 font-semibold text-chocolate">
+                    <span>Milkshake {drink.number}</span> <span className="tabular-nums">{money(drink.price)}</span>
+                  </h3>
+                  <ul className="mt-1 text-sm text-warm-grey">
+                    <li>
+                      {drink.flavour.name} · {money(drink.flavour.fee)}
+                    </li>
+                    <li>
+                      {drink.consistency.name} · {money(drink.consistency.fee)}
+                    </li>
+                    <li>
+                      {drink.topping.name} · {money(drink.topping.fee)}
+                    </li>
+                  </ul>
+                </li>
+              ))}
+            </ol>
+          </Card>
         </div>
 
-        <div>
-          <h2 className="text-lg font-semibold">{order.drinks.length === 1 ? '1 milkshake' : `${order.drinks.length} milkshakes`}</h2>
-          <ol className="mt-1 space-y-3">
-            {order.drinks.map((drink) => (
-              <li key={drink.number}>
-                <h3 className="flex justify-between gap-4 font-medium">
-                  <span>Milkshake {drink.number}</span> <span>{money(drink.price)}</span>
-                </h3>
-                <ul className="text-sm text-slate-700">
-                  <li>
-                    {drink.flavour.name} · {money(drink.flavour.fee)}
-                  </li>
-                  <li>
-                    {drink.consistency.name} · {money(drink.consistency.fee)}
-                  </li>
-                  <li>
-                    {drink.topping.name} · {money(drink.topping.fee)}
-                  </li>
-                </ul>
-              </li>
-            ))}
-          </ol>
-        </div>
+        <aside aria-label="Price and payment" className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+          <Card as="section" aria-labelledby="order-price-heading" padding="md">
+            <h2 id="order-price-heading" className="mb-3 font-display text-xl font-semibold text-chocolate">
+              Price
+            </h2>
+            <PriceSummary totals={order.totals} locale={locale} totalLabel="Total" />
+          </Card>
+
+          <PaymentPanel
+            key={order.reference}
+            reference={order.reference}
+            awaitsPayment={order.awaitsPayment}
+            amountLabel={money(order.totals.total)}
+            returning={returning}
+            onOrderChanged={reloadOrder}
+          />
+        </aside>
       </div>
 
-      <section aria-labelledby="order-price-heading" className="mt-6 max-w-sm rounded-xl bg-slate-50 p-4">
-        <h2 id="order-price-heading" className="mb-2 text-lg font-semibold">
-          Price
-        </h2>
-        <PriceSummary totals={order.totals} locale={locale} totalLabel="Total" />
-      </section>
+      {/* Cancelling, restaurant requests and refunds are kept apart from paying. */}
+      <div className="mt-10 border-t border-line pt-2">
+        <CancellationPanel reference={order.reference} orderStatus={order.status} locale={locale} onOrderChanged={reloadOrder} />
+      </div>
 
-      <PaymentPanel
-        key={order.reference}
-        reference={order.reference}
-        awaitsPayment={order.awaitsPayment}
-        amountLabel={money(order.totals.total)}
-        returning={returning}
-        onOrderChanged={reloadOrder}
-      />
-
-      <CancellationPanel reference={order.reference} orderStatus={order.status} locale={locale} onOrderChanged={reloadOrder} />
-
-      <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-6">
-        <Link to="/order" className={LINK_CLASS}>
+      <div className="mt-10">
+        <Link to="/order" className={buttonClasses({ variant: 'secondary' })}>
           Start a new order
         </Link>
       </div>

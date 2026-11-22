@@ -4,8 +4,15 @@ import { fetchOrderingOptions, fetchOrders } from '../../features/ordering/api'
 import { describeOrderingError } from '../../features/ordering/errors'
 import { formatLocalTime } from '../../features/ordering/format'
 import { formatPlacedAt, paymentText } from '../../features/ordering/history'
-import { STATUS_LABELS } from '../../features/ordering/placement'
+import { OrderStatusBadges } from '../../features/ordering/OrderStatusBadges'
 import type { OrderSummary } from '../../features/ordering/types'
+import { Alert } from '../../components/ui/Alert'
+import { Button } from '../../components/ui/Button'
+import { buttonClasses } from '../../components/ui/buttonClasses'
+import { EmptyState } from '../../components/ui/EmptyState'
+import { Icon } from '../../components/ui/Icon'
+import { PageHeader } from '../../components/ui/PageHeader'
+import { Skeleton } from '../../components/ui/Skeleton'
 import { formatMoney } from '../../lib/format/money'
 
 type PageState =
@@ -14,10 +21,6 @@ type PageState =
   | { kind: 'error'; message: string }
 
 type MoreState = { kind: 'idle' } | { kind: 'loading' } | { kind: 'error'; message: string }
-
-const LINK_CLASS = 'rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700'
-const SECONDARY_BUTTON_CLASS =
-  'rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
 
 /**
  * /orders — the patron's order history (AC-12.1), newest first, a page at a time: when each order was placed, its
@@ -73,61 +76,98 @@ export function MyOrdersPage() {
   }
 
   return (
-    <section aria-labelledby="my-orders-heading" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <h1 id="my-orders-heading" className="text-2xl font-bold tracking-tight">
-        My orders
-      </h1>
+    <section aria-labelledby="my-orders-heading" className="mx-auto max-w-4xl">
+      <div>
+        <PageHeader
+          id="my-orders-heading"
+          title="My orders"
+          description={
+            state.kind === 'loaded' && state.orders.length > 0
+              ? `${state.orders.length === 1 ? '1 order' : `${state.orders.length} orders`}, newest first.`
+              : undefined
+          }
+          actions={
+            state.kind === 'loaded' && state.orders.length > 0 ? (
+              <Link to="/order" className={buttonClasses({ variant: 'secondary' })}>
+                Build Your Milkshake
+              </Link>
+            ) : undefined
+          }
+        />
+      </div>
 
       {state.kind === 'loading' && (
-        <p role="status" className="mt-4 text-sm text-slate-600">
-          Loading your orders…
-        </p>
+        <div className="mt-6 space-y-3">
+          <p role="status" className="sr-only">
+            Loading your orders…
+          </p>
+          {[0, 1, 2].map((key) => (
+            <div key={key} className="rounded-card border border-line bg-surface p-5 shadow-soft">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="mt-3 h-4 w-3/4" />
+              <Skeleton className="mt-2 h-4 w-1/2" />
+            </div>
+          ))}
+        </div>
       )}
 
       {state.kind === 'error' && (
-        <div role="alert" className="mt-4 rounded-lg bg-rose-50 p-4 text-sm text-rose-800">
+        <Alert tone="danger" role="alert" className="mt-6">
           <p>{state.message}</p>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => {
               setState({ kind: 'loading' })
               setMore({ kind: 'idle' })
               setAttempt((count) => count + 1)
             }}
-            className={`${SECONDARY_BUTTON_CLASS} mt-3`}
+            className="mt-3"
           >
             Try again
-          </button>
-        </div>
+          </Button>
+        </Alert>
       )}
 
       {state.kind === 'loaded' && state.orders.length === 0 && (
-        <div className="mt-4">
-          <p className="text-slate-600">You have not placed any orders yet.</p>
-          <Link to="/order" className={`${LINK_CLASS} mt-4 inline-block`}>
-            Start an order
-          </Link>
+        <div className="mt-6">
+          <EmptyState
+            title="No orders yet"
+            icon="receipt"
+            action={
+              <Link to="/order" className={buttonClasses()}>
+                Start an order
+              </Link>
+            }
+          >
+            You have not placed any orders yet.
+          </EmptyState>
         </div>
       )}
 
       {state.kind === 'loaded' && state.orders.length > 0 && (
         <>
-          <p className="mt-1 text-sm text-slate-600">
-            {state.orders.length === 1 ? '1 order' : `${state.orders.length} orders`}, newest first.
-          </p>
-          <ul className="mt-4 divide-y divide-slate-100">
+          {/* Cards on phones; one list in a single card from the md breakpoint. */}
+          <ul className="mt-6 space-y-3 md:space-y-0 md:divide-y md:divide-line md:overflow-hidden md:rounded-card md:border md:border-line md:bg-surface md:shadow-soft">
             {state.orders.map((order) => (
-              <li key={order.reference} className="flex flex-wrap items-start justify-between gap-3 py-3">
-                <div>
-                  <Link to={`/orders/${order.reference}`} className="font-semibold text-brand-700 underline">
+              <li
+                key={order.reference}
+                className="grid gap-3 rounded-card border border-line bg-surface p-4 shadow-soft md:grid-cols-[minmax(0,1fr)_auto] md:gap-6 md:rounded-none md:border-0 md:px-6 md:py-5 md:shadow-none"
+              >
+                <div className="min-w-0">
+                  <Link
+                    to={`/orders/${order.reference}`}
+                    className="inline-flex items-center gap-1 font-display text-lg font-semibold text-raspberry underline-offset-4 hover:underline"
+                  >
                     Order {order.reference}
+                    <Icon name="chevron-right" className="size-4" />
                   </Link>
-                  <p className="text-sm text-slate-600">Placed {formatPlacedAt(order.placedAtUtc, order.pickup.timeZone, state.locale)}</p>
-                  <p className="text-sm text-slate-600">
+                  <p className="text-sm text-warm-grey">Placed {formatPlacedAt(order.placedAtUtc, order.pickup.timeZone, state.locale)}</p>
+                  <p className="mt-2 text-sm text-chocolate">
                     {order.drinkCount === 1 ? '1 milkshake' : `${order.drinkCount} milkshakes`} · {order.restaurantName} · Pickup{' '}
                     {formatLocalTime(order.pickup.local, state.locale)}
                   </p>
-                  <ul aria-label={`Milkshakes in order ${order.reference}`} className="mt-1 list-disc pl-5 text-sm text-slate-700">
+                  <ul aria-label={`Milkshakes in order ${order.reference}`} className="mt-1 space-y-0.5 text-sm text-warm-grey">
                     {order.drinks.map((drink) => (
                       <li key={drink.number}>
                         {drink.flavour} · {drink.consistency} · {drink.topping}
@@ -135,39 +175,40 @@ export function MyOrdersPage() {
                     ))}
                   </ul>
                 </div>
-                <div className="text-right text-sm">
-                  <p className="font-medium">{formatMoney(order.total, order.currencyCode, state.locale)}</p>
-                  <p>
-                    {STATUS_LABELS[order.status]} · {paymentText(order)}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 md:flex-col md:items-end md:justify-start md:border-0 md:pt-0">
+                  <p className="font-display text-xl font-semibold text-chocolate tabular-nums">
+                    {formatMoney(order.total, order.currencyCode, state.locale)}
                   </p>
+                  <OrderStatusBadges status={order.status} payment={paymentText(order)} />
                 </div>
               </li>
             ))}
           </ul>
 
           {more.kind === 'error' && (
-            <p role="alert" className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">
+            <Alert tone="danger" role="alert" className="mt-4">
               {more.message}
-            </p>
+            </Alert>
           )}
 
-          {state.nextCursor !== null ? (
-            <button
-              type="button"
-              disabled={more.kind === 'loading'}
-              aria-busy={more.kind === 'loading'}
-              onClick={() => {
-                if (state.nextCursor !== null) {
-                  loadMore(state.nextCursor)
-                }
-              }}
-              className={`${SECONDARY_BUTTON_CLASS} mt-4`}
-            >
-              {more.kind === 'loading' ? 'Loading more orders…' : 'Load more orders'}
-            </button>
-          ) : (
-            <p className="mt-4 text-sm text-slate-600">That is all your orders.</p>
-          )}
+          <div className="mt-6 text-center">
+            {state.nextCursor !== null ? (
+              <Button
+                variant="secondary"
+                disabled={more.kind === 'loading'}
+                aria-busy={more.kind === 'loading'}
+                onClick={() => {
+                  if (state.nextCursor !== null) {
+                    loadMore(state.nextCursor)
+                  }
+                }}
+              >
+                {more.kind === 'loading' ? 'Loading more orders…' : 'Load more orders'}
+              </Button>
+            ) : (
+              <p className="text-sm text-warm-grey">That is all your orders.</p>
+            )}
+          </div>
         </>
       )}
     </section>

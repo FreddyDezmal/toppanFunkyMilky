@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { buttonClasses } from '../../components/ui/buttonClasses'
+import { Icon } from '../../components/ui/Icon'
 import { ApiError } from '../../lib/api/httpClient'
 import { refreshPayment, startPayment } from './api'
 import {
@@ -35,8 +37,8 @@ interface PaymentPanelProps {
   onOrderChanged: () => void
 }
 
-const BUTTON_CLASS = 'rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50'
-const SECONDARY_CLASS = 'rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50'
+const BUTTON_CLASS = buttonClasses({ size: 'lg', fullWidth: true })
+const SECONDARY_CLASS = buttonClasses({ variant: 'secondary', size: 'sm' })
 
 /**
  * Paying for an order (M8). "Pay now" asks the server to open a checkout and sends the browser only to Paystack's
@@ -159,13 +161,13 @@ export function PaymentPanel({ reference, awaitsPayment, amountLabel, returning,
   }
 
   return (
-    <section aria-labelledby="payment-heading" className="mt-6 max-w-xl rounded-xl border border-slate-200 p-4">
-      <h2 id="payment-heading" className="text-lg font-semibold">
+    <section aria-labelledby="payment-heading" className="rounded-card border border-line bg-surface p-5 shadow-soft">
+      <h2 id="payment-heading" className="font-display text-xl font-semibold text-chocolate">
         Payment
       </h2>
 
       {view.kind === 'checking' && (
-        <p role="status" className="mt-2 text-sm text-slate-700">
+        <p role="status" className="mt-2 text-sm text-chocolate">
           {PAYMENT_MESSAGES.checking}
         </p>
       )}
@@ -187,16 +189,17 @@ export function PaymentPanel({ reference, awaitsPayment, amountLabel, returning,
             aria-describedby="payment-help"
             className={BUTTON_CLASS}
           >
+            <Icon name="tag" className="size-5" />
             {view.kind === 'starting' ? 'Opening secure checkout…' : 'Pay now'}
           </button>
-          <p id="payment-help" className="mt-2 text-xs text-slate-600">
+          <p id="payment-help" className="mt-3 text-sm text-warm-grey">
             You will pay {amountLabel} on Paystack&rsquo;s secure page. We never see or store your card details. Your order is confirmed
             only once we have verified the payment.
           </p>
         </div>
       )}
       {view.kind === 'redirecting' && (
-        <p role="status" className="mt-2 text-sm text-slate-700">
+        <p role="status" className="mt-2 text-sm text-chocolate">
           Taking you to Paystack&rsquo;s secure checkout…
         </p>
       )}
@@ -208,15 +211,15 @@ function OutcomeMessage({ outcome, message }: { outcome: PaymentOutcome; message
   switch (outcome) {
     case 'paid':
       return (
-        <p role="status" className="mt-2 rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-900">
+        <p role="status" className="mt-3 rounded-control border border-pistachio bg-pistachio-tint p-3 text-sm font-semibold text-pistachio-deep">
           {PAYMENT_MESSAGES.paid}
         </p>
       )
     case 'failed':
       return (
-        <div role="alert" className="mt-2 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">
+        <div role="alert" className="mt-3 rounded-control border border-danger/30 bg-danger-tint p-3 text-sm text-danger">
           <p>{PAYMENT_MESSAGES.failed}</p>
-          {message && <p className="mt-1 text-xs">Paystack said: {message}</p>}
+          {message && <p className="mt-1">Paystack said: {message}</p>}
         </div>
       )
     case 'cancelled':
@@ -232,7 +235,9 @@ function Notice({ tone, message, action }: { tone: 'info' | 'error'; message: st
   return (
     <div
       role={tone === 'error' ? 'alert' : 'status'}
-      className={`mt-2 rounded-lg p-3 text-sm ${tone === 'error' ? 'bg-rose-50 text-rose-800' : 'bg-amber-50 text-amber-900'}`}
+      className={`mt-3 rounded-control border p-3 text-sm ${
+        tone === 'error' ? 'border-danger/30 bg-danger-tint text-danger' : 'border-warning/30 bg-warning-tint text-warning'
+      }`}
     >
       <p>{message}</p>
       {action && (

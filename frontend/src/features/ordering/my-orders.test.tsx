@@ -160,6 +160,25 @@ describe('My orders', () => {
     expect(await screen.findByRole('heading', { name: 'Order not found' })).toBeInTheDocument()
   })
 
+  it('shows order and payment status as separate labelled badges, never colour alone', async () => {
+    renderOrderingAt('/orders', {
+      [LIST]: () =>
+        jsonResponse(
+          page([
+            summary({ reference: 'MS-PEND-0001', status: 'PendingPayment', isPaid: false, awaitsPayment: true, paymentStatus: 'Unpaid' }),
+            summary({ reference: 'MS-RFND-0001', status: 'Cancelled', isPaid: false, paymentStatus: 'Cancelled', refundStatus: 'RefundFailed' }),
+          ]),
+        ),
+    })
+
+    const pending = (await screen.findByRole('link', { name: 'Order MS-PEND-0001' })).closest('li')!
+    expect(within(pending).getByText('Awaiting payment', { exact: true })).toBeInTheDocument()
+    expect(within(pending).getByText('Not paid', { exact: true })).toBeInTheDocument()
+    expect(pending).toHaveTextContent('Awaiting payment · Not paid')
+    const refund = screen.getByRole('link', { name: 'Order MS-RFND-0001' }).closest('li')!
+    expect(refund).toHaveTextContent('Cancelled · Refund failed')
+  })
+
   it('invites a patron without orders to start one', async () => {
     renderOrderingAt('/orders', { [LIST]: () => jsonResponse(page([])) })
 

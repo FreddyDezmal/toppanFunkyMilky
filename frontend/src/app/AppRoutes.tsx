@@ -46,10 +46,8 @@ export function AppRoutes() {
             <Route path="pickup" element={<OrderPickupPage />} />
             <Route path="review" element={<OrderReviewPage />} />
           </Route>
-          <Route element={<NarrowContent />}>
-            <Route path="orders" element={<MyOrdersPage />} />
-            <Route path="orders/:reference" element={<OrderDetailsPage />} />
-          </Route>
+          <Route path="orders" element={<MyOrdersPage />} />
+          <Route path="orders/:reference" element={<OrderDetailsPage />} />
         </Route>
 
         <Route element={<RequireAuth role={ROLES.manager} />}>

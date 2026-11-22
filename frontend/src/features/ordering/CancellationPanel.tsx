@@ -1,3 +1,4 @@
+import { buttonClasses } from '../../components/ui/buttonClasses'
 import { useEffect, useRef, useState } from 'react'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { formatMoney, formatPercent } from '../../lib/format/money'
@@ -17,8 +18,8 @@ interface CancellationPanelProps {
   onOrderChanged: () => void
 }
 
-const SECONDARY_CLASS = 'rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50'
-const DANGER_CLASS = 'rounded-lg border border-rose-300 bg-white px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50'
+const SECONDARY_CLASS = buttonClasses({ variant: 'secondary' })
+const DANGER_CLASS = buttonClasses({ variant: 'secondary', className: 'border-danger/50 text-danger hover:border-danger hover:bg-danger-tint' })
 
 /**
  * Cancelling an order and answering a manager's request (M8b). Every amount shown comes from the server: the browser
@@ -54,7 +55,7 @@ export function CancellationPanel({ reference, orderStatus, locale, onOrderChang
   }, [reference, orderStatus])
 
   if (!data) {
-    return loadFailed ? <p className="mt-6 text-sm text-slate-600">{CANCELLATION_MESSAGES.loadFailed}</p> : null
+    return loadFailed ? <p className="mt-6 text-sm text-warm-grey">{CANCELLATION_MESSAGES.loadFailed}</p> : null
   }
 
   const money = (amount: number) => formatMoney(amount, data.currencyCode, locale)
@@ -101,8 +102,12 @@ export function CancellationPanel({ reference, orderStatus, locale, onOrderChang
       {notice && (
         <div
           role={notice.tone === 'error' ? 'alert' : 'status'}
-          className={`mt-6 rounded-lg p-3 text-sm ${
-            notice.tone === 'success' ? 'bg-emerald-50 text-emerald-900' : notice.tone === 'warning' ? 'bg-amber-50 text-amber-900' : 'bg-rose-50 text-rose-800'
+          className={`mt-6 max-w-2xl rounded-control border p-3 text-sm ${
+            notice.tone === 'success'
+              ? 'border-pistachio bg-pistachio-tint text-pistachio-deep'
+              : notice.tone === 'warning'
+                ? 'border-warning/30 bg-warning-tint text-warning'
+                : 'border-danger/30 bg-danger-tint text-danger'
           }`}
         >
           {notice.text}
@@ -110,14 +115,14 @@ export function CancellationPanel({ reference, orderStatus, locale, onOrderChang
       )}
 
       {request && (
-        <section aria-labelledby="request-heading" className="mt-6 max-w-xl rounded-xl border border-amber-300 bg-amber-50 p-4">
-          <h2 id="request-heading" className="text-lg font-semibold text-amber-900">
+        <section aria-labelledby="request-heading" className="mt-6 max-w-2xl rounded-card border border-warning/30 bg-warning-tint p-5">
+          <h2 id="request-heading" className="font-display text-xl font-semibold text-warning">
             The restaurant has asked to cancel this order
           </h2>
-          <p className="mt-1 text-sm text-amber-900">
+          <p className="mt-1 text-sm text-warning">
             Reason: <q>{request.reason}</q>
           </p>
-          <p className="mt-2 text-sm text-amber-900">
+          <p className="mt-2 text-sm text-warning">
             {data.isPaid
               ? `If you accept, your order is cancelled and you get back everything you paid (${money(request.refundAmount)}), with no fee.`
               : 'If you accept, your order is cancelled. You have not paid, so nothing is charged.'}{' '}
@@ -140,13 +145,13 @@ export function CancellationPanel({ reference, orderStatus, locale, onOrderChang
       )}
 
       {data.refunds.length > 0 && (
-        <section aria-labelledby="refunds-heading" className="mt-6 max-w-xl">
-          <h2 id="refunds-heading" className="text-lg font-semibold">
+        <section aria-labelledby="refunds-heading" className="mt-6 max-w-2xl">
+          <h2 id="refunds-heading" className="font-display text-xl font-semibold text-chocolate">
             {data.refunds.length === 1 ? 'Refund' : 'Refunds'}
           </h2>
           <ul className="mt-1 space-y-2">
             {data.refunds.map((refund) => (
-              <li key={refund.reference} className="rounded-lg bg-slate-50 p-3 text-sm">
+              <li key={refund.reference} className="rounded-control border border-line bg-surface p-3 text-sm">
                 <RefundLine refund={refund} money={money} locale={locale} />
               </li>
             ))}
@@ -160,15 +165,15 @@ export function CancellationPanel({ reference, orderStatus, locale, onOrderChang
             Cancel order
           </button>
           {data.isPaid && (
-            <p className="mt-2 text-xs text-slate-600">
+            <p className="mt-2 max-w-2xl text-sm text-warm-grey">
               Cancelling keeps a fee of {formatPercent(data.feeRate, locale)} of the price before VAT; you get back {money(data.refundAmount)}.
             </p>
           )}
         </div>
       )}
-      {data.cannotCancelReason === 'PickupPassed' && <p className="mt-6 text-sm text-slate-600">{CANCELLATION_MESSAGES.pickupPassed}</p>}
+      {data.cannotCancelReason === 'PickupPassed' && <p className="mt-6 text-sm text-warm-grey">{CANCELLATION_MESSAGES.pickupPassed}</p>}
       {!data.canCancel && data.cannotCancelReason === null && data.isPaid && (
-        <p className="mt-6 text-sm text-slate-600">{CANCELLATION_MESSAGES.unavailable}</p>
+        <p className="mt-6 text-sm text-warm-grey">{CANCELLATION_MESSAGES.unavailable}</p>
       )}
 
       <ConfirmDialog
@@ -206,7 +211,7 @@ function RefundLine({ refund, money, locale }: { refund: RefundInfo; money: (amo
   }
   if (refund.status === 'Failed' || refund.needsAttention) {
     return (
-      <p className="text-rose-800">
+      <p className="text-danger">
         {`${what} – could not be completed automatically. ${CANCELLATION_MESSAGES.contactRestaurant}`}
       </p>
     )
