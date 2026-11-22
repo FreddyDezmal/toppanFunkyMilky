@@ -157,12 +157,17 @@ test('E2E-10 the audit trail of a paid and refunded order shows each change and 
   const orderId = /Orders #(\S+?)\)?$/m.exec((await created.locator('p').first().textContent()) ?? '')?.[1] ?? ''
   expect(orderId).not.toBe('')
 
+  // The search matches any part of a record id or a change (ILIKE), so with tests running in parallel it can also
+  // find other orders whose ids or values contain the same digits (seen on 22 Nov 2026: order #1x also matched #x1x).
+  // Entries are therefore pinned to this order: its own rows by record id, and related rows by the order id they hold.
   const trail = await auditSearch(manager, 'All changes', orderId)
   const entries = trail.getByRole('listitem')
-  await expect(entries.filter({ hasText: /^Added · Orders #/ })).toHaveCount(1)
-  await expect(entries.filter({ hasText: /^Added · Payments #/ }).first()).toBeVisible()
-  await expect(entries.filter({ hasText: /^Added · Refunds #/ })).toHaveCount(1)
-  const statusChanges = entries.filter({ hasText: /^Changed · Orders #/ })
+  const thisOrder = new RegExp(`^(Added|Changed) · Orders #${escape(orderId)}\\)?$`, 'm')
+  const holdsOrderId = manager.getByRole('cell', { name: orderId, exact: true })
+  await expect(entries.filter({ hasText: thisOrder }).filter({ hasText: /^Added · / })).toHaveCount(1)
+  await expect(entries.filter({ hasText: /^Added · Payments #/ }).filter({ has: holdsOrderId }).first()).toBeVisible()
+  await expect(entries.filter({ hasText: /^Added · Refunds #/ }).filter({ has: holdsOrderId })).toHaveCount(1)
+  const statusChanges = entries.filter({ hasText: thisOrder }).filter({ hasText: /^Changed · / })
   await expect(statusChanges.filter({ has: manager.getByRole('cell', { name: 'Confirmed', exact: true }) }).first()).toBeVisible()
   await expect(statusChanges.filter({ has: manager.getByRole('cell', { name: 'Cancelled', exact: true }) }).first()).toBeVisible()
   // Personal data is masked: the patron's email never appears in full.
@@ -170,7 +175,7 @@ test('E2E-10 the audit trail of a paid and refunded order shows each change and 
   await expectNoSeriousAccessibilityProblems(manager, 'Audit Lookup – all changes')
 
   // The refund was completed by the system (the verified Paystack notification), not by a person.
-  const refundRow = entries.filter({ hasText: /^Added · Refunds #/ }).first()
+  const refundRow = entries.filter({ hasText: /^Added · Refunds #/ }).filter({ has: holdsOrderId }).first()
   const refundId = /Refunds #(\S+?)\)?$/m.exec((await refundRow.locator('p').first().textContent()) ?? '')?.[1] ?? ''
   const refundChanges = await auditSearch(manager, 'All changes', refundId, 'Refunds')
   const processed = refundChanges.getByRole('listitem').filter({ has: manager.getByRole('cell', { name: 'Processed', exact: true }) }).first()
