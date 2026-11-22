@@ -162,12 +162,15 @@ test('E2E-10 the audit trail of a paid and refunded order shows each change and 
   // Entries are therefore pinned to this order: its own rows by record id, and related rows by the order id they hold.
   const trail = await auditSearch(manager, 'All changes', orderId)
   const entries = trail.getByRole('listitem')
-  const thisOrder = new RegExp(`^(Added|Changed) · Orders #${escape(orderId)}\\)?$`, 'm')
+  // Each entry starts with a line such as "Added · Orders #251" (its first paragraph); it is matched on its own,
+  // because the entry's whole text runs straight on into the date line.
+  const titled = (action: 'Added' | 'Changed') =>
+    entries.filter({ has: manager.getByText(new RegExp(`^${action} · Orders #${escape(orderId)}$`)) })
   const holdsOrderId = manager.getByRole('cell', { name: orderId, exact: true })
-  await expect(entries.filter({ hasText: thisOrder }).filter({ hasText: /^Added · / })).toHaveCount(1)
+  await expect(titled('Added')).toHaveCount(1)
   await expect(entries.filter({ hasText: /^Added · Payments #/ }).filter({ has: holdsOrderId }).first()).toBeVisible()
   await expect(entries.filter({ hasText: /^Added · Refunds #/ }).filter({ has: holdsOrderId })).toHaveCount(1)
-  const statusChanges = entries.filter({ hasText: thisOrder }).filter({ hasText: /^Changed · / })
+  const statusChanges = titled('Changed')
   await expect(statusChanges.filter({ has: manager.getByRole('cell', { name: 'Confirmed', exact: true }) }).first()).toBeVisible()
   await expect(statusChanges.filter({ has: manager.getByRole('cell', { name: 'Cancelled', exact: true }) }).first()).toBeVisible()
   // Personal data is masked: the patron's email never appears in full.
